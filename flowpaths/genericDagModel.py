@@ -58,11 +58,15 @@ class genericDagModel:
     def write_model(self, filename: str):
         self.solver.writeModel(filename)
 
-    def __get_solution_variables(self):
-
+    def check_solved(self):
+        
         if not self.solved:
             raise("Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
+
+    def __get_path_variables_values(self):
+
+        self.check_solved()
 
         varNames = self.solver.allVariableNames()
         varValues = self.solver.allVariableValues()
@@ -76,9 +80,9 @@ class genericDagModel:
                 self.edge_vars_sol[(u,v,i)] = int(varValues[index])
 
     def get_solution_paths(self) -> list:
-    
+
         if self.edge_vars_sol == {}:
-            self.__get_solution_variables()
+            self.__get_path_variables_values()
 
         paths = []
         for i in range(self.k):

@@ -4,7 +4,7 @@ import genericDagModel
 
 class modelMFD(genericDagModel.genericDagModel):
 
-    def __init__(self, G : stDiGraph, flow_attr: str, num_paths: int, \
+    def __init__(self, G : stDiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
                 edges_to_ignore: set = set(),\
                 threads: int = 4, \
                 time_limit: int = 300, \
@@ -21,8 +21,11 @@ class modelMFD(genericDagModel.genericDagModel):
         
         self.pi_vars = {}
         self.path_weights = {}
+        if weight_type not in [int, float]:
+            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
+        self.weight_type = weight_type
+    
         self.path_weights_sol = [0]*len(range(0,self.k))
-        self.spc_vars = {}
         
         # These methods are called from the super class genericDagModel
         self.create_solver()
@@ -45,8 +48,13 @@ class modelMFD(genericDagModel.genericDagModel):
             if data.get(self.flow_attr, 0) > self.w_max:
                 self.w_max = data.get(self.flow_attr, 0)
 
-        self.pi_vars        = self.solver.addVariables(self.edge_indexes, lb=0, ub=self.w_max, type=highspy.HighsVarType.kInteger, name_prefix='p')
-        self.path_weights   = self.solver.addVariables(self.path_indexes, lb=1, ub=self.w_max, type=highspy.HighsVarType.kInteger, name_prefix='w')
+        if self.weight_type == int:
+            wtype = highspy.HighsVarType.kInteger
+        elif self.weight_type == float:
+            wtype = highspy.HighsVarType.kContinuous
+        
+        self.pi_vars        = self.solver.addVariables(self.edge_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='p')
+        self.path_weights   = self.solver.addVariables(self.path_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='w')
 
         for u, v, data in self.G.edges(data=True):
             if (u,v) in self.edges_to_ignore:
@@ -62,9 +70,7 @@ class modelMFD(genericDagModel.genericDagModel):
 
     def __get_solution_weights(self) -> list:
 
-        if not self.solved:
-            raise("Model not solved. If you want to solve it, call the solve method first. \
-                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
+        self.check_solved()
         
         varNames = self.solver.allVariableNames()
         varValues = self.solver.allVariableValues()
@@ -72,14 +78,12 @@ class modelMFD(genericDagModel.genericDagModel):
         for index, var in enumerate(varNames):
             if var[0] == 'w':
                 weight_index = int(var[1:].strip())
-                self.path_weights_sol[weight_index] = int(varValues[index])
+                self.path_weights_sol[weight_index] = self.weight_type(varValues[index])
 
         return self.path_weights_sol
     
     def get_solution(self):
 
-        if not self.solved:
-            raise("Model not solved. If you want to solve it, call the solve method first. \
-                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
+        self.check_solved()
 
         return (self.get_solution_paths(), self.__get_solution_weights())
