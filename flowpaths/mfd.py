@@ -1,20 +1,24 @@
 import highspy
+import networkx as nx
 import stDiGraph
 import genericDagModel
 
 class modelMFD(genericDagModel.genericDagModel):
 
-    def __init__(self, G : stDiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
+    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
+                subpath_constraints: list = [], \
                 edges_to_ignore: set = set(),\
+                optimize_with_safe_paths: bool = False, \
+                optimize_with_safe_sequences: bool = True, \
                 threads: int = 4, \
                 time_limit: int = 300, \
                 presolve = "on", \
                 log_to_console = "false"):
-        super().__init__(G, num_paths, threads, time_limit, presolve, log_to_console)    
-    
-        self.G = G
+            
+        self.G = stDiGraph.stDiGraph(G)
         self.flow_attr = flow_attr
         self.k = num_paths
+        self.subpath_constraints = subpath_constraints
         self.edges_to_ignore = edges_to_ignore
         self.edges_to_ignore.update(self.G.source_edges)
         self.edges_to_ignore.update(self.G.sink_edges)
@@ -25,17 +29,36 @@ class modelMFD(genericDagModel.genericDagModel):
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
     
-        self.path_weights_sol = [0]*len(range(0,self.k))
+        self.path_weights_sol = []
+
+        # Call the constructor of the parent class genericDagModel
+        super().__init__(self.G, num_paths, \
+                         subpath_constraints = self.subpath_constraints, \
+                         optimize_with_safe_paths = optimize_with_safe_paths, \
+                         optimize_with_safe_sequences = optimize_with_safe_sequences, \
+                         trusted_edges_for_safety = self.get_non_zero_flow_edges(), \
+                         threads = threads, \
+                         time_limit = time_limit, \
+                         presolve = presolve, \
+                         log_to_console = log_to_console)  
         
-        # These methods are called from the super class genericDagModel
-        self.create_solver()
-        self.encode_paths()
+        # This method is called from the super class genericDagModel
+        self.create_solver_and_paths()
 
         # This method is called from the current class modelMFD
         self.encode_flow_decomposition()
 
         # From genericDagModel
-        self.write_model(f"mfd-model-{G.id}.lp")
+        self.write_model(f"mfd-model-{self.G.id}.lp")
+
+    def get_non_zero_flow_edges(self):
+        
+        non_zero_flow_edges = set()
+        for u, v, data in self.G.edges(data=True):
+            if (u,v) not in self.edges_to_ignore and data.get(self.flow_attr, 0) != 0:
+                non_zero_flow_edges.add((u,v))
+
+        return non_zero_flow_edges
 
     def encode_flow_decomposition(self):
         
@@ -45,8 +68,7 @@ class modelMFD(genericDagModel.genericDagModel):
                 continue
             if not self.flow_attr in data:
                 raise ValueError(f"Edge ({u},{v}) does not have the required flow attribute '{self.flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data.")
-            if data.get(self.flow_attr, 0) > self.w_max:
-                self.w_max = data.get(self.flow_attr, 0)
+            self.w_max = max(self.w_max, data[self.flow_attr])
 
         if self.weight_type == int:
             wtype = highspy.HighsVarType.kInteger
@@ -59,7 +81,7 @@ class modelMFD(genericDagModel.genericDagModel):
         for u, v, data in self.G.edges(data=True):
             if (u,v) in self.edges_to_ignore:
                 continue
-            f_u_v = data.get(self.flow_attr, 0)
+            f_u_v = data[self.flow_attr]
 
             for i in range(self.k):
                 self.solver.addConstr( self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max                                  , "10e_u={}_v={}_i={}".format(u,v,i) )
@@ -74,6 +96,7 @@ class modelMFD(genericDagModel.genericDagModel):
         
         varNames = self.solver.allVariableNames()
         varValues = self.solver.allVariableValues()
+        self.path_weights_sol = [0]*len(range(0,self.k))
 
         for index, var in enumerate(varNames):
             if var[0] == 'w':

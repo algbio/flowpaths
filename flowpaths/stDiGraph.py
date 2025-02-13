@@ -8,7 +8,10 @@ class stDiGraph(nx.DiGraph):
                  additional_ends: list = []):
         super().__init__()
         self.base_graph             = base_graph
-        self.id                     = base_graph.graph['id']
+        if 'id' in base_graph.graph:
+            self.id                     = base_graph.graph['id']
+        else:
+            self.id                     = id(self)
         self.additional_starts      = set(additional_starts)
         self.additional_ends        = set(additional_ends)
         self.source                 = f"source_{id(self)}"
@@ -72,7 +75,7 @@ class stDiGraph(nx.DiGraph):
                 if minFlow[u][v] > demand[(u,v)]:
                     DFS_find_saturating(v, visited)
                 elif minFlow[u][v] == demand[(u,v)] and demand[(u,v)]>=1 and visited[v]==0:
-                    antichain.append((u-1,v-1))
+                    antichain.append((u,v))
             for v in self.predecessors(u):
                 DFS_find_saturating(v,visited)
 
