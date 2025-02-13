@@ -57,8 +57,6 @@ class genericDAGModel:
         if optimize_with_safe_paths and optimize_with_safe_sequences:
             raise ValueError("Cannot optimize with both safe paths and safe sequences")
 
-
-
     def create_solver_and_paths(self):
         if self.external_solution_paths != None:
             return

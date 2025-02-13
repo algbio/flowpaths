@@ -4,7 +4,7 @@ import networkx as nx
 import stDiGraph
 import genericDAGModel
 
-class modelMFD(genericDAGModel.genericDAGModel):
+class modelFD(genericDAGModel.genericDAGModel):
 
     def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
                 subpath_constraints: list = [], \
@@ -200,7 +200,7 @@ class modelMFD(genericDAGModel.genericDAGModel):
 
         for (u, v, data) in self.G.edges(data=True):
             if self.flow_attr in data:
-                if flow_from_paths[(u, v)] != data[self.flow_attr]:
+                if flow_from_paths[(u, v)] != data[self.flow_attr]: # TODO: add tolerance here?
                     return False
 
         return True
@@ -259,3 +259,73 @@ class modelMFD(genericDAGModel.genericDAGModel):
             weights.append(bottleneck)
             
         return (paths, weights)
+    
+
+class modelMFD:
+    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = int,\
+                subpath_constraints: list = [], \
+                edges_to_ignore: set = set(),\
+                optimize_with_safe_paths: bool = False, \
+                optimize_with_safe_sequences: bool = True, \
+                optimize_with_greedy: bool = False, \
+                threads: int = 4, \
+                time_limit: int = 300, \
+                presolve = "on", \
+                log_to_console = "false"):
+        
+        stG = stDiGraph.stDiGraph(G)
+        self.lowerbound = stG.width
+
+        self.G = G
+        self.flow_attr = flow_attr
+        self.weight_type = weight_type
+        self.subpath_constraints = subpath_constraints
+        self.edges_to_ignore = edges_to_ignore
+        self.optimize_with_safe_paths = optimize_with_safe_paths
+        self.optimize_with_safe_sequences = optimize_with_safe_sequences
+        self.optimize_with_greedy = optimize_with_greedy
+        self.threads = threads
+        self.time_limit = time_limit
+        self.presolve = presolve
+        self.log_to_console = log_to_console
+        self.solve_statistics = {}
+        self.solution = None
+        self.solved = False
+
+
+    def solve(self) -> bool:
+        start_time = time.time()
+        for i in range(self.lowerbound, self.G.number_of_edges()):
+            fd_model = modelFD(G = self.G, flow_attr = self.flow_attr, num_paths = i, weight_type = self.weight_type, \
+                subpath_constraints = self.subpath_constraints, \
+                edges_to_ignore = self.edges_to_ignore, \
+                optimize_with_safe_paths = self.optimize_with_safe_paths, \
+                optimize_with_safe_sequences = self.optimize_with_safe_sequences, \
+                optimize_with_greedy = self.optimize_with_greedy, \
+                threads = self.threads, \
+                time_limit = self.time_limit, \
+                presolve = self.presolve, \
+                log_to_console = self.log_to_console)
+            
+            fd_model.solve()
+
+            if fd_model.solved:
+                self.solution = fd_model.get_solution()
+                self.solved = True
+                self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+                return True
+        return False
+    
+    def get_solution(self):
+        
+        self.check_solved()
+        return self.solution
+    
+    def check_solved(self):       
+        if not self.solved or self.solution is None:
+            raise("Model not solved. If you want to solve it, call the solve method first. \
+                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
+
+ 
+                
+ 
