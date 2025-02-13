@@ -1,6 +1,7 @@
 import highspy
 import stDiGraph
 import safety
+import time
 
 # TODO
 # - optimize using safe sequences by fixing variables
@@ -16,16 +17,24 @@ class genericDagModel:
                 time_limit: int = 300, \
                 presolve = "on", \
                 log_to_console = "false"):
+        
         self.G = G
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
-        
+        self.solve_statistics = {}
+
         # optimizations
         self.safe_lists = None
         if optimize_with_safe_paths:
+            start_time = time.time()
             self.safe_lists = safety.safe_paths(self.G, trusted_edges_for_safety, no_duplicates=False)
+            self.solve_statistics["safe_paths_time"] = time.time() - start_time
+
         if optimize_with_safe_sequences:
+            start_time = time.time()
             self.safe_lists = safety.safe_sequences(self.G, trusted_edges_for_safety, no_duplicates=False)
+            self.solve_statistics["safe_sequences_time"] = time.time() - start_time
+
         # some checks
         if self.safe_lists != None and trusted_edges_for_safety == None:
             raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")
@@ -102,26 +111,19 @@ class genericDagModel:
 
         len_of_longest_safe_list = {edge: len(self.safe_lists[longest_safe_list[edge]]) for edge in longest_safe_list}
 
-        print("self.safe_lists")
-        print(self.safe_lists)
-
-        print("longest_safe_list")
-        print(longest_safe_list)
-
-        print("len_of_longest_safe_list")
-        print(len_of_longest_safe_list)
-
         _, edge_antichain = self.G.compute_max_edge_antichain(get_antichain=True, weight_function=len_of_longest_safe_list)
         
         paths_to_fix      = list(map(lambda edge : self.safe_lists[longest_safe_list[edge]] , edge_antichain))
 
-        print("Edge antichain:", edge_antichain)
-        print("Paths to fix:", paths_to_fix)
-
         return paths_to_fix
 
     def solve(self) -> bool:
+
+        start_time = time.time()
         self.solver.run()
+        self.solve_statistics["milp_solve_time"] = time.time() - start_time
+
+        self.solve_statistics["milp_solver_status"] = self.solver.getModelStatus().name
         
         if self.solver.getModelStatus() == highspy.HighsModelStatus.kOptimal:
             self.solved = True

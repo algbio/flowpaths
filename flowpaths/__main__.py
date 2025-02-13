@@ -91,8 +91,7 @@ if __name__ == "__main__":
         # print("Safe paths of G:", safety.safe_paths_of_base_edges(G, no_duplicates=True))
         # print("Safe seqeunces of G:", safety.safe_sequences_of_base_edges(G, no_duplicates=True))
 
-        mfd_model_G = mfd.modelMFD(base_graph, num_paths=2, flow_attr='flow', weight_type=float, \
-                                   subpath_constraints=[[(1, 2), (2, 4)], [(1, 3), (3, 4)]], \
+        mfd_model_G = mfd.modelMFD(base_graph, num_paths=15, flow_attr='flow', weight_type=float, \
                                    optimize_with_safe_paths=False, \
                                    optimize_with_safe_sequences=True, \
                                    presolve = "on")
@@ -102,6 +101,8 @@ if __name__ == "__main__":
             print("MFD solution:")
             print(weights)
             print(paths)
+            print(mfd_model_G.solve_statistics)
+            print("Is correct solution", mfd_model_G.check_solution())
         else:
             print("Model not solved")
 

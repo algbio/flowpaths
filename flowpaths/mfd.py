@@ -29,7 +29,8 @@ class modelMFD(genericDagModel.genericDagModel):
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
     
-        self.path_weights_sol = []
+        self.path_weights_sol = None
+        self.solution = None
 
         # Call the constructor of the parent class genericDagModel
         super().__init__(self.G, num_paths, \
@@ -111,5 +112,30 @@ class modelMFD(genericDagModel.genericDagModel):
     def get_solution(self):
 
         self.check_solved()
+        self.solution = (self.get_solution_paths(), self.__get_solution_weights())
 
-        return (self.get_solution_paths(), self.__get_solution_weights())
+        if not self.check_solution():
+            raise(AssertionError("Something went wrong. The solution returned by the MILP solver is not a flow decomposition."))
+
+        return self.solution
+    
+    def check_solution(self):
+
+        if self.solution is None:
+            raise(ValueError("Solution is not available. Call get_solution() first."))
+
+        solution_weights = self.solution[1]
+        solution_paths = self.solution[0]
+        solution_paths_of_edges = [[(path[i],path[i+1]) for i in range(len(path)-1)] for path in solution_paths]
+
+        flow_from_paths = {(u,v):0 for (u,v) in self.G.edges()}
+        for weight, path in zip(solution_weights, solution_paths_of_edges):
+            for e in path:
+                flow_from_paths[e] += weight
+
+        for (u, v, data) in self.G.edges(data=True):
+            if self.flow_attr in data:
+                if flow_from_paths[(u, v)] != data[self.flow_attr]:
+                    return False
+
+        return True
