@@ -81,8 +81,8 @@ if __name__ == "__main__":
     for base_graph in graphs:
         G = graph.stDiGraph(base_graph)
         
-        print("Nodes:", G.nodes())
-        print("Edges:", G.edges(data=True))
+        # print("Nodes:", G.nodes())
+        # print("Edges:", G.edges(data=True))
         print("Width:", G.width)
         # print("Source edges:", G.source_edges)
         # print("Sink edges:", G.sink_edges)
@@ -94,6 +94,7 @@ if __name__ == "__main__":
         mfd_model_G = mfd.modelMFD(base_graph, num_paths=15, flow_attr='flow', weight_type=float, \
                                    optimize_with_safe_paths=False, \
                                    optimize_with_safe_sequences=True, \
+                                   optimize_with_greedy=False, \
                                    presolve = "on")
         mfd_model_G.solve()
         if mfd_model_G.solved:
@@ -102,8 +103,6 @@ if __name__ == "__main__":
             print(weights)
             print(paths)
             print(mfd_model_G.solve_statistics)
-            print("Is correct solution", mfd_model_G.check_solution())
-            print("Max bottleneck decomposition size: ", len(mfd_model_G.decompose_using_max_bottleck()[1]))
         else:
             print("Model not solved")
 

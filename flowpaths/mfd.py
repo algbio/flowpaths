@@ -1,4 +1,5 @@
 import highspy
+import time
 import networkx as nx
 import stDiGraph
 import genericDagModel
@@ -10,15 +11,25 @@ class modelMFD(genericDagModel.genericDagModel):
                 edges_to_ignore: set = set(),\
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = True, \
+                optimize_with_greedy: bool = False, \
                 threads: int = 4, \
                 time_limit: int = 300, \
                 presolve = "on", \
                 log_to_console = "false"):
             
-        self.G = stDiGraph.stDiGraph(G)
+        if weight_type not in [int, float]:
+            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
+        self.weight_type = weight_type
 
+        # Check requirements on input graph:
+        # Check flow conservation
         if not self.check_flow_conservation(G, flow_attr):
             raise( ValueError("The graph G does not satisfy flow conservation."))
+
+        # Check that the flow is positive and get max flow value
+        self.w_max = self.weight_type(self.get_max_flow_value_and_check_positive_flow(G, flow_attr, edges_to_ignore))
+
+        self.G = stDiGraph.stDiGraph(G)
     
         self.flow_attr = flow_attr
         self.k = num_paths
@@ -26,29 +37,36 @@ class modelMFD(genericDagModel.genericDagModel):
         self.edges_to_ignore = edges_to_ignore
         self.edges_to_ignore.update(self.G.source_edges)
         self.edges_to_ignore.update(self.G.sink_edges)
-        
-        self.pi_vars = {}
-        self.path_weights = {}
-        if weight_type not in [int, float]:
-            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
-        self.weight_type = weight_type
 
-        self.w_max = self.weight_type(self.get_max_flow_value(G, flow_attr, self.edges_to_ignore))
+        self.pi_vars = {}
+        self.path_weights_vars = {}
     
         self.path_weights_sol = None
         self.solution = None
+
+        external_solution_paths = None
+        self.solve_statistics = {}
+        if optimize_with_greedy:
+            if self.get_solution_with_greedy():
+                external_solution_paths = self.solution[0]
 
         # Call the constructor of the parent class genericDagModel
         super().__init__(self.G, num_paths, \
                          subpath_constraints = self.subpath_constraints, \
                          optimize_with_safe_paths = optimize_with_safe_paths, \
                          optimize_with_safe_sequences = optimize_with_safe_sequences, \
+                         external_solution_paths = external_solution_paths, \
                          trusted_edges_for_safety = self.get_non_zero_flow_edges(), \
+                         solve_statistics = self.solve_statistics, \
                          threads = threads, \
                          time_limit = time_limit, \
                          presolve = presolve, \
                          log_to_console = log_to_console)  
         
+        # If already solved with a previous method, we don't create solver, not add paths
+        if self.solved:
+            return
+
         # This method is called from the super class genericDagModel
         self.create_solver_and_paths()
 
@@ -58,7 +76,21 @@ class modelMFD(genericDagModel.genericDagModel):
         # From genericDagModel
         self.write_model(f"mfd-model-{self.G.id}.lp")
 
-    def get_max_flow_value(self, G: nx.DiGraph, flow_attr: str, edges_to_ignore: list = []):
+    def get_solution_with_greedy(self):
+        
+        start_time = time.time()
+        (paths, weights) = self.decompose_using_max_bottleck()
+        if len(paths) <= self.k:
+            self.solution = (paths, weights)
+            self.solved = True
+            self.solve_statistics = {}
+            self.solve_statistics["greedy_solve_time"] = time.time() - start_time
+            return True
+        
+        return False
+
+    # This function also checks that the flow is positive
+    def get_max_flow_value_and_check_positive_flow(self, G: nx.DiGraph, flow_attr: str, edges_to_ignore: list = []):
 
         w_max = float('-inf')   
 
@@ -67,9 +99,24 @@ class modelMFD(genericDagModel.genericDagModel):
                 continue
             if not flow_attr in data:
                 raise ValueError(f"Edge ({u},{v}) does not have the required flow attribute '{self.flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data.")
+            if data[flow_attr] < 0:
+                raise ValueError(f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0.")
             w_max = max(w_max, data[flow_attr])
 
         return w_max
+    
+    def check_flow_conservation(self, G: nx.DiGraph, flow_attr) -> bool:
+        
+        for v in G.nodes():
+            if G.out_degree(v) == 0 or G.in_degree(v) == 0:
+                continue
+            out_flow = sum(flow for (v,w,flow) in G.out_edges(v, data=flow_attr))
+            in_flow  = sum(flow for (u,v,flow) in G.in_edges(v, data=flow_attr))
+            
+            if out_flow != in_flow:
+                return False
+            
+        return True
 
     def get_non_zero_flow_edges(self):
         
@@ -82,13 +129,17 @@ class modelMFD(genericDagModel.genericDagModel):
 
     def encode_flow_decomposition(self):
 
+        # If already solved, no need to encode further
+        if self.solved:
+            return
+
         if self.weight_type == int:
             wtype = highspy.HighsVarType.kInteger
         elif self.weight_type == float:
             wtype = highspy.HighsVarType.kContinuous
         
-        self.pi_vars        = self.solver.addVariables(self.edge_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='p')
-        self.path_weights   = self.solver.addVariables(self.path_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='w')
+        self.pi_vars            = self.solver.addVariables(self.edge_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='p')
+        self.path_weights_vars  = self.solver.addVariables(self.path_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='w')
 
         for u, v, data in self.G.edges(data=True):
             if (u,v) in self.edges_to_ignore:
@@ -97,8 +148,8 @@ class modelMFD(genericDagModel.genericDagModel):
 
             for i in range(self.k):
                 self.solver.addConstr( self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max                                  , "10e_u={}_v={}_i={}".format(u,v,i) )
-                self.solver.addConstr( self.pi_vars[(u,v,i)] <= self.path_weights[(i)]                                                , "10f_u={}_v={}_i={}".format(u,v,i) )
-                self.solver.addConstr( self.pi_vars[(u,v,i)] >= self.path_weights[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max   , "10g_u={}_v={}_i={}".format(u,v,i) )
+                self.solver.addConstr( self.pi_vars[(u,v,i)] <= self.path_weights_vars[(i)]                                                , "10f_u={}_v={}_i={}".format(u,v,i) )
+                self.solver.addConstr( self.pi_vars[(u,v,i)] >= self.path_weights_vars[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max   , "10g_u={}_v={}_i={}".format(u,v,i) )
 
             self.solver.addConstr( sum(self.pi_vars[(u,v,i)] for i in range(self.k)) == f_u_v                    , "10d_u={}_v={}_i={}".format(u,v,i) )
 
@@ -121,6 +172,9 @@ class modelMFD(genericDagModel.genericDagModel):
         return self.path_weights_sol
     
     def get_solution(self):
+
+        if self.solution is not None:
+            return self.solution
 
         self.check_solved()
         self.solution = (self.get_solution_paths(), self.__get_solution_weights())
@@ -151,19 +205,6 @@ class modelMFD(genericDagModel.genericDagModel):
 
         return True
     
-    def check_flow_conservation(self, G: nx.DiGraph, flow_attr) -> bool:
-        
-        for v in G.nodes():
-            if G.out_degree(v) == 0 or G.in_degree(v) == 0:
-                continue
-            out_flow = sum(flow for (v,w,flow) in G.out_edges(v, data=flow_attr))
-            in_flow  = sum(flow for (u,v,flow) in G.in_edges(v, data=flow_attr))
-            
-            if out_flow != in_flow:
-                return False
-            
-        return True
-
     def maxBottleckPath(self, G: nx.DiGraph):
         B = dict()
         maxInNeighbor = dict()
@@ -200,8 +241,6 @@ class modelMFD(genericDagModel.genericDagModel):
         
         paths = list()
         weights = list()
-        # Making a copy of flowDict, otherwise the changes we make in this function 
-        # will carry over to the global variable flowDict
         
         temp_G = nx.DiGraph()
         temp_G.add_nodes_from(self.G.nodes())

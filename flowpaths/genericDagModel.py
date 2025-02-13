@@ -13,6 +13,8 @@ class genericDagModel:
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = False, \
                 trusted_edges_for_safety: set = None, \
+                external_solution_paths: list = None, \
+                solve_statistics: dict = {}, \
                 threads: int = 4, \
                 time_limit: int = 300, \
                 presolve = "on", \
@@ -21,16 +23,30 @@ class genericDagModel:
         self.G = G
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
-        self.solve_statistics = {}
+        self.solve_statistics = solve_statistics
+        self.edge_vars = {}
+        self.edge_vars_sol = {}
+        self.subpaths_vars    = {}
+
+        self.threads = threads
+        self.time_limit = time_limit
+        self.presolve = presolve
+        self.log_to_console = log_to_console
+
+        self.external_solution_paths = external_solution_paths
+        if self.external_solution_paths == None:
+            self.solved = None
+        else:
+            self.solved = True
 
         # optimizations
         self.safe_lists = None
-        if optimize_with_safe_paths:
+        if optimize_with_safe_paths and not self.solved:
             start_time = time.time()
             self.safe_lists = safety.safe_paths(self.G, trusted_edges_for_safety, no_duplicates=False)
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
-        if optimize_with_safe_sequences:
+        if optimize_with_safe_sequences and not self.solved:
             start_time = time.time()
             self.safe_lists = safety.safe_sequences(self.G, trusted_edges_for_safety, no_duplicates=False)
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
@@ -41,17 +57,12 @@ class genericDagModel:
         if optimize_with_safe_paths and optimize_with_safe_sequences:
             raise ValueError("Cannot optimize with both safe paths and safe sequences")
 
-        self.edge_vars = {}
-        self.edge_vars_sol = {}
-        self.subpaths_vars    = {}
-        self.solved = None
 
-        self.threads = threads
-        self.time_limit = time_limit
-        self.presolve = presolve
-        self.log_to_console = log_to_console
 
     def create_solver_and_paths(self):
+        if self.external_solution_paths != None:
+            return
+        
         self.solver = highspy.Highs()
         self.solver.setOptionValue("threads", self.threads)
         self.solver.setOptionValue("time_limit", self.time_limit)
@@ -119,6 +130,10 @@ class genericDagModel:
 
     def solve(self) -> bool:
 
+        if self.external_solution_paths != None:
+            self.solved = True
+            return True
+
         start_time = time.time()
         self.solver.run()
         self.solve_statistics["milp_solve_time"] = time.time() - start_time
@@ -156,6 +171,9 @@ class genericDagModel:
                 self.edge_vars_sol[(u,v,i)] = round(varValues[index]) # TODO: check if we can add tolerance here, how does it work with other solvers?
 
     def get_solution_paths(self) -> list:
+
+        if self.external_solution_paths != None:
+            return self.external_solution_paths
 
         if self.edge_vars_sol == {}:
             self.__get_path_variables_values()
