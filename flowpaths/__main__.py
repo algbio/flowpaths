@@ -103,6 +103,7 @@ if __name__ == "__main__":
             print(paths)
             print(mfd_model_G.solve_statistics)
             print("Is correct solution", mfd_model_G.check_solution())
+            print("Max bottleneck decomposition size: ", len(mfd_model_G.decompose_using_max_bottleck()[1]))
         else:
             print("Model not solved")
 

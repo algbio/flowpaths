@@ -19,7 +19,7 @@ class modelMFD(genericDagModel.genericDagModel):
 
         if not self.check_flow_conservation(G, flow_attr):
             raise( ValueError("The graph G does not satisfy flow conservation."))
-
+    
         self.flow_attr = flow_attr
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
@@ -32,6 +32,8 @@ class modelMFD(genericDagModel.genericDagModel):
         if weight_type not in [int, float]:
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
+
+        self.w_max = self.weight_type(self.get_max_flow_value(G, flow_attr, self.edges_to_ignore))
     
         self.path_weights_sol = None
         self.solution = None
@@ -56,6 +58,19 @@ class modelMFD(genericDagModel.genericDagModel):
         # From genericDagModel
         self.write_model(f"mfd-model-{self.G.id}.lp")
 
+    def get_max_flow_value(self, G: nx.DiGraph, flow_attr: str, edges_to_ignore: list = []):
+
+        w_max = float('-inf')   
+
+        for u, v, data in G.edges(data=True):
+            if (u,v) in edges_to_ignore:
+                continue
+            if not flow_attr in data:
+                raise ValueError(f"Edge ({u},{v}) does not have the required flow attribute '{self.flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data.")
+            w_max = max(w_max, data[flow_attr])
+
+        return w_max
+
     def get_non_zero_flow_edges(self):
         
         non_zero_flow_edges = set()
@@ -66,14 +81,6 @@ class modelMFD(genericDagModel.genericDagModel):
         return non_zero_flow_edges
 
     def encode_flow_decomposition(self):
-        
-        self.w_max = 0
-        for u, v, data in self.G.edges(data=True):
-            if (u,v) in self.edges_to_ignore:
-                continue
-            if not self.flow_attr in data:
-                raise ValueError(f"Edge ({u},{v}) does not have the required flow attribute '{self.flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data.")
-            self.w_max = max(self.w_max, data[self.flow_attr])
 
         if self.weight_type == int:
             wtype = highspy.HighsVarType.kInteger
@@ -156,3 +163,60 @@ class modelMFD(genericDagModel.genericDagModel):
                 return False
             
         return True
+
+    def maxBottleckPath(self, G: nx.DiGraph):
+        B = dict()
+        maxInNeighbor = dict()
+        maxBottleneckSink = None
+
+        # Computing the B values with DP
+        for v in nx.topological_sort(G):
+            if G.in_degree(v) == 0:
+                B[v] = float('inf')
+            else:
+                B[v] = float('-inf')
+                for u in G.predecessors(v):
+                    uBottleneck = min(B[u], G.edges[u,v][self.flow_attr])
+                    if uBottleneck > B[v]:
+                        B[v] = uBottleneck 
+                        maxInNeighbor[v] = u
+                if G.out_degree(v) == 0:
+                    if maxBottleneckSink is None or B[v] > B[maxBottleneckSink]:
+                        maxBottleneckSink = v
+
+        
+        # If no s-t flow exists in the network
+        if B[maxBottleneckSink] == 0:
+            return None, None
+        
+        # Recovering the path of maximum bottleneck
+        reverse_path = [maxBottleneckSink]
+        while G.in_degree(reverse_path[-1]) > 0:
+            reverse_path.append(maxInNeighbor[reverse_path[-1]])
+
+        return B[maxBottleneckSink], list(reversed(reverse_path))
+    
+    def decompose_using_max_bottleck(self):
+        
+        paths = list()
+        weights = list()
+        # Making a copy of flowDict, otherwise the changes we make in this function 
+        # will carry over to the global variable flowDict
+        
+        temp_G = nx.DiGraph()
+        temp_G.add_nodes_from(self.G.nodes())
+        temp_G.add_edges_from(self.G.edges(data=True))
+        temp_G.remove_nodes_from([self.G.source, self.G.sink])
+        
+        while True:
+            bottleneck, path = self.maxBottleckPath(temp_G)
+            if path is None:
+                break
+                
+            for i in range(len(path)-1):
+                temp_G[path[i]][path[i+1]][self.flow_attr] -= bottleneck
+            
+            paths.append(path)
+            weights.append(bottleneck)
+            
+        return (paths, weights)
