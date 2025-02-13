@@ -6,7 +6,7 @@ import genericDagModel
 class modelMFD(genericDagModel.genericDagModel):
 
     def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
-                subpath_constraints: list = None, \
+                subpath_constraints: list = [], \
                 edges_to_ignore: set = set(),\
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = True, \
@@ -101,7 +101,10 @@ class modelMFD(genericDagModel.genericDagModel):
         for index, var in enumerate(varNames):
             if var[0] == 'w':
                 weight_index = int(var[1:].strip())
-                self.path_weights_sol[weight_index] = self.weight_type(varValues[index])
+                if self.weight_type == int:
+                    self.path_weights_sol[weight_index] = round(varValues[index]) # TODO: check if we can add tolerance here, how does it work with other solvers?
+                elif self.weight_type == float:
+                    self.path_weights_sol[weight_index] = float(varValues[index])
 
         return self.path_weights_sol
     
