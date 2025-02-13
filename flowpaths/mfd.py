@@ -2,9 +2,9 @@ import highspy
 import time
 import networkx as nx
 import stDiGraph
-import genericDagModel
+import genericDAGModel
 
-class modelMFD(genericDagModel.genericDagModel):
+class modelMFD(genericDAGModel.genericDAGModel):
 
     def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
                 subpath_constraints: list = [], \

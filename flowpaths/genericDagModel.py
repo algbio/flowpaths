@@ -6,7 +6,7 @@ import time
 # TODO
 # - optimize using safe sequences by fixing variables
 
-class genericDagModel:
+class genericDAGModel:
 
     def __init__(self, G : stDiGraph, num_paths: int, \
                 subpath_constraints: list = None, \
