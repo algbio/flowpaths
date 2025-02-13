@@ -16,6 +16,10 @@ class modelMFD(genericDagModel.genericDagModel):
                 log_to_console = "false"):
             
         self.G = stDiGraph.stDiGraph(G)
+
+        if not self.check_flow_conservation(G, flow_attr):
+            raise( ValueError("The graph G does not satisfy flow conservation."))
+
         self.flow_attr = flow_attr
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
@@ -138,4 +142,17 @@ class modelMFD(genericDagModel.genericDagModel):
                 if flow_from_paths[(u, v)] != data[self.flow_attr]:
                     return False
 
+        return True
+    
+    def check_flow_conservation(self, G: nx.DiGraph, flow_attr) -> bool:
+        
+        for v in G.nodes():
+            if G.out_degree(v) == 0 or G.in_degree(v) == 0:
+                continue
+            out_flow = sum(flow for (v,w,flow) in G.out_edges(v, data=flow_attr))
+            in_flow  = sum(flow for (u,v,flow) in G.in_edges(v, data=flow_attr))
+            
+            if out_flow != in_flow:
+                return False
+            
         return True
