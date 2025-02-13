@@ -8,7 +8,7 @@ import safety
 class genericDagModel:
 
     def __init__(self, G : stDiGraph, num_paths: int, \
-                subpath_constraints: list = [], \
+                subpath_constraints: list = None, \
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = False, \
                 trusted_edges_for_safety: set = None, \
@@ -75,7 +75,7 @@ class genericDagModel:
                                        sum(self.edge_vars[(v, w, i)] for w in self.G.successors(v)) == 0, "10c_v={}_i={}".format(v,i) )        
         
         #Example of a subpath constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 paths to cover, the first one is 1-3-5. the second path is just a single edge 0-1
-        if self.subpath_constraints != []:
+        if self.subpath_constraints:
             for i in range(self.k):
                 for j in range(len(self.subpath_constraints)):
                     edgevars_on_subpath = list(map(lambda e: self.edge_vars[(e[0],e[1],i)], self.subpath_constraints[j]))
@@ -151,7 +151,7 @@ class genericDagModel:
                 u = elements[1].strip(' \'')
                 v = elements[2].strip(' \'')
                 i = int(elements[3].strip())
-                self.edge_vars_sol[(u,v,i)] = int(varValues[index])
+                self.edge_vars_sol[(u,v,i)] = round(varValues[index]) # TODO: check if we can add tolerance here, how does it work with other solvers?
 
     def get_solution_paths(self) -> list:
 

@@ -6,7 +6,7 @@ import genericDagModel
 class modelMFD(genericDagModel.genericDagModel):
 
     def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
-                subpath_constraints: list = [], \
+                subpath_constraints: list = None, \
                 edges_to_ignore: set = set(),\
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = True, \
