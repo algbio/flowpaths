@@ -3,19 +3,23 @@ import time
 import networkx as nx
 import stDiGraph
 import genericDAGModel
+import solverWrapper
+
+TOLERANCE = 0.001
 
 class modelFD(genericDAGModel.genericDAGModel):
 
-    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int,\
+    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int, \
                 subpath_constraints: list = [], \
-                edges_to_ignore: set = set(),\
+                edges_to_ignore: set = set(), \
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = True, \
                 optimize_with_greedy: bool = False, \
                 threads: int = 4, \
                 time_limit: int = 300, \
                 presolve = "on", \
-                log_to_console = "false"):
+                log_to_console = "false",\
+                external_solver = "highspy"):
             
         if weight_type not in [int, float]:
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
@@ -24,7 +28,7 @@ class modelFD(genericDAGModel.genericDAGModel):
         # Check requirements on input graph:
         # Check flow conservation
         if not self.check_flow_conservation(G, flow_attr):
-            raise( ValueError("The graph G does not satisfy flow conservation."))
+            raise ValueError("The graph G does not satisfy flow conservation.")
 
         # Check that the flow is positive and get max flow value
         self.w_max = self.weight_type(self.get_max_flow_value_and_check_positive_flow(G, flow_attr, edges_to_ignore))
@@ -61,7 +65,8 @@ class modelFD(genericDAGModel.genericDAGModel):
                          threads = threads, \
                          time_limit = time_limit, \
                          presolve = presolve, \
-                         log_to_console = log_to_console)  
+                         log_to_console = log_to_console, \
+                         external_solver=external_solver)  
         
         # If already solved with a previous method, we don't create solver, not add paths
         if self.solved:
@@ -72,9 +77,6 @@ class modelFD(genericDAGModel.genericDAGModel):
 
         # This method is called from the current class modelMFD
         self.encode_flow_decomposition()
-
-        # From genericDagModel
-        self.write_model(f"mfd-model-{self.G.id}.lp")
 
     def get_solution_with_greedy(self):
         
@@ -138,8 +140,8 @@ class modelFD(genericDAGModel.genericDAGModel):
         elif self.weight_type == float:
             wtype = highspy.HighsVarType.kContinuous
         
-        self.pi_vars            = self.solver.addVariables(self.edge_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='p')
-        self.path_weights_vars  = self.solver.addVariables(self.path_indexes, lb=0, ub=self.w_max, type=wtype, name_prefix='w')
+        self.pi_vars            = self.solver.add_variables(self.edge_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='p')
+        self.path_weights_vars  = self.solver.add_variables(self.path_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='w')
 
         for u, v, data in self.G.edges(data=True):
             if (u,v) in self.edges_to_ignore:
@@ -147,18 +149,18 @@ class modelFD(genericDAGModel.genericDAGModel):
             f_u_v = data[self.flow_attr]
 
             for i in range(self.k):
-                self.solver.addConstr( self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max                                  , "10e_u={}_v={}_i={}".format(u,v,i) )
-                self.solver.addConstr( self.pi_vars[(u,v,i)] <= self.path_weights_vars[(i)]                                                , "10f_u={}_v={}_i={}".format(u,v,i) )
-                self.solver.addConstr( self.pi_vars[(u,v,i)] >= self.path_weights_vars[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max   , "10g_u={}_v={}_i={}".format(u,v,i) )
+                self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max, name="10e_u={}_v={}_i={}".format(u,v,i))
+                self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.path_weights_vars[(i)], name="10f_u={}_v={}_i={}".format(u,v,i))
+                self.solver.add_constraint(self.pi_vars[(u,v,i)] >= self.path_weights_vars[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max, name="10g_u={}_v={}_i={}".format(u,v,i))
 
-            self.solver.addConstr( sum(self.pi_vars[(u,v,i)] for i in range(self.k)) == f_u_v                    , "10d_u={}_v={}_i={}".format(u,v,i) )
+            self.solver.add_constraint(sum(self.pi_vars[(u,v,i)] for i in range(self.k)) == f_u_v, name="10d_u={}_v={}_i={}".format(u,v,i))
 
     def __get_solution_weights(self) -> list:
 
         self.check_solved()
         
-        varNames = self.solver.allVariableNames()
-        varValues = self.solver.allVariableValues()
+        varNames = self.solver.get_variable_names()
+        varValues = self.solver.get_variable_values()
         self.path_weights_sol = [0]*len(range(0,self.k))
 
         for index, var in enumerate(varNames):
@@ -180,27 +182,29 @@ class modelFD(genericDAGModel.genericDAGModel):
         self.solution = (self.get_solution_paths(), self.__get_solution_weights())
 
         if not self.check_solution():
-            raise(AssertionError("Something went wrong. The solution returned by the MILP solver is not a flow decomposition."))
+            raise AssertionError("Something went wrong. The solution returned by the MILP solver is not a flow decomposition.")
 
         return self.solution
     
     def check_solution(self):
 
         if self.solution is None:
-            raise(ValueError("Solution is not available. Call get_solution() first."))
+            raise ValueError("Solution is not available. Call get_solution() first.")
 
         solution_weights = self.solution[1]
         solution_paths = self.solution[0]
         solution_paths_of_edges = [[(path[i],path[i+1]) for i in range(len(path)-1)] for path in solution_paths]
 
         flow_from_paths = {(u,v):0 for (u,v) in self.G.edges()}
+        num_paths_on_edges = {e:0 for e in self.G.edges()}
         for weight, path in zip(solution_weights, solution_paths_of_edges):
             for e in path:
                 flow_from_paths[e] += weight
+                num_paths_on_edges[e] += 1
 
         for (u, v, data) in self.G.edges(data=True):
             if self.flow_attr in data:
-                if flow_from_paths[(u, v)] != data[self.flow_attr]: # TODO: add tolerance here?
+                if flow_from_paths[(u, v)] - data[self.flow_attr] > TOLERANCE * num_paths_on_edges[(u, v)]: 
                     return False
 
         return True
@@ -262,16 +266,17 @@ class modelFD(genericDAGModel.genericDAGModel):
     
 
 class modelMFD:
-    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = int,\
+    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = int, \
                 subpath_constraints: list = [], \
-                edges_to_ignore: set = set(),\
+                edges_to_ignore: set = set(), \
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = True, \
                 optimize_with_greedy: bool = False, \
                 threads: int = 4, \
                 time_limit: int = 300, \
                 presolve = "on", \
-                log_to_console = "false"):
+                log_to_console = "false", \
+                external_solver = "highspy"):
         
         stG = stDiGraph.stDiGraph(G)
         self.lowerbound = stG.width
@@ -291,6 +296,7 @@ class modelMFD:
         self.solve_statistics = {}
         self.solution = None
         self.solved = False
+        self.external_solver = external_solver
 
 
     def solve(self) -> bool:
@@ -305,7 +311,8 @@ class modelMFD:
                 threads = self.threads, \
                 time_limit = self.time_limit, \
                 presolve = self.presolve, \
-                log_to_console = self.log_to_console)
+                log_to_console = self.log_to_console, \
+                external_solver = self.external_solver)
             
             fd_model.solve()
 
@@ -323,9 +330,8 @@ class modelMFD:
     
     def check_solved(self):       
         if not self.solved or self.solution is None:
-            raise("Model not solved. If you want to solve it, call the solve method first. \
+            raise Exception("Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
 
- 
-                
- 
+
+
