@@ -43,13 +43,15 @@ class genericDAGModel:
 
         # optimizations
         self.optimize_with_safe_zero_edges = optimize_with_safe_zero_edges
+        self.optimize_with_safe_paths = optimize_with_safe_paths
+        self.optimize_with_safe_sequences = optimize_with_safe_sequences
         self.safe_lists = None
-        if optimize_with_safe_paths and not self.solved:
+        if self.optimize_with_safe_paths and not self.solved:
             start_time = time.time()
             self.safe_lists = safety.safe_paths(self.G, trusted_edges_for_safety, no_duplicates=False)
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
-        if optimize_with_safe_sequences and not self.solved:
+        if self.optimize_with_safe_sequences and not self.solved:
             start_time = time.time()
             self.safe_lists = safety.safe_sequences(self.G, trusted_edges_for_safety, no_duplicates=False)
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
@@ -59,8 +61,6 @@ class genericDAGModel:
             raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")
         if optimize_with_safe_paths and optimize_with_safe_sequences:
             raise ValueError("Cannot optimize with both safe paths and safe sequences")
-        if optimize_with_safe_sequences and optimize_with_safe_zero_edges:
-            raise ValueError("Not implemented. Cannot optimize with both safe sequences and safe zero edges")
 
     def create_solver_and_paths(self):
         if self.external_solution_paths is not None:
@@ -119,13 +119,26 @@ class genericDAGModel:
                 if self.optimize_with_safe_zero_edges:
                     # print("Optimizing with safe zero edges for safe list", paths_to_fix[i])
                     # get the edges not reachable from the end of a safe list
-                    first_node = paths_to_fix[i][0][0]
+                    first_node = paths_to_fix[i][0][0] 
                     last_node = paths_to_fix[i][-1][1]
+                    if self.optimize_with_safe_sequences:
+                        for j in range(len(paths_to_fix[i])-1):
+                            # at the first break in the sequence, last_node =  the node before the break
+                            if paths_to_fix[i][j][1] != paths_to_fix[i][j+1][0]:
+                                last_node = paths_to_fix[i][j][1]
+                                break
+                        for j in reversed(range(1,len(paths_to_fix[i]))):
+                            # at the first break in the sequence, first_node = the node after the break
+                            if paths_to_fix[i][j][0] != paths_to_fix[i][j-1][1]:
+                                first_node = paths_to_fix[i][j][0]
+                                break
                     
+                    # print("first_node", first_node)
+                    # print("last_node", last_node)
                     reachable_nodes = set()
                     if last_node != self.G.sink:
                         reachable_nodes = {last_node}
-                        successors = nx.dfs_successors(self.G.base_graph, source=last_node)
+                        successors = nx.dfs_successors(self.G, source=last_node)
                         # print("successors", successors)
                         for node in successors:
                             # print("node", node)
@@ -138,7 +151,9 @@ class genericDAGModel:
                     reachable_nodes_reverse = set()
                     if first_node != self.G.source:
                         reachable_nodes_reverse = {first_node}
-                        predecessors = nx.dfs_successors(self.G.base_graph.reverse(copy = True), source=first_node)
+                        rev_G = nx.DiGraph(self.G)
+                        rev_G = rev_G.reverse(copy = True)
+                        predecessors = nx.dfs_successors(rev_G, source=first_node)
                         for node in predecessors:
                             # print("node", node)
                             # print("predecessors[node]", predecessors[node])
