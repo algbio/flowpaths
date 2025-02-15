@@ -1,4 +1,5 @@
 import stDiGraph
+import networkx as nx
 import safety
 import solverWrapper
 import time
@@ -9,6 +10,7 @@ class genericDAGModel:
                  subpath_constraints: list = None, \
                  optimize_with_safe_paths: bool = False, \
                  optimize_with_safe_sequences: bool = False, \
+                 optimize_with_safe_zero_edges: bool = False, \
                  trusted_edges_for_safety: set = None, \
                  external_solution_paths: list = None, \
                  solve_statistics: dict = {}, \
@@ -40,6 +42,7 @@ class genericDAGModel:
             self.solved = True
 
         # optimizations
+        self.optimize_with_safe_zero_edges = optimize_with_safe_zero_edges
         self.safe_lists = None
         if optimize_with_safe_paths and not self.solved:
             start_time = time.time()
@@ -56,6 +59,8 @@ class genericDAGModel:
             raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")
         if optimize_with_safe_paths and optimize_with_safe_sequences:
             raise ValueError("Cannot optimize with both safe paths and safe sequences")
+        if optimize_with_safe_sequences and optimize_with_safe_zero_edges:
+            raise ValueError("Not implemented. Cannot optimize with both safe sequences and safe zero edges")
 
     def create_solver_and_paths(self):
         if self.external_solution_paths is not None:
@@ -103,10 +108,53 @@ class genericDAGModel:
         # Fixing variables based on safe lists
         if self.safe_lists is not None:
             paths_to_fix = self.__get_paths_to_fix_from_safe_lists()
+            
+            # iterating over safe lists
             for i in range(min(len(paths_to_fix), self.k)):
+                # print("Fixing variables for safe list #", i)
+                # iterate over the edges in the safe list to fix variables to 1
                 for (u, v) in paths_to_fix[i]:
                     self.solver.add_constraint(self.edge_vars[(u, v, i)] == 1, name="safe_list_u={}_v={}_i={}".format(u, v, i))
+                
+                if self.optimize_with_safe_zero_edges:
+                    # print("Optimizing with safe zero edges for safe list", paths_to_fix[i])
+                    # get the edges not reachable from the end of a safe list
+                    first_node = paths_to_fix[i][0][0]
+                    last_node = paths_to_fix[i][-1][1]
+                    
+                    reachable_nodes = set()
+                    if last_node != self.G.sink:
+                        reachable_nodes = {last_node}
+                        successors = nx.dfs_successors(self.G.base_graph, source=last_node)
+                        # print("successors", successors)
+                        for node in successors:
+                            # print("node", node)
+                            # print("successors[node]", successors[node])
+                            for reachable_node in successors[node]:
+                                reachable_nodes.add(reachable_node)
+                            
+                    # print("reachable_nodes", reachable_nodes, "from source", last_node)
+                    
+                    reachable_nodes_reverse = set()
+                    if first_node != self.G.source:
+                        reachable_nodes_reverse = {first_node}
+                        predecessors = nx.dfs_successors(self.G.base_graph.reverse(copy = True), source=first_node)
+                        for node in predecessors:
+                            # print("node", node)
+                            # print("predecessors[node]", predecessors[node])
+                            for reachable_node_reverse in predecessors[node]:
+                                reachable_nodes_reverse.add(reachable_node_reverse)
+                    # print("reachable_nodes_reverse", reachable_nodes_reverse, "from source", first_node)    
 
+                    path_edges = set((u,v) for (u, v) in paths_to_fix[i])
+                    # print("path_edges", path_edges)
+
+                    for (u, v) in self.G.base_graph.edges():
+                        if (u, v) not in path_edges and \
+                            u not in reachable_nodes and v not in reachable_nodes_reverse:
+                            # print(f"Adding zero constraint for edge ({u}, {v}) in path {i}")
+                            self.solver.add_constraint(self.edge_vars[(u, v, i)] == 0, name="safe_list_zero_edge_u={}_v={}_i={}".format(u, v, i))
+                    
     def __get_paths_to_fix_from_safe_lists(self):
         longest_safe_list = dict()
         for i, safe_list in enumerate(self.safe_lists):
@@ -130,7 +178,7 @@ class genericDAGModel:
             self.solved = True
             return True
 
-        # self.write_model(f"model-{self.id}.lp")
+        self.write_model(f"model-{self.id}.lp")
         start_time = time.time()
         self.solver.optimize()
         self.solve_statistics["milp_solve_time"] = time.time() - start_time

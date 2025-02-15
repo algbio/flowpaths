@@ -94,14 +94,3 @@ class solverWrapper:
             return self.solver.allVariableNames()
         elif self.solver_type == 'gurobi':
             return [var.VarName for var in self.solver.getVars()]
-
-# Example usage
-if __name__ == "__main__":
-    solver = SolverWrapper(solver_type='gurobi', threads=4, time_limit=300, log_to_console="true", tolerance=1e-5)
-    indexes = [(1, 2), (2, 3), (3, 4)]
-    vars = solver.add_variables(indexes, lb=0, ub=1, var_type='integer', name_prefix='e')
-    solver.add_constraint(vars[(1, 2)] + vars[(2, 3)] == 1, name="constraint1")
-    solver.set_objective(vars[(1, 2)] + vars[(2, 3)] + vars[(3, 4)], sense='minimize')
-    solver.optimize()
-    print(solver.get_model_status())
-    print(solver.get_variable_values())

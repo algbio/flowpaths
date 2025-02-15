@@ -14,6 +14,7 @@ class modelFD(genericDAGModel.genericDAGModel):
                 edges_to_ignore: set = set(), \
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = True, \
+                optimize_with_safe_zero_edges: bool = False, \
                 optimize_with_greedy: bool = False, \
                 threads: int = 4, \
                 time_limit: int = 300, \
@@ -32,6 +33,10 @@ class modelFD(genericDAGModel.genericDAGModel):
 
         # Check that the flow is positive and get max flow value
         self.w_max = self.weight_type(self.get_max_flow_value_and_check_positive_flow(G, flow_attr, edges_to_ignore))
+
+        # Check that the graph is acyclic
+        if not nx.is_directed_acyclic_graph(G):
+            raise ValueError("The graph G must be acyclic.")
 
         self.G = stDiGraph.stDiGraph(G)
     
@@ -59,6 +64,7 @@ class modelFD(genericDAGModel.genericDAGModel):
                          subpath_constraints = self.subpath_constraints, \
                          optimize_with_safe_paths = optimize_with_safe_paths, \
                          optimize_with_safe_sequences = optimize_with_safe_sequences, \
+                         optimize_with_safe_zero_edges = optimize_with_safe_zero_edges, \
                          external_solution_paths = external_solution_paths, \
                          trusted_edges_for_safety = self.get_non_zero_flow_edges(), \
                          solve_statistics = self.solve_statistics, \
@@ -271,6 +277,7 @@ class modelMFD:
                 edges_to_ignore: set = set(), \
                 optimize_with_safe_paths: bool = False, \
                 optimize_with_safe_sequences: bool = True, \
+                optimize_with_safe_zero_edges: bool = False, \
                 optimize_with_greedy: bool = False, \
                 threads: int = 4, \
                 time_limit: int = 300, \
@@ -288,6 +295,7 @@ class modelMFD:
         self.edges_to_ignore = edges_to_ignore
         self.optimize_with_safe_paths = optimize_with_safe_paths
         self.optimize_with_safe_sequences = optimize_with_safe_sequences
+        self.optimize_with_safe_zero_edges = optimize_with_safe_zero_edges
         self.optimize_with_greedy = optimize_with_greedy
         self.threads = threads
         self.time_limit = time_limit
@@ -307,6 +315,7 @@ class modelMFD:
                 edges_to_ignore = self.edges_to_ignore, \
                 optimize_with_safe_paths = self.optimize_with_safe_paths, \
                 optimize_with_safe_sequences = self.optimize_with_safe_sequences, \
+                optimize_with_safe_zero_edges = self.optimize_with_safe_zero_edges, \
                 optimize_with_greedy = self.optimize_with_greedy, \
                 threads = self.threads, \
                 time_limit = self.time_limit, \

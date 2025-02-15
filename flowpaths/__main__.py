@@ -4,12 +4,6 @@ import mfd
 
 # Example usage
 if __name__ == "__main__":
-    # base_graph = nx.DiGraph()
-    # base_graph.add_edge(1, 2, flow=10)
-    # base_graph.add_edge(2, 3, flow=5)
-    # base_graph.add_edge(2, 2.5, flow=5)
-    # base_graph.add_edge(2.5, 3, flow=5)
-    # base_graph.add_edge(3, 4, flow=15)
 
     graphs = graphutils.read_graphs("./flowpaths/tests.graph")
 
@@ -18,6 +12,7 @@ if __name__ == "__main__":
         mfd_model_G = mfd.modelMFD(base_graph, flow_attr='flow', weight_type=float, \
                                    optimize_with_safe_paths=True, \
                                    optimize_with_safe_sequences=False, \
+                                   optimize_with_safe_zero_edges=False, \
                                    optimize_with_greedy=False, \
                                    presolve = "on", \
                                    external_solver = "highs")
