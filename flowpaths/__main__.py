@@ -20,8 +20,8 @@ if __name__ == "__main__":
         if mfd_model_G.solved:
             (paths, weights) = mfd_model_G.get_solution()
             print("MFD solution:")
-            print(weights)
-            print(paths)
+            # print(weights)
+            # print(paths)
             print(mfd_model_G.solve_statistics)
         else:
             print("Model not solved")

@@ -306,7 +306,6 @@ class modelMFD:
         self.solved = False
         self.external_solver = external_solver
 
-
     def solve(self) -> bool:
         start_time = time.time()
         for i in range(self.lowerbound, self.G.number_of_edges()):
@@ -328,6 +327,7 @@ class modelMFD:
             if fd_model.solved:
                 self.solution = fd_model.get_solution()
                 self.solved = True
+                self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.time() - start_time
                 return True
         return False

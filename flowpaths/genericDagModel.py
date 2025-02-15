@@ -122,17 +122,31 @@ class genericDAGModel:
                     first_node = paths_to_fix[i][0][0] 
                     last_node = paths_to_fix[i][-1][1]
                     if self.optimize_with_safe_sequences:
+                        # finding the longest safe path in a sequence
+                        left_node = paths_to_fix[i][0][0]
+                        right_node =paths_to_fix[i][0][1]
+                        length_safe_path = 1
+                        max_left_node = left_node
+                        max_right_node = right_node
+                        max_length_safe_path = 1
+
+                        # iterating through the edges of the safe sequence
                         for j in range(len(paths_to_fix[i])-1):
                             # at the first break in the sequence, last_node =  the node before the break
-                            if paths_to_fix[i][j][1] != paths_to_fix[i][j+1][0]:
-                                last_node = paths_to_fix[i][j][1]
-                                break
-                        for j in reversed(range(1,len(paths_to_fix[i]))):
-                            # at the first break in the sequence, first_node = the node after the break
-                            if paths_to_fix[i][j][0] != paths_to_fix[i][j-1][1]:
-                                first_node = paths_to_fix[i][j][0]
-                                break
-                    
+                            if paths_to_fix[i][j][1] == paths_to_fix[i][j+1][0]:
+                                right_node = paths_to_fix[i][j+1][1]
+                                length_safe_path += 1
+                            else:
+                                if length_safe_path > max_length_safe_path:
+                                    max_length_safe_path = length_safe_path
+                                    max_left_node = left_node
+                                    max_right_node = right_node
+                                left_node = paths_to_fix[i][j+1][0]
+                                right_node = paths_to_fix[i][j+1][1]
+                                length_safe_path = 1
+
+                        first_node = max_left_node
+                        last_node = max_right_node                    
                     # print("first_node", first_node)
                     # print("last_node", last_node)
                     reachable_nodes = set()
@@ -196,9 +210,9 @@ class genericDAGModel:
         self.write_model(f"model-{self.id}.lp")
         start_time = time.time()
         self.solver.optimize()
-        self.solve_statistics["milp_solve_time"] = time.time() - start_time
+        self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = time.time() - start_time
 
-        self.solve_statistics["milp_solver_status"] = self.solver.get_model_status()
+        self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = self.solver.get_model_status()
         
         if self.solver.get_model_status() == 'kOptimal' or self.solver.get_model_status() == 2:
             self.solved = True
