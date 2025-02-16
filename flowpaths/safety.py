@@ -130,6 +130,17 @@ def safe_paths(G : graph.stDiGraph, edges_to_cover: list, no_duplicates = False)
         return paths
     
 def get_endpoints_of_longest_safe_path_in(safe_sequence: list) -> list :
+    """
+    Given a sequence of safe edges, this function finds the endpoints of the longest continuous safe path inside it.
+    
+    Parameters
+    ----------
+    - safe_sequence (list): A list of tuples where each tuple represents an edge in the form (start_node, end_node).
+
+    Returns
+    ----------
+    - list: A list containing two elements, the start and end nodes of the longest continuous safe path.
+    """
     
     left_node = max_left_node = safe_sequence[0][0]
     right_node = max_right_node = safe_sequence[0][1]

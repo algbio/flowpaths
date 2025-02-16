@@ -10,12 +10,12 @@ if __name__ == "__main__":
     for base_graph in graphs:
 
         mfd_model_G = mfd.modelMFD(base_graph, flow_attr='flow', weight_type=float, \
-                                   optimize_with_safe_paths=False, \
-                                   optimize_with_safe_sequences=True, \
+                                   optimize_with_safe_paths=True, \
+                                   optimize_with_safe_sequences=False, \
                                    optimize_with_safe_zero_edges=True, \
                                    optimize_with_greedy=False, \
                                    presolve = "on", \
-                                   external_solver = "highs")
+                                   external_solver = "gurobi")
         mfd_model_G.solve()
         if mfd_model_G.solved:
             (paths, weights) = mfd_model_G.get_solution()

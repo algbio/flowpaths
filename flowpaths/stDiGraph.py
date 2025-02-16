@@ -1,6 +1,5 @@
 import networkx as nx
 import graphutils
-import warnings
 
 class stDiGraph(nx.DiGraph):
     def __init__(self, base_graph: nx.DiGraph, 
@@ -19,11 +18,32 @@ class stDiGraph(nx.DiGraph):
 
         self.__build_graph__()
 
-        # TODO: add check that base_graph is acyclic
-
         nx.freeze(self)
 
     def __build_graph__(self):
+        """
+        Builds the graph by adding nodes and edges from the base graph, and 
+        connecting source and sink nodes.
+
+        This method performs the following steps:
+        1. Checks if the base graph is a directed acyclic graph (DAG). If not, 
+           raises a ValueError.
+        2. Adds all nodes and edges from the base graph to the current graph.
+        3. Connects nodes with no incoming edges or specified as additional 
+           start nodes to the source node.
+        4. Connects nodes with no outgoing edges or specified as additional 
+           end nodes to the sink node.
+        5. Stores the edges connected to the source and sink nodes.
+        6. Initializes the width attribute to None.
+
+        Raises
+        ----------
+        - ValueError: If the base graph is not a directed acyclic graph (DAG).
+        """
+
+        if not nx.is_directed_acyclic_graph(self.base_graph):
+            raise ValueError("The base graph must be a directed acyclic graph.")
+
         self.add_nodes_from(self.base_graph.nodes(data=True))
         self.add_edges_from(self.base_graph.edges(data=True))
 
@@ -39,6 +59,16 @@ class stDiGraph(nx.DiGraph):
         self.width = None
 
     def get_width(self) -> int:
+        """
+        Calculate and return the width of the graph.
+        The width is computed as the maximum edge antichain if it has not been
+        previously calculated and stored. If the width has already been computed,
+        the stored value is returned.
+
+        Returns
+        ----------
+        - int: The width of the graph.
+        """
         
         if self.width == None:
             width, _ = self.compute_max_edge_antichain(self)
@@ -46,7 +76,23 @@ class stDiGraph(nx.DiGraph):
 
         return self.width
     
-    def compute_max_edge_antichain(self, get_antichain = False, weight_function = {}) -> list :
+    def compute_max_edge_antichain(self, get_antichain = False, weight_function = {}):
+        """
+        Computes the maximum edge antichain in a directed graph.
+
+        Parameters
+        ----------
+        - get_antichain (bool): If True, the function also returns the antichain along with its cost. Default is False.
+        - weight_function (dict): A dictionary where keys are edges (tuples) and values are weights. 
+                If empty, weights 1 are used. If given, the antichain weight is computed as the sum of the weights of the edges in the antichain. 
+                Default is {}.
+        
+        Returns
+        ----------
+        - If get_antichain is False, returns the size of maximum edge antichain.
+        - If get_antichain is True, returns a tuple containing the 
+                size of maximum edge antichain and the antichain.
+        """
 
         G_nx       = nx.DiGraph()
         demand     = dict()
@@ -102,25 +148,46 @@ class stDiGraph(nx.DiGraph):
 
 
     def get_reachable_nodes_from(self, v) -> set:
+        """
+        Get all nodes reachable from a given node in the graph.
+        This method performs a depth-first search (DFS) starting from the specified node
+        and returns a set of all nodes that can be reached from it, including the given node `v`.
 
-        reachable_nodes = {v}
+        Args
+        ----------
+        - v: The starting node from which to find all reachable nodes.
+
+        Returns
+        ----------
+        - A set of nodes that are reachable from the given node `v`.
+        """
+
         successors = nx.dfs_successors(self, source=v)
-        for node in successors:
-            for reachable_node in successors[node]:
-                reachable_nodes.add(reachable_node)
-
+        reachable_nodes = {v} | {reachable_node for node in successors for reachable_node in successors[node]}
+        
         return reachable_nodes
 
     def get_reachable_nodes_reverse_from(self, v) -> set:
+        """
+        Get the set of nodes that are reachable in reverse from a given node `v`.
+        This method computes the set of nodes that can reach the given node `v`, including node `v`,
+        by traversing the graph in reverse. If the given node `v` is the source 
+        node, it returns a set containing only `v`.
+        
+        Parameters
+        ----------
+        - v The node from which to find all reachable nodes in reverse.
+        
+        Returns
+        ----------
+        - A set of nodes that can reach the given node `v` by traversing the graph in reverse.
+        """
 
-        reachable_nodes_reverse = {v}
-        # if check just to avoid constructing the reverse graph if not necessary
-        if v != self.source:
-            rev_G = nx.DiGraph(self)
-            rev_G = rev_G.reverse(copy = True)
-            predecessors = nx.dfs_successors(rev_G, source=v)
-            for node in predecessors:
-                for reachable_node_reverse in predecessors[node]:
-                    reachable_nodes_reverse.add(reachable_node_reverse)
-
+        if v == self.source:
+            return {v}
+        
+        rev_G = nx.DiGraph(self).reverse()
+        predecessors = nx.dfs_successors(rev_G, source=v)
+        reachable_nodes_reverse = {v} | {reachable_node_reverse for node in predecessors for reachable_node_reverse in predecessors[node]}
+        
         return reachable_nodes_reverse

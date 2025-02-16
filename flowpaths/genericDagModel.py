@@ -5,7 +5,6 @@ import solverWrapper
 import time
 
 class genericDAGModel:
-
     def __init__(self, G: stDiGraph.stDiGraph, num_paths: int, \
                  subpath_constraints: list = None, \
                  optimize_with_safe_paths: bool = False, \
@@ -19,7 +18,32 @@ class genericDAGModel:
                  presolve = "on", \
                  log_to_console = "false", \
                  external_solver = "highs"):
+        """
+        This is a generic class modelling a path finding ILP in a DAG.
+
+        Parameters
+        ----------
+        - G (stDiGraph.stDiGraph): The directed acyclic graph (DAG) to be used.
+        - num_paths (int): The number of paths to be computed.
+        - subpath_constraints (list, optional): Constraints for subpaths. Defaults to None.
+        - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Defaults to False.
+        - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Defaults to False.
+        - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Defaults to False.
+        - trusted_edges_for_safety (set, optional): Set of trusted edges for safety. Defaults to None.
+        - external_solution_paths (list, optional): External solution paths. Defaults to None.
+        - solve_statistics (dict, optional): Dictionary to store solve statistics. Defaults to {}.
+        - threads (int, optional): Number of threads to use. Defaults to 4.
+        - time_limit (int, optional): Time limit for solving. Defaults to 300.
+        - presolve (str, optional): Presolve option. Defaults to "on".
+        - log_to_console (str, optional): Log to console option. Defaults to "false".
+        - external_solver (str, optional): External solver to use. Defaults to "highs".
         
+        Raises
+        ----------
+        - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with safe lists.
+        - ValueError: If both `optimize_with_safe_paths` and `optimize_with_safe_sequences` are set to True.
+        """
+
         self.G = G
         self.id = self.G.id
         self.k = num_paths
@@ -63,6 +87,14 @@ class genericDAGModel:
             raise ValueError("Cannot optimize with both safe paths and safe sequences")
 
     def create_solver_and_paths(self):
+        """
+        Creates a solver instance and encodes the paths in the graph.
+
+        This method initializes the solver with the specified parameters and encodes the paths
+        by creating variables for edges and subpaths. 
+        
+        If external solution paths are provided, it skips the solver creation.
+        """
         if self.external_solution_paths is not None:
             return
 
@@ -75,6 +107,12 @@ class genericDAGModel:
         self.encode_paths()
 
     def encode_paths(self):
+        """
+        Encodes the paths in the graph by creating variables for edges and subpaths.
+        
+        This method initializes the edge and subpath variables for the solver and adds constraints
+        to ensure the paths are valid according to the given subpath constraints and safe lists.
+        """
         self.edge_indexes = [(u, v, i) for i in range(self.k) for (u, v) in self.G.edges()]
         self.path_indexes = [(i) for i in range(self.k)]
         self.subpath_indexes = [(i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))]
@@ -150,12 +188,27 @@ class genericDAGModel:
         return paths_to_fix
 
     def solve(self) -> bool:
+        """
+        Solves the optimization model for the current instance.
+
+        Returns
+        ----------
+        - True if the model is solved successfully, False otherwise.
+
+        The method first checks if an external solution is already provided. If so, it sets the 
+        solved attribute to True and returns True.
+
+        If not, it optimizes the model using the solver, and records the solve time and solver status 
+        in the solve_statistics dictionary. If the solver status indicates an optimal solution 
+        (either 'kOptimal' (highs) or status code 2 (gurobi)), it sets the solved attribute to True and returns True. 
+        Otherwise, it sets the solved attribute to False and returns False.
+        """
         # If we already received an external solution, we don't need to solve the model
         if self.external_solution_paths is not None:
             self.solved = True
             return True
 
-        self.write_model(f"model-{self.id}.lp")
+        # self.write_model(f"model-{self.id}.lp")
         start_time = time.time()
         self.solver.optimize()
         self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = time.time() - start_time
@@ -170,6 +223,13 @@ class genericDAGModel:
         return False
     
     def write_model(self, filename: str):
+        """
+        Writes the current model to a file.
+
+        Parameters
+        ----------
+        - filename (str): The path to the file where the model will be written.
+        """
         self.solver.write_model(filename)
 
     def check_solved(self):       
@@ -192,6 +252,17 @@ class genericDAGModel:
                 self.edge_vars_sol[(u, v, i)] = abs(round(varValues[index]))  # TODO: check if we can add tolerance here, how does it work with other solvers?
 
     def get_solution_paths(self) -> list:
+        """
+        Retrieves the solution paths from the graph.
+
+        This method returns the solution paths either from the external solution paths
+        if they are provided at initialization time, or by calculating them based on the 
+        edge variable solutions.
+
+        Returns
+        ----------
+        - A list of paths, where each path is represented as a list of vertices.
+        """
         if self.external_solution_paths is not None:
             return self.external_solution_paths
 
