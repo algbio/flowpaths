@@ -36,7 +36,15 @@ class stDiGraph(nx.DiGraph):
         self.source_edges = list(self.out_edges(self.source))
         self.sink_edges = list(self.in_edges(self.sink))
 
-        self.width, self.edge_antichain = self.compute_max_edge_antichain(self)
+        self.width = None
+
+    def get_width(self) -> int:
+        
+        if self.width == None:
+            width, _ = self.compute_max_edge_antichain(self)
+            self.width = width
+
+        return self.width
     
     def compute_max_edge_antichain(self, get_antichain = False, weight_function = {}) -> list :
 
@@ -93,3 +101,26 @@ class stDiGraph(nx.DiGraph):
         return minFlowCost
 
 
+    def get_reachable_nodes_from(self, v) -> set:
+
+        reachable_nodes = {v}
+        successors = nx.dfs_successors(self, source=v)
+        for node in successors:
+            for reachable_node in successors[node]:
+                reachable_nodes.add(reachable_node)
+
+        return reachable_nodes
+
+    def get_reachable_nodes_reverse_from(self, v) -> set:
+
+        reachable_nodes_reverse = {v}
+        # if check just to avoid constructing the reverse graph if not necessary
+        if v != self.source:
+            rev_G = nx.DiGraph(self)
+            rev_G = rev_G.reverse(copy = True)
+            predecessors = nx.dfs_successors(rev_G, source=v)
+            for node in predecessors:
+                for reachable_node_reverse in predecessors[node]:
+                    reachable_nodes_reverse.add(reachable_node_reverse)
+
+        return reachable_nodes_reverse

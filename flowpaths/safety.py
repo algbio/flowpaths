@@ -128,3 +128,26 @@ def safe_paths(G : graph.stDiGraph, edges_to_cover: list, no_duplicates = False)
         return list(paths)
     else:
         return paths
+    
+def get_endpoints_of_longest_safe_path_in(safe_sequence: list) -> list :
+    
+    left_node = max_left_node = safe_sequence[0][0]
+    right_node = max_right_node = safe_sequence[0][1]
+    length_safe_path = max_length_safe_path = 1
+
+    # iterating through the edges of the safe sequence
+    for j in range(len(safe_sequence)-1):
+        # if there is no break in the sequence, we advance the right node
+        if safe_sequence[j][1] == safe_sequence[j+1][0]:
+            right_node = safe_sequence[j+1][1]
+            length_safe_path += 1
+        else: # otherwise, we check if the current path is the longest one, and reset the left and right nodes
+            if length_safe_path > max_length_safe_path:
+                max_length_safe_path = length_safe_path
+                max_left_node = left_node
+                max_right_node = right_node
+            left_node = safe_sequence[j+1][0]
+            right_node = safe_sequence[j+1][1]
+            length_safe_path = 1
+
+    return max_left_node, max_right_node

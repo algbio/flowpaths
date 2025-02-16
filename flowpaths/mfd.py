@@ -286,7 +286,7 @@ class modelMFD:
                 external_solver = "highspy"):
         
         stG = stDiGraph.stDiGraph(G)
-        self.lowerbound = stG.width
+        self.lowerbound = stG.get_width()
 
         self.G = G
         self.flow_attr = flow_attr

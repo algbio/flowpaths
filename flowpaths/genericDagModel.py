@@ -117,66 +117,14 @@ class genericDAGModel:
                     self.solver.add_constraint(self.edge_vars[(u, v, i)] == 1, name="safe_list_u={}_v={}_i={}".format(u, v, i))
                 
                 if self.optimize_with_safe_zero_edges:
-                    # print("Optimizing with safe zero edges for safe list", paths_to_fix[i])
-                    # get the edges not reachable from the end of a safe list
-                    first_node = paths_to_fix[i][0][0] 
-                    last_node = paths_to_fix[i][-1][1]
-                    if self.optimize_with_safe_sequences:
-                        # finding the longest safe path in a sequence
-                        left_node = paths_to_fix[i][0][0]
-                        right_node =paths_to_fix[i][0][1]
-                        length_safe_path = 1
-                        max_left_node = left_node
-                        max_right_node = right_node
-                        max_length_safe_path = 1
-
-                        # iterating through the edges of the safe sequence
-                        for j in range(len(paths_to_fix[i])-1):
-                            # at the first break in the sequence, last_node =  the node before the break
-                            if paths_to_fix[i][j][1] == paths_to_fix[i][j+1][0]:
-                                right_node = paths_to_fix[i][j+1][1]
-                                length_safe_path += 1
-                            else:
-                                if length_safe_path > max_length_safe_path:
-                                    max_length_safe_path = length_safe_path
-                                    max_left_node = left_node
-                                    max_right_node = right_node
-                                left_node = paths_to_fix[i][j+1][0]
-                                right_node = paths_to_fix[i][j+1][1]
-                                length_safe_path = 1
-
-                        first_node = max_left_node
-                        last_node = max_right_node                    
-                    # print("first_node", first_node)
-                    # print("last_node", last_node)
-                    reachable_nodes = set()
-                    if last_node != self.G.sink:
-                        reachable_nodes = {last_node}
-                        successors = nx.dfs_successors(self.G, source=last_node)
-                        # print("successors", successors)
-                        for node in successors:
-                            # print("node", node)
-                            # print("successors[node]", successors[node])
-                            for reachable_node in successors[node]:
-                                reachable_nodes.add(reachable_node)
-                            
-                    # print("reachable_nodes", reachable_nodes, "from source", last_node)
-                    
-                    reachable_nodes_reverse = set()
-                    if first_node != self.G.source:
-                        reachable_nodes_reverse = {first_node}
-                        rev_G = nx.DiGraph(self.G)
-                        rev_G = rev_G.reverse(copy = True)
-                        predecessors = nx.dfs_successors(rev_G, source=first_node)
-                        for node in predecessors:
-                            # print("node", node)
-                            # print("predecessors[node]", predecessors[node])
-                            for reachable_node_reverse in predecessors[node]:
-                                reachable_nodes_reverse.add(reachable_node_reverse)
-                    # print("reachable_nodes_reverse", reachable_nodes_reverse, "from source", first_node)    
-
+                    # get the endpoints of the longest safe path in the sequence
+                    first_node, last_node = safety.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])                            
+                    # get the reachable nodes from the last node
+                    reachable_nodes = self.G.get_reachable_nodes_from(last_node)
+                    # get the backwards reachable nodes from the first node
+                    reachable_nodes_reverse = self.G.get_reachable_nodes_reverse_from(first_node)                   
+                    # get the edges in the path
                     path_edges = set((u,v) for (u, v) in paths_to_fix[i])
-                    # print("path_edges", path_edges)
 
                     for (u, v) in self.G.base_graph.edges():
                         if (u, v) not in path_edges and \
