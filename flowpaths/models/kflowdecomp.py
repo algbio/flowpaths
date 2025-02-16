@@ -3,8 +3,6 @@ import networkx as nx
 import stdigraph
 from . import genericdagmodel as dagmodel
 
-TOLERANCE = 0.001
-
 class kFlowDecomp(dagmodel.GenericDAGModel):
 
     def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int, \
@@ -299,7 +297,7 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
 
         return self.solution
     
-    def check_solution(self):
+    def check_solution(self, tolerance = 0.001):
         """
         Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
 
@@ -334,7 +332,7 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
 
         for (u, v, data) in self.G.edges(data=True):
             if self.flow_attr in data:
-                if flow_from_paths[(u, v)] - data[self.flow_attr] > TOLERANCE * num_paths_on_edges[(u, v)]: 
+                if flow_from_paths[(u, v)] - data[self.flow_attr] > tolerance * num_paths_on_edges[(u, v)]: 
                     return False
 
         return True
