@@ -1,6 +1,6 @@
 import networkx as nx
 import graphutils
-import mfd
+import models.minflowdecomp as mfd
 
 # Example usage
 if __name__ == "__main__":
@@ -9,13 +9,14 @@ if __name__ == "__main__":
 
     for base_graph in graphs:
 
-        mfd_model_G = mfd.modelMFD(base_graph, flow_attr='flow', weight_type=float, \
+        mfd_model_G = mfd.MinFlowDecomp(base_graph, flow_attr='flow', weight_type=float, \
                                    optimize_with_safe_paths=True, \
                                    optimize_with_safe_sequences=False, \
-                                   optimize_with_safe_zero_edges=True, \
+                                   optimize_with_safe_zero_edges=False, \
                                    optimize_with_greedy=False, \
                                    presolve = "on", \
-                                   external_solver = "gurobi")
+                                   external_solver = "highs",\
+                                   log_to_console="false")
         mfd_model_G.solve()
         if mfd_model_G.solved:
             (paths, weights) = mfd_model_G.get_solution()

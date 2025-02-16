@@ -1,4 +1,4 @@
-class solverWrapper:
+class SolverWrapper:
     def __init__(self, solver_type='highs', **kwargs):
         self.solver_type = solver_type
         self.tolerance = kwargs.get('tolerance', 1e-6)  # Default tolerance value
@@ -16,13 +16,14 @@ class solverWrapper:
             self.env = gurobipy.Env(empty=True)
             self.env.setParam('OutputFlag', 0)
             self.env.setParam('LogToConsole', 1 if kwargs.get('log_to_console', "false") == "true" else 0)
+            self.env.setParam('OutputFlag', 1 if kwargs.get('log_to_console', "false") == "true" else 0)
             self.env.setParam('TimeLimit', kwargs.get('time_limit', 300))
             self.env.setParam('Threads', kwargs.get('threads', 4))
             self.env.setParam('MIPGap', self.tolerance)
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
         else:
-            raise ValueError("Unsupported solver type")
+            raise ValueError(f"Unsupported solver type `{solver_type}`")
 
     def add_variables(self, indexes, lb=0, ub=1, var_type='integer', name_prefix=''):
         if self.solver_type == 'highs':

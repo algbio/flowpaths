@@ -1,4 +1,4 @@
-import stDiGraph as graph
+import stdigraph as stdigraph
 from queue import Queue
 
 def find_all_bridges(adj_dict, s, t) -> list:
@@ -56,11 +56,11 @@ def find_all_bridges(adj_dict, s, t) -> list:
 
     return bridges
 
-def safe_sequences_of_base_edges(G : graph.stDiGraph, no_duplicates = False) -> list :
+def safe_sequences_of_base_edges(G : stdigraph.stDiGraph, no_duplicates = False) -> list :
     
     return safe_sequences(G, G.base_graph.edges(), no_duplicates)
 
-def safe_sequences(G : graph.stDiGraph, edges_to_cover: list, no_duplicates = False) -> list :
+def safe_sequences(G : stdigraph.stDiGraph, edges_to_cover: list, no_duplicates = False) -> list :
     
     sequences = set() if no_duplicates else []
 
@@ -94,11 +94,11 @@ def safe_sequences(G : graph.stDiGraph, edges_to_cover: list, no_duplicates = Fa
     else:
         return sequences
 
-def safe_paths_of_base_edges(G : graph.stDiGraph, no_duplicates = False) -> list :
+def safe_paths_of_base_edges(G : stdigraph.stDiGraph, no_duplicates = False) -> list :
 
     return safe_paths(G, G.base_graph.edges(), no_duplicates)
 
-def safe_paths(G : graph.stDiGraph, edges_to_cover: list, no_duplicates = False) -> list :
+def safe_paths(G : stdigraph.stDiGraph, edges_to_cover: list, no_duplicates = False) -> list :
     
     paths = set() if no_duplicates else []
 

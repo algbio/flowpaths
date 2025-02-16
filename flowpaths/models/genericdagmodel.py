@@ -1,11 +1,10 @@
-import stDiGraph
-import networkx as nx
+import stdigraph
 import safety
-import solverWrapper
+import solverwrapper
 import time
 
-class genericDAGModel:
-    def __init__(self, G: stDiGraph.stDiGraph, num_paths: int, \
+class GenericDAGModel:
+    def __init__(self, G: stdigraph.stDiGraph, num_paths: int, \
                  subpath_constraints: list = None, \
                  optimize_with_safe_paths: bool = False, \
                  optimize_with_safe_sequences: bool = False, \
@@ -98,7 +97,7 @@ class genericDAGModel:
         if self.external_solution_paths is not None:
             return
 
-        self.solver = solverWrapper.solverWrapper(solver_type=self.external_solver, 
+        self.solver = solverwrapper.SolverWrapper(solver_type=self.external_solver, 
                                                   threads=self.threads, 
                                                   time_limit=self.time_limit, 
                                                   presolve=self.presolve, 
