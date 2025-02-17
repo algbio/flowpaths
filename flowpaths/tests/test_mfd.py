@@ -4,7 +4,7 @@ import itertools
 from utils import graphutils as graphutils
 import minflowdecomp as mfd
 
-# Run as python -m tests.test_mfd in flowpaths directory
+# Run as `python -m tests.test_mfd` in the `flowpaths` directory
 
 class TestMinFlowDecomp(unittest.TestCase):
 

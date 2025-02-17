@@ -1,21 +1,16 @@
 [project]
-name = "Package Template"
-version = "1.0.0"
-description = "A Python package template."
+name = "Flow Paths"
+version = "0.1.0"
+description = "A Python package to decompose weighted graphs into weights paths, under various models."
 readme = "README.md"
 
 requires-python = ">=3.8"
 
-[project.optional-dependencies]
-dev-requirements = {file = "dev-requirements.txt"}
+dependencies = [
+    "networkx",
+    "highspy"
+]
 
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
-
-
-
-
-
-
-
