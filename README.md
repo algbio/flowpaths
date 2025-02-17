@@ -1,6 +1,6 @@
 # Flow Papths Python Package
 
-Usage example:
+Usage example (check also `__main__.py`):
 
 ```python
 def main():
@@ -15,7 +15,8 @@ def main():
     graph.add_edge('c', 1, flow=7)
     graph.add_edge('d', 1, flow=6)
     
-    # We create a Minimum Flow Decomposition solver with default settings
+    # We create a Minimum Flow Decomposition solver with default settings,
+    # by specifying that the flow value of each edge is in the attribute `flow` of the edges.
     mfd_model = mfd.MinFlowDecomp(graph, flow_attr='flow')
     
     # We solve it
@@ -29,13 +30,16 @@ def main():
     mfd_model_int.solve()
     process_solution(mfd_model_int)
 
-    # We solver again, but using the `gurobi` solver, instead of the default `highs`. 
-    # This requires the `gurobipy` package and a Gurobi license
-    mfd_model_int_gurobi = mfd.MinFlowDecomp(graph, flow_attr='flow', weight_type=int)
+    # We solve again, but using the `gurobi` solver, instead of the default `highs`. 
+    # This requires the `gurobipy` package and a Gurobi license.
+    # For this, we deactivate the greedy optimization, to make sure the gurobi solver is used.
+    mfd_model_int_gurobi = mfd.MinFlowDecomp(graph, flow_attr='flow', weight_type=int,
+                                             optimize_with_greedy=False,
+                                             external_solver="gurobi")
     mfd_model_int_gurobi.solve()
     process_solution(mfd_model_int_gurobi)
 
-    # We deactivate all optimizations
+    # We solve again, by deactivating all optimizations
     mfd_model_slow = mfd.MinFlowDecomp(graph, flow_attr='flow', weight_type=int,
                                         optimize_with_safe_paths=False, 
                                         optimize_with_safe_sequences=False, 
