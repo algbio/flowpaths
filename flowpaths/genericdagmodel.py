@@ -1,6 +1,6 @@
 import stdigraph
-import safety
-import solverwrapper
+from utils import safety
+from utils import solverwrapper
 import time
 
 class GenericDAGModel:

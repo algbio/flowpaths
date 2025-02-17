@@ -1,8 +1,7 @@
 import time
 import networkx as nx
 import stdigraph
-from . import genericdagmodel as dagmodel
-from . import kflowdecomp as kflowdecomp    
+import kflowdecomp as kflowdecomp    
 
 class MinFlowDecomp:
     def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = int, \
@@ -100,6 +99,9 @@ class MinFlowDecomp:
                 self.solved = True
                 self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+
+                # storing the fd_model object for further analysis
+                self.fd_model = fd_model
                 return True
         return False
     
@@ -112,6 +114,9 @@ class MinFlowDecomp:
         if not self.solved or self.solution is None:
             raise Exception("Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
+        
+    def check_solution(self) -> bool:
+        return self.fd_model.check_solution()
 
 
 

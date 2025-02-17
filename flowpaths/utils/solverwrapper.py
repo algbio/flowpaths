@@ -8,7 +8,7 @@ class SolverWrapper:
             self.solver = highspy.Highs()
             self.solver.setOptionValue("threads", kwargs.get('threads', 4))
             self.solver.setOptionValue("time_limit", kwargs.get('time_limit', 300))
-            self.solver.setOptionValue("presolve", kwargs.get('presolve', "on"))
+            self.solver.setOptionValue("presolve", kwargs.get('presolve', "choose"))
             self.solver.setOptionValue("log_to_console", kwargs.get('log_to_console', "false"))
             self.solver.setOptionValue("mip_rel_gap", self.tolerance)
         elif solver_type == 'gurobi':

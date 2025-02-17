@@ -1,6 +1,5 @@
 from itertools import count
 import networkx as nx
-import random
 import logging
 #from graphviz  import Digraph
 

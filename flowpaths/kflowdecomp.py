@@ -1,7 +1,7 @@
 import time
 import networkx as nx
 import stdigraph
-from . import genericdagmodel as dagmodel
+import genericdagmodel as dagmodel
 
 class kFlowDecomp(dagmodel.GenericDAGModel):
 
@@ -276,7 +276,7 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
         Otherwise, it checks if the problem has been solved, computes the solution paths and weights,
-        caches the solution, and then verifies its correctness.
+        and caches the solution.
 
         Returns
         -------
@@ -291,9 +291,6 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
 
         self.check_solved()
         self.solution = (self.get_solution_paths(), self.__get_solution_weights())
-
-        if not self.check_solution():
-            raise AssertionError("Something went wrong. The solution returned by the MILP solver is not a flow decomposition.")
 
         return self.solution
     

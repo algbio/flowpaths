@@ -1,5 +1,5 @@
 import networkx as nx
-import graphutils
+from utils import graphutils
 
 class stDiGraph(nx.DiGraph):
     def __init__(self, base_graph: nx.DiGraph, 
