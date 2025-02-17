@@ -4,17 +4,7 @@ import stdigraph
 import kflowdecomp as kflowdecomp    
 
 class MinFlowDecomp:
-    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = int, \
-                subpath_constraints: list = [], \
-                optimize_with_safe_paths: bool = True, \
-                optimize_with_safe_sequences: bool = False, \
-                optimize_with_safe_zero_edges: bool = False, \
-                optimize_with_greedy: bool = True, \
-                threads: int = 4, \
-                time_limit: int = 300, \
-                presolve = "on", \
-                log_to_console = "false", \
-                external_solver = "highs"):
+    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = int, subpath_constraints: list = [], **kwargs):
         """
         Initialize the Minimum Flow Decompostion model, minimizing the number of paths.
 
@@ -54,18 +44,11 @@ class MinFlowDecomp:
         self.flow_attr = flow_attr
         self.weight_type = weight_type
         self.subpath_constraints = subpath_constraints
-        self.optimize_with_safe_paths = optimize_with_safe_paths
-        self.optimize_with_safe_sequences = optimize_with_safe_sequences
-        self.optimize_with_safe_zero_edges = optimize_with_safe_zero_edges
-        self.optimize_with_greedy = optimize_with_greedy
-        self.threads = threads
-        self.time_limit = time_limit
-        self.presolve = presolve
-        self.log_to_console = log_to_console
+        self.kwargs = kwargs
+
         self.solve_statistics = {}
         self.solution = None
         self.solved = False
-        self.external_solver = external_solver
 
     def solve(self) -> bool:
         """
@@ -81,16 +64,7 @@ class MinFlowDecomp:
         start_time = time.time()
         for i in range(self.lowerbound, self.G.number_of_edges()):
             fd_model = kflowdecomp.kFlowDecomp(G = self.G, flow_attr = self.flow_attr, num_paths = i, weight_type = self.weight_type, \
-                subpath_constraints = self.subpath_constraints, \
-                optimize_with_safe_paths = self.optimize_with_safe_paths, \
-                optimize_with_safe_sequences = self.optimize_with_safe_sequences, \
-                optimize_with_safe_zero_edges = self.optimize_with_safe_zero_edges, \
-                optimize_with_greedy = self.optimize_with_greedy, \
-                threads = self.threads, \
-                time_limit = self.time_limit, \
-                presolve = self.presolve, \
-                log_to_console = self.log_to_console, \
-                external_solver = self.external_solver)
+                                               subpath_constraints = self.subpath_constraints, **self.kwargs)
             
             fd_model.solve()
 

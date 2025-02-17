@@ -5,17 +5,7 @@ import genericdagmodel as dagmodel
 
 class kFlowDecomp(dagmodel.GenericDAGModel):
 
-    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int, \
-                subpath_constraints: list = [], \
-                optimize_with_safe_paths: bool = True, \
-                optimize_with_safe_sequences: bool = False, \
-                optimize_with_safe_zero_edges: bool = False, \
-                optimize_with_greedy: bool = True, \
-                threads: int = 4, \
-                time_limit: int = 300, \
-                presolve = "on", \
-                log_to_console = "false",\
-                external_solver = "highs"):
+    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int, subpath_constraints: list = [], **kwargs):
         """
         Initialize the Flow Decompostion model for a given number of paths.
 
@@ -74,26 +64,18 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
         self.path_weights_sol = None
         self.solution = None
 
-        external_solution_paths = None
+        greedy_solution_paths = None
         self.solve_statistics = {}
-        if optimize_with_greedy:
+        self.optimize_with_greedy = kwargs.get('optimize_with_greedy', True)
+        if self.optimize_with_greedy:
             if self.get_solution_with_greedy():
-                external_solution_paths = self.solution[0]
+                greedy_solution_paths = self.solution[0]
 
         # Call the constructor of the parent class genericDagModel
-        super().__init__(self.G, num_paths, \
-                         subpath_constraints = self.subpath_constraints, \
-                         optimize_with_safe_paths = optimize_with_safe_paths, \
-                         optimize_with_safe_sequences = optimize_with_safe_sequences, \
-                         optimize_with_safe_zero_edges = optimize_with_safe_zero_edges, \
-                         external_solution_paths = external_solution_paths, \
-                         trusted_edges_for_safety = self.get_non_zero_flow_edges(), \
-                         solve_statistics = self.solve_statistics, \
-                         threads = threads, \
-                         time_limit = time_limit, \
-                         presolve = presolve, \
-                         log_to_console = log_to_console, \
-                         external_solver=external_solver)  
+        kwargs["trusted_edges_for_safety"] = self.get_non_zero_flow_edges()
+        kwargs["solve_statistics"] = self.solve_statistics
+        kwargs["external_solution_paths"] = greedy_solution_paths
+        super().__init__(self.G, num_paths, subpath_constraints = self.subpath_constraints, **kwargs)
         
         # If already solved with a previous method, we don't create solver, not add paths
         if self.solved:

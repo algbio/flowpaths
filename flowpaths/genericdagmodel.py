@@ -4,19 +4,7 @@ from utils import solverwrapper
 import time
 
 class GenericDAGModel:
-    def __init__(self, G: stdigraph.stDiGraph, num_paths: int, \
-                 subpath_constraints: list = None, \
-                 optimize_with_safe_paths: bool = False, \
-                 optimize_with_safe_sequences: bool = False, \
-                 optimize_with_safe_zero_edges: bool = False, \
-                 trusted_edges_for_safety: set = None, \
-                 external_solution_paths: list = None, \
-                 solve_statistics: dict = {}, \
-                 threads: int = 4, \
-                 time_limit: int = 300, \
-                 presolve = "on", \
-                 log_to_console = "false", \
-                 external_solver = "highs"):
+    def __init__(self, G: stdigraph.stDiGraph, num_paths: int, subpath_constraints: list = None, **kwargs):
         """
         This is a generic class modelling a path finding ILP in a DAG.
 
@@ -47,42 +35,45 @@ class GenericDAGModel:
         self.id = self.G.id
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
-        self.solve_statistics = solve_statistics
+
+        self.solve_statistics = kwargs.get("solve_statistics", {})
         self.edge_vars = {}
         self.edge_vars_sol = {}
         self.subpaths_vars = {}
 
-        self.threads = threads
-        self.time_limit = time_limit
-        self.presolve = presolve
-        self.log_to_console = log_to_console
-        self.external_solver = external_solver
+        self.threads = kwargs.get("threads", 4)
+        self.time_limit = kwargs.get("time_limit", 300)
+        self.presolve = kwargs.get("presolve", "on")    
+        self.log_to_console = kwargs.get("log_to_console", "false")
+        self.external_solver = kwargs.get("external_solver", "highs")
 
-        self.external_solution_paths = external_solution_paths
+        self.external_solution_paths = kwargs.get("external_solution_paths", None)
         if self.external_solution_paths is None:
             self.solved = None
         else:
             self.solved = True
 
         # optimizations
-        self.optimize_with_safe_zero_edges = optimize_with_safe_zero_edges
-        self.optimize_with_safe_paths = optimize_with_safe_paths
-        self.optimize_with_safe_sequences = optimize_with_safe_sequences
+        self.optimize_with_safe_zero_edges = kwargs.get("optimize_with_safe_zero_edges", False)
+        self.optimize_with_safe_paths = kwargs.get("optimize_with_safe_paths", False)
+        self.optimize_with_safe_sequences = kwargs.get("optimize_with_safe_sequences", False)
+        self.trusted_edges_for_safety = kwargs.get("trusted_edges_for_safety", None)
+
         self.safe_lists = None
         if self.optimize_with_safe_paths and not self.solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_paths(self.G, trusted_edges_for_safety, no_duplicates=False)
+            self.safe_lists = safety.safe_paths(self.G, self.trusted_edges_for_safety, no_duplicates=False)
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
         if self.optimize_with_safe_sequences and not self.solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_sequences(self.G, trusted_edges_for_safety, no_duplicates=False)
+            self.safe_lists = safety.safe_sequences(self.G, self.trusted_edges_for_safety, no_duplicates=False)
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
 
         # some checks
-        if self.safe_lists is not None and trusted_edges_for_safety is None:
+        if self.safe_lists is not None and self.trusted_edges_for_safety is None:
             raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")
-        if optimize_with_safe_paths and optimize_with_safe_sequences:
+        if self.optimize_with_safe_paths and self.optimize_with_safe_sequences:
             raise ValueError("Cannot optimize with both safe paths and safe sequences")
 
     def create_solver_and_paths(self):
