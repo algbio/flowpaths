@@ -4,7 +4,7 @@ import stdigraph
 import kflowdecomp as kflowdecomp    
 
 class MinFlowDecomp:
-    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = int, subpath_constraints: list = [], **kwargs):
+    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = float, subpath_constraints: list = [], **kwargs):
         """
         Initialize the Minimum Flow Decompostion model, minimizing the number of paths.
 

@@ -5,7 +5,7 @@ import genericdagmodel as dagmodel
 
 class kFlowDecomp(dagmodel.GenericDAGModel):
 
-    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = int, subpath_constraints: list = [], **kwargs):
+    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = float, subpath_constraints: list = [], **kwargs):
         """
         Initialize the Flow Decompostion model for a given number of paths.
 
