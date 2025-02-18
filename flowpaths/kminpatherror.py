@@ -143,12 +143,14 @@ class kMinPathError(dagmodel.GenericDAGModel):
             
             f_u_v = data[self.flow_attr]
 
+            # pi vars from https://arxiv.org/pdf/2201.10923 
+
             for i in range(self.k):
                 self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max,                                     name="10e_u={}_v={}_i={}".format(u,v,i))
                 self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.path_weights_vars[(i)],                                              name="10f_u={}_v={}_i={}".format(u,v,i))
                 self.solver.add_constraint(self.pi_vars[(u,v,i)] >= self.path_weights_vars[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max, name="10g_u={}_v={}_i={}".format(u,v,i))
 
-            # gamma varts from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content 
+            # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content 
 
             for i in range(self.k):
                 self.solver.add_constraint(self.gamma_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max,                                    name="12a_u={}_v={}_i={}".format(u,v,i))
