@@ -1,7 +1,7 @@
 class SolverWrapper:
     def __init__(self, solver_type='highs', **kwargs):
         self.solver_type = solver_type
-        self.tolerance = kwargs.get('tolerance', 1e-6)  # Default tolerance value
+        self.tolerance = kwargs.get('tolerance', 1e-4)  # Default tolerance value
 
         if solver_type == 'highs':
             import highspy

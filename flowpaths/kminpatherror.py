@@ -192,10 +192,10 @@ class kMinPathError(dagmodel.GenericDAGModel):
         for var, value in zip(varNames, varValues):
             if var[0] == 'w':
                 path_index = int(var[1:].strip())
-                self.path_weights_sol[path_index] = round(value) if self.weight_type == int else float(value)
+                self.path_weights_sol[path_index] = abs(round(value)) if self.weight_type == int else abs(float(value))
             elif var[0] == 's':
                 path_index = int(var[1:].strip())
-                self.path_slacks_sol[path_index] = round(value) if self.weight_type == int else float(value)
+                self.path_slacks_sol[path_index] = abs(round(value)) if self.weight_type == int else abs(float(value))
 
         return self.path_weights_sol, self.path_slacks_sol
     

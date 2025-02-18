@@ -56,7 +56,7 @@ def main():
     graph.remove_edge('a', 'c')
     graph.add_edge('a', 'c', flow=5)
 
-    kminpatherror_model = kmpe.kMinPathError(graph, flow_attr='flow', weight_type=int, num_paths=3,
+    kminpatherror_model = kmpe.kMinPathError(graph, flow_attr='flow', weight_type=float, num_paths=3,
                                              optimize_with_safe_paths=True, 
                                              optimize_with_safe_sequences=False, 
                                              optimize_with_safe_zero_edges=True, 
