@@ -43,7 +43,7 @@ class GenericDAGModel:
 
         self.threads = kwargs.get("threads", 4)
         self.time_limit = kwargs.get("time_limit", 300)
-        self.presolve = kwargs.get("presolve", "on")    
+        self.presolve = kwargs.get("presolve", "on")
         self.log_to_console = kwargs.get("log_to_console", "false")
         self.external_solver = kwargs.get("external_solver", "highs")
 
@@ -240,6 +240,8 @@ class GenericDAGModel:
                 v = elements[2].strip(' \'')
                 i = int(elements[3].strip())
                 self.edge_vars_sol[(u, v, i)] = abs(round(varValues[index]))  # TODO: check if we can add tolerance here, how does it work with other solvers?
+                if self.edge_vars_sol[(u, v, i)] not in [0, 1]:
+                    raise Exception(f"Variable {var} has value {self.edge_vars_sol[(u, v, i)]} different from 0 or 1.")
 
     def get_solution_paths(self) -> list:
         """
