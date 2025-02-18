@@ -6,7 +6,7 @@ import graphviz as gv
 
 class kMinPathError(dagmodel.GenericDAGModel):
 
-    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = float, subpath_constraints: list = [], **kwargs):
+    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = float, subpath_constraints: list = [], edges_to_ignore: list = [], **kwargs):
         """
         Initialize the Min Path Error model for a given number of paths.
 
@@ -44,7 +44,8 @@ class kMinPathError(dagmodel.GenericDAGModel):
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
-        self.edges_to_ignore = set(self.G.source_edges)
+        self.edges_to_ignore = set(edges_to_ignore)
+        self.edges_to_ignore.update(self.G.source_edges)
         self.edges_to_ignore.update(self.G.sink_edges)
         self.flow_attr = flow_attr
         self.w_max = num_paths * self.weight_type(self.get_max_flow_value_and_check_positive_flow())
@@ -63,7 +64,7 @@ class kMinPathError(dagmodel.GenericDAGModel):
         self.solve_statistics = {}
 
         # Call the constructor of the parent class genericDagModel
-        kwargs["trusted_edges_for_safety"] = self.get_non_zero_flow_edges()
+        kwargs["trusted_edges_for_safety"] = self.get_non_zero_flow_edges().difference(self.edges_to_ignore)
         kwargs["solve_statistics"] = self.solve_statistics
         super().__init__(self.G, num_paths, subpath_constraints = self.subpath_constraints, **kwargs)
 

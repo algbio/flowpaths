@@ -76,7 +76,7 @@ class stDiGraph(nx.DiGraph):
 
         return self.width
     
-    def compute_max_edge_antichain(self, get_antichain = False, weight_function = {}):
+    def compute_max_edge_antichain(self, get_antichain = False, weight_function = None):
         """
         Computes the maximum edge antichain in a directed graph.
 
@@ -84,8 +84,10 @@ class stDiGraph(nx.DiGraph):
         ----------
         - get_antichain (bool): If True, the function also returns the antichain along with its cost. Default is False.
         - weight_function (dict): A dictionary where keys are edges (tuples) and values are weights. 
-                If empty, weights 1 are used. If given, the antichain weight is computed as the sum of the weights of the edges in the antichain. 
-                Default is {}.
+                If None, weights 1 are used for original graph edges, and weight 0 are used for source / sink edges. 
+                If given, the antichain weight is computed as the sum of the weights of the edges in the antichain,
+                where edges that have some missing weight again get weight 0. 
+                Default is None.
         
         Returns
         ----------
@@ -102,9 +104,12 @@ class stDiGraph(nx.DiGraph):
         for (u,v) in self.edges():
             # the cost of each path is 1
             cost = 1 if u == self.source else 0 
-            # the demand of each edge is either from weight_function, or 1 if edge of base_graph, or 0 otherwise
-            is_not_source_sink = int(u != self.source and v != self.sink)
-            demand[(u,v)] = weight_function[(u,v)] if weight_function else is_not_source_sink
+            
+            edge_demand = int(u != self.source and v != self.sink)
+            if weight_function:
+                edge_demand = weight_function.get((u,v),0)
+            
+            demand[(u,v)] = edge_demand
             # adding the edge
             G_nx.add_edge(u, v, l = demand[(u,v)], u = graphutils.bigNumber, c = cost)
 
