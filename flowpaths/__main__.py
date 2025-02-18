@@ -7,6 +7,7 @@ import networkx as nx
 def main():
     # Create a simple graph
     graph = nx.DiGraph()
+    graph.graph['id'] = "simple_graph"
     graph.add_edge(0, 'a', flow=6)
     graph.add_edge(0, 'b', flow=7)
     graph.add_edge('a', 'b', flow=2)
@@ -22,6 +23,8 @@ def main():
     
     # We solve it
     mfd_model.solve()
+
+    mfd_model.draw_solution()
 
     # We process its solution
     process_solution(mfd_model)

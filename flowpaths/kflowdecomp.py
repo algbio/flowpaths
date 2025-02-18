@@ -2,6 +2,7 @@ import time
 import networkx as nx
 import stdigraph
 import genericdagmodel as dagmodel
+from graphviz import Digraph
 
 class kFlowDecomp(dagmodel.GenericDAGModel):
 
@@ -298,8 +299,8 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
         if self.solution is None:
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_weights = self.solution[1]
         solution_paths = self.solution[0]
+        solution_weights = self.solution[1]
         solution_paths_of_edges = [[(path[i],path[i+1]) for i in range(len(path)-1)] for path in solution_paths]
 
         flow_from_paths = {(u,v):0 for (u,v) in self.G.edges()}
@@ -397,3 +398,32 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
             weights.append(bottleneck)
             
         return (paths, weights)
+
+    def draw_solution(self, show_flow_attr=True):
+
+        self.check_solved()
+
+        dot = Digraph(format='pdf')
+        dot.graph_attr['rankdir'] = 'LR'        # Display the graph in landscape mode
+        dot.node_attr['shape']    = 'rectangle' # Rectangle nodes
+
+        colors = ['red','blue','green','purple','brown','cyan','yellow','pink','grey']
+
+        for u,v,data in self.G.edges(data=True):
+            if u == self.G.source or v == self.G.sink:
+                continue
+            if show_flow_attr and data[self.flow_attr] != None:
+                dot.edge(str(u),str(v),str(data[self.flow_attr]))
+            else:
+                dot.edge(str(u),str(v))
+
+        solution_paths,solution_weights = self.get_solution()
+
+        for path in solution_paths:
+            pathColor = colors[len(path)+73 % len(colors)]
+            for i in range(len(path)-1):
+                dot.edge(str(path[i]), str(path[i+1]), fontcolor=pathColor, color=pathColor, penwidth='2.0') #label=str(weight)
+            if len(path) == 1:
+                dot.node(str(path[0]), color=pathColor, penwidth='2.0')
+            
+        dot.render(filename=str(self.G.id),directory='.', view=True)

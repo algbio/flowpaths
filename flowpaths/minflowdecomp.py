@@ -91,6 +91,9 @@ class MinFlowDecomp:
         
     def check_solution(self) -> bool:
         return self.fd_model.check_solution()
+    
+    def draw_solution(self, show_flow_attr=True):
+        self.fd_model.draw_solution(show_flow_attr)
 
 
 

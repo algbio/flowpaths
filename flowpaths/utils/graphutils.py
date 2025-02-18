@@ -1,9 +1,6 @@
 from itertools import count
 import networkx as nx
-import logging
-#from graphviz  import Digraph
 
-logger    = logging.getLogger(__name__)
 bigNumber = 1 << 32
 
 def read_graph(graph_raw) -> nx.DiGraph:
@@ -15,7 +12,7 @@ def read_graph(graph_raw) -> nx.DiGraph:
     G.graph['id'] = id
 
     if n == 0:
-        logging.warning("Graph %s has 0 vertices.", id)
+        print("Graph %s has 0 vertices.", id)
         return G
 
     for edge in graph_raw[2:]:
@@ -43,21 +40,13 @@ def read_graphs(filename):
             break
 
     return graphs
-    
-
-# def is_0_flow_everywhere(G : graph.stDiGraph) -> bool:
-#     is_0_everywhere = True
-#     for edge in G.flow:
-#         if G.flow[edge]!=0:
-#             is_0_everywhere=False
-#             break
-#     return is_0_everywhere
-
 
 def min_cost_flow(G : nx.DiGraph, s, t):
     
     flowNetwork = nx.DiGraph()
     
+    
+
     flowNetwork.add_node(s, demand = -bigNumber)
     flowNetwork.add_node(t, demand = bigNumber)
             
@@ -93,38 +82,3 @@ def min_cost_flow(G : nx.DiGraph, s, t):
         flowDict[x][y] = flowDictNet[x][edgeMap[(x,y)]]
 
     return flowCost, flowDict
-
-
-
-
-
-'''
-def network2dot(G : graph.st_DAG, safe_sequences=[]):
-    dot = Digraph(format='pdf')
-    dot.graph_attr['rankdir'] = 'LR'        # Display the graph in landscape mode
-    dot.node_attr['shape']    = 'rectangle' # Rectangle nodes
-
-    E = G.edge_list
-    colors = ['red','blue','green','purple','brown','cyan','yellow','pink','grey']
-
-    for (u,v) in E:
-        dot.edge(str(u),str(v))#,label=str(F[(u,v)]))
-
-    for sequence in safe_sequences:
-        pathColor = colors[len(sequence)+73 % len(colors)]
-        for (u,v) in sequence:
-            dot.edge(str(u), str(v), fontcolor=pathColor, color=pathColor, penwidth='2.0') #label=str(weight)
-        if len(sequence) == 1:
-            dot.node(str(sequence[0]), color=pathColor, penwidth='2.0')
-           
-    dot.render(filename=G.id,directory='.', view=True)
-
-
-def visualize(G : graph.st_DAG, paths=[]):
-    network2dot(G, paths)
-'''
-
-
-# class GRB_TimeOut(Exception):
-#     def __init__(self, message:str):
-#         super(GRB_TimeOut, self).__init__('Gurobi TimeOut: ' + message)
