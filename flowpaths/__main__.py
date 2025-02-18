@@ -1,6 +1,5 @@
 import minflowdecomp as mfd
 import kminpatherror as kmpe
-from utils import graphutils
 import networkx as nx
 
 # Run as `python __main__.py` in the `flowpaths` directory
@@ -58,9 +57,9 @@ def main():
     graph.add_edge('a', 'c', flow=5)
 
     kminpatherror_model = kmpe.kMinPathError(graph, flow_attr='flow', weight_type=int, num_paths=3,
-                                             optimize_with_safe_paths=False, 
+                                             optimize_with_safe_paths=True, 
                                              optimize_with_safe_sequences=False, 
-                                             optimize_with_safe_zero_edges=False, 
+                                             optimize_with_safe_zero_edges=True, 
                                              optimize_with_greedy=False)
     kminpatherror_model.solve()
     process_solution_kmpe(kminpatherror_model)
