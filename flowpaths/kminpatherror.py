@@ -35,7 +35,6 @@ class kMinPathError(dagmodel.GenericDAGModel):
         ----------
         - ValueError: If `weight_type` is not int or float.
         - ValueError: If some edge does not have the flow attribute specified as `flow_attr`.
-        - ValueError: If the graph does not satisfy flow conservation on nodes different from source or sink.
         - ValueError: If the graph contains edges with negative (<0) flow values.
         """
 
@@ -129,24 +128,8 @@ class kMinPathError(dagmodel.GenericDAGModel):
 
     def encode_minpatherror_decomposition(self):
         """
-        TODO: update
-        Encodes the flow decomposition constraints for the given graph.
-        This method sets up the path weight variables and the edge variables encoding 
-        the sum of the weights of the paths going through the edge.
-        
-        The method performs the following steps:
-        1. Checks if the problem is already solved to avoid redundant encoding.
-        2. Initializes the sum of path weights variables (`pi_vars`) and path weight variables (`path_weights_vars`).
-        3. Iterates over each edge in the graph and adds constraints to ensure:
-
-        Returns
-        -------
-        - None
+        Encodes the minimum path error decomposition variables and constraints for the optimization problem.
         """
-
-        # If already solved, no need to encode further
-        if self.solved:
-            return
         
         self.pi_vars            = self.solver.add_variables(self.edge_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='p')
         self.path_weights_vars  = self.solver.add_variables(self.path_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='w')
@@ -186,11 +169,14 @@ class kMinPathError(dagmodel.GenericDAGModel):
         represents a weight (indicated by the variable name starting with 'w'), it extracts the
         weight index and assigns the corresponding value to the `path_weights_sol` list. The
         values are rounded if the weight type is `int`, and converted to float if the weight type
-        is `float`.
+        is `float`. 
+        
+        The above is repeated for the slack variables, and the values are assigned to the
+        `path_slacks_sol` list. 
 
         Returns
         -------
-        - list: A list of solution weights.
+        - tuple (list, list): A tuple of lists of path weights, and of path slacks.
         """
 
         self.check_solved()

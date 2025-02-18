@@ -53,18 +53,20 @@ class SolverWrapper:
 
     def set_objective(self, expr, sense='minimize'):
         if self.solver_type == 'highs':
-            import highspy
-            self.solver.setObjective(expr, sense=highspy.HighsObjectiveSense.kMinimize if sense == 'minimize' else highspy.HighsObjectiveSense.kMaximize)
+            if sense == 'minimize':
+                self.solver.minimize(expr)
+            else:
+                self.solver.maximize(expr)
         elif self.solver_type == 'gurobi':
             import gurobipy
             self.solver.setObjective(expr, gurobipy.GRB.MINIMIZE if sense == 'minimize' else gurobipy.GRB.MAXIMIZE)
 
-    def set_minimize(self):
-        if self.solver_type == 'highs':
-            self.solver.setMinimize()
-        elif self.solver_type == 'gurobi':
-            import gurobipy
-            self.solver.modelSense = gurobipy.GRB.MINIMIZE
+    # def set_minimize(self):
+    #     if self.solver_type == 'highs':
+    #         self.solver.setMinimize()
+    #     elif self.solver_type == 'gurobi':
+    #         import gurobipy
+    #         self.solver.modelSense = gurobipy.GRB.MINIMIZE
 
     def optimize(self):
         if self.solver_type == 'highs':
