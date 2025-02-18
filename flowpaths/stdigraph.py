@@ -84,7 +84,7 @@ class stDiGraph(nx.DiGraph):
         ----------
         - get_antichain (bool): If True, the function also returns the antichain along with its cost. Default is False.
         - weight_function (dict): A dictionary where keys are edges (tuples) and values are weights. 
-                If None, weights 1 are used for original graph edges, and weight 0 are used for source / sink edges. 
+                If None, weights 1 are used for original graph edges, and weights 0 are used for global source / global sink edges. 
                 If given, the antichain weight is computed as the sum of the weights of the edges in the antichain,
                 where edges that have some missing weight again get weight 0. 
                 Default is None.
