@@ -143,7 +143,7 @@ class kMinPathError(dagmodel.GenericDAGModel):
             
             f_u_v = data[self.flow_attr]
 
-            # pi vars from https://arxiv.org/pdf/2201.10923 
+            # pi vars from https://arxiv.org/pdf/2201.10923 page 14
 
             for i in range(self.k):
                 self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max,                                     name="10e_u={}_v={}_i={}".format(u,v,i))
