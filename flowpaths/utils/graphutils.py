@@ -45,8 +45,6 @@ def min_cost_flow(G : nx.DiGraph, s, t):
     
     flowNetwork = nx.DiGraph()
     
-    
-
     flowNetwork.add_node(s, demand = -bigNumber)
     flowNetwork.add_node(t, demand = bigNumber)
             
