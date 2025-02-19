@@ -131,9 +131,11 @@ class kMinPathError(dagmodel.GenericDAGModel):
         """
         Encodes the minimum path error decomposition variables and constraints for the optimization problem.
         """
-        
+        # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars            = self.solver.add_variables(self.edge_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='p')
         self.path_weights_vars  = self.solver.add_variables(self.path_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='w')
+        
+        # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content 
         self.gamma_vars         = self.solver.add_variables(self.edge_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='g')
         self.path_slacks_vars    = self.solver.add_variables(self.path_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='s')
 
@@ -143,19 +145,23 @@ class kMinPathError(dagmodel.GenericDAGModel):
             
             f_u_v = data[self.flow_attr]
 
-            # pi vars from https://arxiv.org/pdf/2201.10923 page 14
-
+            # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)], 
+            # assuming self.w_max is a bound for self.path_weights_vars[(i)]
             for i in range(self.k):
-                self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max,                                     name="10e_u={}_v={}_i={}".format(u,v,i))
-                self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.path_weights_vars[(i)],                                              name="10f_u={}_v={}_i={}".format(u,v,i))
-                self.solver.add_constraint(self.pi_vars[(u,v,i)] >= self.path_weights_vars[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max, name="10g_u={}_v={}_i={}".format(u,v,i))
-
-            # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content 
-
+                self.solver.add_product_constraint(binary_var  = self.edge_vars[(u,v,i)],
+                                                   product_var = self.path_weights_vars[(i)], 
+                                                   equal_var   = self.pi_vars[(u,v,i)],
+                                                   bound       = self.w_max, 
+                                                   name        = "10_u={}_v={}_i={}".format(u,v,i))
+                
+            # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)], 
+            # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
             for i in range(self.k):
-                self.solver.add_constraint(self.gamma_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max,                                    name="12a_u={}_v={}_i={}".format(u,v,i))
-                self.solver.add_constraint(self.gamma_vars[(u,v,i)] <= self.path_slacks_vars[(i)],                                              name="12b_u={}_v={}_i={}".format(u,v,i))
-                self.solver.add_constraint(self.gamma_vars[(u,v,i)] >= self.path_slacks_vars[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max, name="12c_u={}_v={}_i={}".format(u,v,i))
+                self.solver.add_product_constraint(binary_var  = self.edge_vars[(u,v,i)],
+                                                   product_var = self.path_slacks_vars[(i)], 
+                                                   equal_var   = self.gamma_vars[(u,v,i)],
+                                                   bound       = self.w_max, 
+                                                   name        = "12_u={}_v={}_i={}".format(u,v,i))
 
             self.solver.add_constraint(f_u_v - sum(self.pi_vars[(u,v,i)] for i in range(self.k)) <=  sum(self.gamma_vars[(u,v,i)] for i in range(self.k)), name="9a_u={}_v={}_i={}".format(u,v,i))
             self.solver.add_constraint(f_u_v - sum(self.pi_vars[(u,v,i)] for i in range(self.k)) >= -sum(self.gamma_vars[(u,v,i)] for i in range(self.k)), name="9a_u={}_v={}_i={}".format(u,v,i))

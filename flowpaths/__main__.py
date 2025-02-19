@@ -64,7 +64,7 @@ def main():
     kminpatherror_model.solve()
     process_solution_kmpe(kminpatherror_model)
 
-    # We now ignore the edge ('a', 'c') in the optimization
+    # We now ignore the edge ('a', 'c') in the optimization, but allow the paths to go through it
     kminpatherror_model = kmpe.kMinPathError(graph, flow_attr='flow', weight_type=int, num_paths=3, edges_to_ignore=[('a', 'c')],
                                              optimize_with_safe_paths=True, 
                                              optimize_with_safe_sequences=False, 

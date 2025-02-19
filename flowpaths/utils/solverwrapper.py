@@ -51,6 +51,11 @@ class SolverWrapper:
         elif self.solver_type == 'gurobi':
             self.solver.addConstr(expr, name=name)
 
+    def add_product_constraint(self, binary_var, product_var, equal_var, bound, name):
+        self.add_constraint(equal_var <= binary_var * bound, name=name + "_a")
+        self.add_constraint(equal_var <= product_var, name=name + "_b")
+        self.add_constraint(equal_var >= product_var - (1 - binary_var) * bound, name=name + "_c")
+
     def set_objective(self, expr, sense='minimize'):
         if self.solver_type == 'highs':
             if sense == 'minimize':
