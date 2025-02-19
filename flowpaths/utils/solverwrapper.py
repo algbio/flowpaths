@@ -23,7 +23,7 @@ class SolverWrapper:
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
         else:
-            raise ValueError(f"Unsupported solver type `{solver_type}`")
+            raise ValueError(f"Unsupported solver type `{solver_type}`, supported solvers are `highs` and `gurobi`.")
 
     def add_variables(self, indexes, lb=0, ub=1, var_type='integer', name_prefix=''):
         if self.solver_type == 'highs':

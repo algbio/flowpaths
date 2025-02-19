@@ -88,31 +88,6 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
         # This method is called from the current class modelMFD
         self.encode_flow_decomposition()
 
-    def get_solution_with_greedy(self):
-        """
-        Attempts to find a solution using a greedy algorithm.
-        This method first decomposes the problem using the maximum bottleneck approach.
-        If the number of paths obtained is less than or equal to the specified limit `k`,
-        it sets the solution and marks the problem as solved. It also records the time
-        taken to solve the problem using the greedy approach.
-
-        Returns
-        -------
-        - bool: True if a solution is found using the greedy algorithm, False otherwise.
-        """
-        
-        start_time = time.time()
-        (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
-        if len(paths) <= self.k:
-            self.solution = (paths, weights)
-            self.solved = True
-            self.solve_statistics = {}
-            self.solve_statistics["greedy_solve_time"] = time.time() - start_time
-            return True
-        
-        return False
-
-
     def encode_flow_decomposition(self):
         """
         Encodes the flow decomposition constraints for the given graph.
@@ -155,6 +130,30 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
 
             self.solver.add_constraint(sum(self.pi_vars[(u,v,i)] for i in range(self.k)) == f_u_v, name="10d_u={}_v={}_i={}".format(u,v,i))
    
+    def get_solution_with_greedy(self):
+        """
+        Attempts to find a solution using a greedy algorithm.
+        This method first decomposes the problem using the maximum bottleneck approach.
+        If the number of paths obtained is less than or equal to the specified limit `k`,
+        it sets the solution and marks the problem as solved. It also records the time
+        taken to solve the problem using the greedy approach.
+
+        Returns
+        -------
+        - bool: True if a solution is found using the greedy algorithm, False otherwise.
+        """
+        
+        start_time = time.time()
+        (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
+        if len(paths) <= self.k:
+            self.solution = (paths, weights)
+            self.solved = True
+            self.solve_statistics = {}
+            self.solve_statistics["greedy_solve_time"] = time.time() - start_time
+            return True
+        
+        return False
+
     def get_solution(self):
         """
         Retrieves the solution for the flow decomposition problem.
