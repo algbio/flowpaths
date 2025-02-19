@@ -44,11 +44,9 @@ class kMinPathError(dagmodel.GenericDAGModel):
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
-        self.edges_to_ignore = set(edges_to_ignore)
-        self.edges_to_ignore.update(self.G.source_edges)
-        self.edges_to_ignore.update(self.G.sink_edges)
+        self.edges_to_ignore = set(edges_to_ignore) | self.G.source_edges | self.G.sink_edges
         self.flow_attr = flow_attr
-        self.w_max = num_paths * self.weight_type(self.get_max_flow_value_and_check_positive_flow())
+        self.w_max = num_paths * self.weight_type(self.G.get_max_flow_value_and_check_positive_flow(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
     
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
@@ -76,41 +74,6 @@ class kMinPathError(dagmodel.GenericDAGModel):
 
         # This method is called from the current class to add the objective function
         self.encode_objective()
-
-    def get_max_flow_value_and_check_positive_flow(self):
-        """
-        Determines the maximum flow value in the graph and checks for positive flow values.
-
-        This method iterates over all edges in the graph, ignoring edges specified in 
-        `self.edges_to_ignore`. It checks if each edge has the required flow attribute 
-        specified by `self.flow_attr`. If an edge does not have this attribute, a 
-        ValueError is raised. If an edge has a negative flow value, a ValueError is 
-        raised. The method returns the maximum flow value found among all edges.
-
-        Returns
-        -------
-        - float: The maximum flow value among all edges in the graph.
-
-        Raises
-        -------
-        - ValueError: If an edge does not have the required flow attribute.
-        - ValueError: If an edge has a negative flow value.
-        """
-
-        w_max = float('-inf')   
-
-        for u, v, data in self.G.edges(data=True):
-            if (u,v) in self.edges_to_ignore:
-                continue
-            if not self.flow_attr in data:
-                raise ValueError(f"Edge ({u},{v}) does not have the required flow attribute '{self.flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data.")
-            if data[self.flow_attr] < 0:
-                raise ValueError(f"Edge ({u},{v}) has negative flow value {data[self.flow_attr]}. All flow values must be >=0.")
-            w_max = max(w_max, data[self.flow_attr])
-
-        return w_max
-
-    
 
     def encode_minpatherror_decomposition(self):
         """
