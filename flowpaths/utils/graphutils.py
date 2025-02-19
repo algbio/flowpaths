@@ -129,6 +129,31 @@ def maxBottleckPath(G: nx.DiGraph, flow_attr) -> tuple:
 
     return B[maxBottleneckSink], list(reversed(reverse_path))
 
+def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
+        """
+        Check if the flow conservation property holds for the given graph.
+
+        Parameters
+        ----------
+        - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
+        - flow_attr (str): The attribute name from where to get the flow values on the edges.
+
+        Returns
+        -------
+        - bool: True if the flow conservation property holds, False otherwise.
+        """
+        
+        for v in G.nodes():
+            if G.out_degree(v) == 0 or G.in_degree(v) == 0:
+                continue
+            out_flow = sum(flow for _,_,flow in G.out_edges(v, data=flow_attr))
+            in_flow  = sum(flow for _,_,flow in G.in_edges(v, data=flow_attr))
+            
+            if out_flow != in_flow:
+                return False
+            
+        return True
+
 
     #  # gv.render(dot, engine='dot', filepath=str(self.G.id), format='pdf')
         

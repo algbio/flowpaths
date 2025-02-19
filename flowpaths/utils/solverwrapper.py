@@ -84,14 +84,46 @@ class SolverWrapper:
         elif self.solver_type == 'gurobi':
             return self.solver.status
 
-    def get_variable_values(self):
+    def get_all_variable_values(self):
         if self.solver_type == 'highs':
             return self.solver.allVariableValues()
         elif self.solver_type == 'gurobi':
             return [var.X for var in self.solver.getVars()]
 
-    def get_variable_names(self):
+    def get_all_variable_names(self):
         if self.solver_type == 'highs':
             return self.solver.allVariableNames()
         elif self.solver_type == 'gurobi':
             return [var.VarName for var in self.solver.getVars()]
+        
+    def get_variable_values(self, name_prefix, index_types: list, allowed_values: list=None) -> dict:
+        
+        varNames = self.get_all_variable_names()
+        varValues = self.get_all_variable_values()
+
+        values = dict()
+
+        for index, var in enumerate(varNames):
+            if var.startswith(name_prefix):
+                if var.count('(') == 1:
+                    elements = [elem.strip(' \'') for elem in var.replace(name_prefix,'', 1).replace('(','').replace(')','').split(',')]
+                    tuple_index = tuple([index_types[i](elements[i]) for i in range(len(elements))])
+                   
+                    if len(index_types) != len(elements):
+                        raise Exception(f"We are getting the value of variable {var}, indexed by ({tuple_index}), but the provided list of var_types ({index_types}) has different length.")
+                   
+                    values[tuple_index] = round(varValues[index])  # TODO: check if we can add tolerance here, how does it work with other solvers?
+                    if allowed_values != None and values[tuple_index] not in allowed_values:
+                        raise Exception(f"Variable {var} has value {values[tuple_index]} different from {allowed_values}.")
+                else:
+                    element = var.replace(name_prefix,'',1)
+                    if len(index_types) != 1:
+                        raise Exception(f"We are getting the value of variable {var}, with only one index ({element}), but the provided list of var_types is not of length one ({index_types}).")
+                    
+                    index = index_types[0](element)
+                    values[index] = round(varValues[index])
+                    if allowed_values != None and values[index] not in allowed_values:
+                        raise Exception(f"Variable {var} has value {values[var]} different from {allowed_values}.")
+
+        return values
+

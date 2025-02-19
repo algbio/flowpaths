@@ -169,41 +169,6 @@ class kMinPathError(dagmodel.GenericDAGModel):
     def encode_objective(self):
 
         self.solver.set_objective(sum(self.path_slacks_vars[(i)] for i in range(self.k)), sense='minimize')
-
-    def __get_solution_weights_and_slacks(self) -> list:
-        """
-        Retrieves the solution weights from the solver and returns them as a list.
-        This method first checks if the solver has been solved using the `check_solved` method.
-        It then retrieves the variable names and values from the solver. For each variable that
-        represents a weight (indicated by the variable name starting with 'w'), it extracts the
-        weight index and assigns the corresponding value to the `path_weights_sol` list. The
-        values are rounded if the weight type is `int`, and converted to float if the weight type
-        is `float`. 
-        
-        The above is repeated for the slack variables, and the values are assigned to the
-        `path_slacks_sol` list. 
-
-        Returns
-        -------
-        - tuple (list, list): A tuple of lists of path weights, and of path slacks.
-        """
-
-        self.check_solved()
-        
-        varNames = self.solver.get_variable_names()
-        varValues = self.solver.get_variable_values()
-        self.path_weights_sol = [0]*len(range(0,self.k))
-        self.path_slacks_sol  = [0]*len(range(0,self.k))
-
-        for var, value in zip(varNames, varValues):
-            if var[0] == 'w':
-                path_index = int(var[1:].strip())
-                self.path_weights_sol[path_index] = abs(round(value)) if self.weight_type == int else abs(float(value))
-            elif var[0] == 's':
-                path_index = int(var[1:].strip())
-                self.path_slacks_sol[path_index] = abs(round(value)) if self.weight_type == int else abs(float(value))
-
-        return self.path_weights_sol, self.path_slacks_sol
     
     def get_solution(self):
         """
@@ -225,9 +190,13 @@ class kMinPathError(dagmodel.GenericDAGModel):
             return self.solution
 
         self.check_solved()
-        weights, slacks = self.__get_solution_weights_and_slacks()
 
-        self.solution = (self.get_solution_paths(), weights, slacks)
+        weights_sol_dict      = self.solver.get_variable_values('w', [int])
+        self.path_weights_sol = [abs(round(weights_sol_dict[i])) if self.weight_type == int else abs(float(weights_sol_dict[i])) for i in range(self.k)]
+        slacks_sol_dict       = self.solver.get_variable_values('s', [int])
+        self.path_slacks_sol  = [abs(round(slacks_sol_dict[i])) if self.weight_type == int else abs(float(slacks_sol_dict[i])) for i in range(self.k)]
+
+        self.solution = (self.get_solution_paths(), self.path_weights_sol, self.path_slacks_sol)
 
         return self.solution
     

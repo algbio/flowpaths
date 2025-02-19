@@ -227,22 +227,6 @@ class GenericDAGModel:
             raise Exception("Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
 
-    def __get_path_variables_values(self):
-        self.check_solved()
-
-        varNames = self.solver.get_variable_names()
-        varValues = self.solver.get_variable_values()
-
-        for index, var in enumerate(varNames):
-            if var[0] == 'e':
-                elements = var.replace('(',',').replace(')',',').split(',')
-                u = elements[1].strip(' \'')
-                v = elements[2].strip(' \'')
-                i = int(elements[3].strip())
-                self.edge_vars_sol[(u, v, i)] = abs(round(varValues[index]))  # TODO: check if we can add tolerance here, how does it work with other solvers?
-                if self.edge_vars_sol[(u, v, i)] not in [0, 1]:
-                    raise Exception(f"Variable {var} has value {self.edge_vars_sol[(u, v, i)]} different from 0 or 1.")
-
     def get_solution_paths(self) -> list:
         """
         Retrieves the solution paths from the graph.
@@ -259,7 +243,7 @@ class GenericDAGModel:
             return self.external_solution_paths
 
         if self.edge_vars_sol == {}:
-            self.__get_path_variables_values()
+            self.edge_vars_sol = self.solver.get_variable_values('e', [str, str, int], [0, 1])
 
         paths = []
         for i in range(self.k):

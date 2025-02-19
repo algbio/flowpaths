@@ -47,7 +47,7 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
 
         # Check requirements on input graph:
         # Check flow conservation
-        if not self.check_flow_conservation(G, flow_attr):
+        if not gu.check_flow_conservation(G, flow_attr):
             raise ValueError("The graph G does not satisfy flow conservation.")
 
         # Check that the flow is positive and get max flow value
@@ -144,31 +144,6 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
             w_max = max(w_max, data[self.flow_attr])
 
         return w_max
-    
-    def check_flow_conservation(self, G: nx.DiGraph, flow_attr) -> bool:
-        """
-        Check if the flow conservation property holds for the given graph.
-
-        Parameters
-        ----------
-        - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-        - flow_attr (str): The attribute name from where to get the flow values on the edges.
-
-        Returns
-        -------
-        - bool: True if the flow conservation property holds, False otherwise.
-        """
-        
-        for v in G.nodes():
-            if G.out_degree(v) == 0 or G.in_degree(v) == 0:
-                continue
-            out_flow = sum(flow for _,_,flow in G.out_edges(v, data=flow_attr))
-            in_flow  = sum(flow for _,_,flow in G.in_edges(v, data=flow_attr))
-            
-            if out_flow != in_flow:
-                return False
-            
-        return True
 
     def get_non_zero_flow_edges(self):
         """
@@ -228,38 +203,7 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
                                                    name        = "10_u={}_v={}_i={}".format(u,v,i))
 
             self.solver.add_constraint(sum(self.pi_vars[(u,v,i)] for i in range(self.k)) == f_u_v, name="10d_u={}_v={}_i={}".format(u,v,i))
-
-    def __get_solution_weights(self) -> list:
-        """
-        Retrieves the solution weights from the solver and returns them as a list.
-        This method first checks if the solver has been solved using the `check_solved` method.
-        It then retrieves the variable names and values from the solver. For each variable that
-        represents a weight (indicated by the variable name starting with 'w'), it extracts the
-        weight index and assigns the corresponding value to the `path_weights_sol` list. The
-        values are rounded if the weight type is `int`, and converted to float if the weight type
-        is `float`.
-
-        Returns
-        -------
-        - list: A list of solution weights.
-        """
-
-        self.check_solved()
-        
-        varNames = self.solver.get_variable_names()
-        varValues = self.solver.get_variable_values()
-        self.path_weights_sol = [0]*len(range(0,self.k))
-
-        for index, var in enumerate(varNames):
-            if var[0] == 'w':
-                weight_index = int(var[1:].strip())
-                if self.weight_type == int:
-                    self.path_weights_sol[weight_index] = round(varValues[index]) # TODO: check if we can add tolerance here, how does it work with other solvers?
-                elif self.weight_type == float:
-                    self.path_weights_sol[weight_index] = float(varValues[index])
-
-        return self.path_weights_sol
-    
+   
     def get_solution(self):
         """
         Retrieves the solution for the flow decomposition problem.
@@ -280,7 +224,10 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
             return self.solution
 
         self.check_solved()
-        self.solution = (self.get_solution_paths(), self.__get_solution_weights())
+        weights_sol_dict = self.solver.get_variable_values('w', [int])
+        self.path_weights_sol = [abs(round(weights_sol_dict[i])) if self.weight_type == int else abs(float(weights_sol_dict[i])) for i in range(self.k)]
+
+        self.solution = (self.get_solution_paths(), self.path_weights_sol)
 
         return self.solution
     
