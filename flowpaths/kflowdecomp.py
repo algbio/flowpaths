@@ -1,8 +1,8 @@
 import time
 import networkx as nx
 import stdigraph
+import utils.graphutils as gu
 import genericdagmodel as dagmodel
-from graphviz import Digraph
 
 class kFlowDecomp(dagmodel.GenericDAGModel):
 
@@ -102,7 +102,7 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
         """
         
         start_time = time.time()
-        (paths, weights) = self.decompose_using_max_bottleck()
+        (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
         if len(paths) <= self.k:
             self.solution = (paths, weights)
             self.solved = True
@@ -207,18 +207,25 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
         if self.solved:
             return
         
+        # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars            = self.solver.add_variables(self.edge_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='p')
         self.path_weights_vars  = self.solver.add_variables(self.path_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='w')
 
+
+        # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
         for u, v, data in self.G.edges(data=True):
             if (u,v) in self.edges_to_ignore:
                 continue
             f_u_v = data[self.flow_attr]
 
+            # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)], 
+            # assuming self.w_max is a bound for self.path_weights_vars[(i)]
             for i in range(self.k):
-                self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.edge_vars[(u,v,i)] * self.w_max, name="10e_u={}_v={}_i={}".format(u,v,i))
-                self.solver.add_constraint(self.pi_vars[(u,v,i)] <= self.path_weights_vars[(i)], name="10f_u={}_v={}_i={}".format(u,v,i))
-                self.solver.add_constraint(self.pi_vars[(u,v,i)] >= self.path_weights_vars[(i)] - (1 - self.edge_vars[(u,v,i)]) * self.w_max, name="10g_u={}_v={}_i={}".format(u,v,i))
+                self.solver.add_product_constraint(binary_var  = self.edge_vars[(u,v,i)],
+                                                   product_var = self.path_weights_vars[(i)], 
+                                                   equal_var   = self.pi_vars[(u,v,i)],
+                                                   bound       = self.w_max, 
+                                                   name        = "10_u={}_v={}_i={}".format(u,v,i))
 
             self.solver.add_constraint(sum(self.pi_vars[(u,v,i)] for i in range(self.k)) == f_u_v, name="10d_u={}_v={}_i={}".format(u,v,i))
 
@@ -317,93 +324,15 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
 
         return True
     
-    def maxBottleckPath(self, G: nx.DiGraph):
-        """
-        Computes the maximum bottleneck path in a directed graph.
-        
-        Parameters
-        ----------
-        - G (nx.DiGraph): A directed graph where each edge has a flow attribute.
-        
-        Returns
-        ----------
-        - tuple: A tuple containing:
-            - The value of the maximum bottleneck.
-            - The path corresponding to the maximum bottleneck (list of nodes).
-                If no s-t flow exists in the network, returns (None, None).
-        """
-        B = dict()
-        maxInNeighbor = dict()
-        maxBottleneckSink = None
 
-        # Computing the B values with DP
-        for v in nx.topological_sort(G):
-            if G.in_degree(v) == 0:
-                B[v] = float('inf')
-            else:
-                B[v] = float('-inf')
-                for u in G.predecessors(v):
-                    uBottleneck = min(B[u], G.edges[u,v][self.flow_attr])
-                    if uBottleneck > B[v]:
-                        B[v] = uBottleneck 
-                        maxInNeighbor[v] = u
-                if G.out_degree(v) == 0:
-                    if maxBottleneckSink is None or B[v] > B[maxBottleneckSink]:
-                        maxBottleneckSink = v
-
-        
-        # If no s-t flow exists in the network
-        if B[maxBottleneckSink] == 0:
-            return None, None
-        
-        # Recovering the path of maximum bottleneck
-        reverse_path = [maxBottleneckSink]
-        while G.in_degree(reverse_path[-1]) > 0:
-            reverse_path.append(maxInNeighbor[reverse_path[-1]])
-
-        return B[maxBottleneckSink], list(reversed(reverse_path))
-    
-    def decompose_using_max_bottleck(self):
-        """
-        Decomposes the flow greedily into paths using the maximum bottleneck algorithm.
-        This method iteratively finds the path with the maximum bottleneck capacity
-        in the graph and decomposes the flow along that path. The process continues
-        until no more paths can be found.
-        
-        Returns
-        ----------
-        - tuple: A tuple containing two lists:
-            - paths (list of lists): A list of paths, where each path is represented
-              as a list of nodes.
-            - weights (list): A list of weights (bottleneck capacities) corresponding to each path.
-        """
-        
-        paths = list()
-        weights = list()
-        
-        temp_G = nx.DiGraph()
-        temp_G.add_nodes_from(self.G.nodes())
-        temp_G.add_edges_from(self.G.edges(data=True))
-        temp_G.remove_nodes_from([self.G.source, self.G.sink])
-        
-        while True:
-            bottleneck, path = self.maxBottleckPath(temp_G)
-            if path is None:
-                break
-                
-            for i in range(len(path)-1):
-                temp_G[path[i]][path[i+1]][self.flow_attr] -= bottleneck
-            
-            paths.append(path)
-            weights.append(bottleneck)
-            
-        return (paths, weights)
 
     def draw_solution(self, show_flow_attr=True):
 
+        import graphviz as gv
+
         self.check_solved()
 
-        dot = Digraph(format='pdf')
+        dot = gv.Digraph(format='pdf')
         dot.graph_attr['rankdir'] = 'LR'        # Display the graph in landscape mode
         dot.node_attr['shape']    = 'rectangle' # Rectangle nodes
 
@@ -426,4 +355,4 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
             if len(path) == 1:
                 dot.node(str(path[0]), color=pathColor, penwidth='2.0')
             
-        dot.render(filename=str(self.G.id),directory='.', view=True)
+   

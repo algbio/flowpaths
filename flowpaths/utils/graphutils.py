@@ -82,6 +82,54 @@ def min_cost_flow(G : nx.DiGraph, s, t):
     return flowCost, flowDict
 
 
+def maxBottleckPath(G: nx.DiGraph, flow_attr) -> tuple:
+    """
+    Computes the maximum bottleneck path in a directed graph.
+    
+    Parameters
+    ----------
+    - G (nx.DiGraph): A directed graph where each edge has a flow attribute.
+    - flow_attr (str): The flow attribute from where to get the flow values.
+    
+    Returns
+    ----------
+    - tuple: A tuple containing:
+        - The value of the maximum bottleneck.
+        - The path corresponding to the maximum bottleneck (list of nodes).
+            If no s-t flow exists in the network, returns (None, None).
+    """
+    B = dict()
+    maxInNeighbor = dict()
+    maxBottleneckSink = None
+
+    # Computing the B values with DP
+    for v in nx.topological_sort(G):
+        if G.in_degree(v) == 0:
+            B[v] = float('inf')
+        else:
+            B[v] = float('-inf')
+            for u in G.predecessors(v):
+                uBottleneck = min(B[u], G.edges[u,v][flow_attr])
+                if uBottleneck > B[v]:
+                    B[v] = uBottleneck 
+                    maxInNeighbor[v] = u
+            if G.out_degree(v) == 0:
+                if maxBottleneckSink is None or B[v] > B[maxBottleneckSink]:
+                    maxBottleneckSink = v
+
+    
+    # If no s-t flow exists in the network
+    if B[maxBottleneckSink] == 0:
+        return None, None
+    
+    # Recovering the path of maximum bottleneck
+    reverse_path = [maxBottleneckSink]
+    while G.in_degree(reverse_path[-1]) > 0:
+        reverse_path.append(maxInNeighbor[reverse_path[-1]])
+
+    return B[maxBottleneckSink], list(reversed(reverse_path))
+
+
     #  # gv.render(dot, engine='dot', filepath=str(self.G.id), format='pdf')
         
     #     dot.render(filename=str(self.G.id),directory='.', view=True)

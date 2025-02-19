@@ -196,3 +196,41 @@ class stDiGraph(nx.DiGraph):
         reachable_nodes_reverse = {v} | {reachable_node_reverse for node in predecessors for reachable_node_reverse in predecessors[node]}
         
         return reachable_nodes_reverse
+    
+    def decompose_using_max_bottleck(self, flow_attr: str):
+        """
+        Decomposes the flow greedily into paths using the maximum bottleneck algorithm.
+        This method iteratively finds the path with the maximum bottleneck capacity
+        in the graph and decomposes the flow along that path. The process continues
+        until no more paths can be found.
+        
+        Returns
+        ----------
+        - tuple: A tuple containing two lists:
+            - paths (list of lists): A list of paths, where each path is represented
+                as a list of nodes.
+            - weights (list): A list of weights (bottleneck capacities) corresponding to each path.
+        """
+        
+        paths = list()
+        weights = list()
+        
+        temp_G = nx.DiGraph()
+        temp_G.add_nodes_from(self.nodes())
+        temp_G.add_edges_from(self.edges(data=True))
+        temp_G.remove_nodes_from([self.source, self.sink])
+        
+        while True:
+            bottleneck, path = graphutils.maxBottleckPath(temp_G, flow_attr)
+            if path is None:
+                break
+                
+            for i in range(len(path)-1):
+                temp_G[path[i]][path[i+1]][flow_attr] -= bottleneck
+            
+            paths.append(path)
+            weights.append(bottleneck)
+            
+        return (paths, weights)
+
+
