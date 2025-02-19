@@ -44,7 +44,7 @@ class kMinPathError(dagmodel.GenericDAGModel):
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
-        self.edges_to_ignore = set(edges_to_ignore) | self.G.source_edges | self.G.sink_edges
+        self.edges_to_ignore = set(edges_to_ignore) | set(self.G.source_edges) | set(self.G.sink_edges)
         self.flow_attr = flow_attr
         self.w_max = num_paths * self.weight_type(self.G.get_max_flow_value_and_check_positive_flow(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
     

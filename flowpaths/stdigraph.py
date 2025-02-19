@@ -250,7 +250,7 @@ class stDiGraph(nx.DiGraph):
 
         return non_zero_flow_edges
     
-    def get_max_flow_value_and_check_positive_flow(self, flow_attr:str, edges_to_ignore: set = set()) -> float:
+    def get_max_flow_value_and_check_positive_flow(self, flow_attr:str, edges_to_ignore: set) -> float:
         """
         Determines the maximum flow value in the graph and checks for positive flow values.
 
@@ -271,6 +271,8 @@ class stDiGraph(nx.DiGraph):
         """
 
         w_max = float('-inf')   
+        if edges_to_ignore is None:
+            edges_to_ignore = set()
 
         for u, v, data in self.edges(data=True):
             if (u,v) in edges_to_ignore:
