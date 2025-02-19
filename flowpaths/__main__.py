@@ -59,15 +59,15 @@ def main():
     kminpatherror_model = kmpe.kMinPathError(graph, flow_attr='flow', weight_type=float, num_paths=3,
                                              optimize_with_safe_paths=True, 
                                              optimize_with_safe_sequences=False, 
-                                             optimize_with_safe_zero_edges=True, 
+                                             optimize_with_safe_zero_edges=False, 
                                              optimize_with_greedy=False)
     kminpatherror_model.solve()
     process_solution_kmpe(kminpatherror_model)
 
     # We now ignore the edge ('a', 'c') in the optimization, but allow the paths to go through it
     kminpatherror_model = kmpe.kMinPathError(graph, flow_attr='flow', weight_type=int, num_paths=3, edges_to_ignore=[('a', 'c')],
-                                             optimize_with_safe_paths=True, 
-                                             optimize_with_safe_sequences=False, 
+                                             optimize_with_safe_paths=False, 
+                                             optimize_with_safe_sequences=True, 
                                              optimize_with_safe_zero_edges=True, 
                                              optimize_with_greedy=False)
     kminpatherror_model.solve()

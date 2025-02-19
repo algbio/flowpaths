@@ -62,12 +62,12 @@ class GenericDAGModel:
         self.safe_lists = None
         if self.optimize_with_safe_paths and not self.solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_paths(self.G, self.trusted_edges_for_safety, no_duplicates=False)
+            self.safe_lists = safety.safe_paths(self.G, self.trusted_edges_for_safety, no_duplicates=False, threads=self.threads)
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
         if self.optimize_with_safe_sequences and not self.solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_sequences(self.G, self.trusted_edges_for_safety, no_duplicates=False)
+            self.safe_lists = safety.safe_sequences(self.G, self.trusted_edges_for_safety, no_duplicates=False, threads=self.threads)
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
 
         # some checks

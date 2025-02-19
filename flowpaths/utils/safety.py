@@ -1,5 +1,6 @@
 import stdigraph as stdigraph
 from queue import Queue
+from copy import deepcopy
 
 def find_all_bridges(adj_dict, s, t) -> list:
 
@@ -48,19 +49,19 @@ def find_all_bridges(adj_dict, s, t) -> list:
                     component[v]=i
         i = i+1
 
-    #recover original adjacency relation
-    for i in range(len(p)-1):
-        u,v = p[i],p[i+1]
-        adj_dict[v].pop()      #remove reversed edges
-        adj_dict[u].append(v)  #reinsert removed edges
+    # #recover original adjacency relation
+    # for i in range(len(p)-1):
+    #     u,v = p[i],p[i+1]
+    #     adj_dict[v].pop()      #remove reversed edges
+    #     adj_dict[u].append(v)  #reinsert removed edges
 
     return bridges
 
-def safe_sequences_of_base_edges(G : stdigraph.stDiGraph, no_duplicates = False) -> list :
+def safe_sequences_of_base_edges(G : stdigraph.stDiGraph, no_duplicates = False, threads: int = 4) -> list :
     
-    return safe_sequences(G, G.base_graph.edges(), no_duplicates)
+    return safe_sequences(G, G.base_graph.edges(), no_duplicates, threads=threads)
 
-def safe_sequences(G : stdigraph.stDiGraph, edges_to_cover: list, no_duplicates = False) -> list :
+def safe_sequences(G : stdigraph.stDiGraph, edges_to_cover: list, no_duplicates = False, threads: int = 4) -> list :
     
     sequences = set() if no_duplicates else []
 
@@ -74,55 +75,70 @@ def safe_sequences(G : stdigraph.stDiGraph, edges_to_cover: list, no_duplicates 
         for v in G.predecessors(u):
             adj_dict_rev[u].append(v)
 
-    for (u,v) in edges_to_cover:
-        left_extension  = find_all_bridges(adj_dict_rev , u, G.source)
-        right_extension = find_all_bridges(adj_dict     , v, G.sink  )
+    import concurrent.futures
 
-        for i in range(len(left_extension)): #reverse edges of left extension, recall G^R
-            x,y = left_extension[i]
-            left_extension[i] = (y,x)
+    def process_edge(edge):
+        u, v = edge
+        left_extension = find_all_bridges(deepcopy(adj_dict_rev), u, G.source)
+        right_extension = find_all_bridges(deepcopy(adj_dict), v, G.sink)
 
-        seq = left_extension[::-1] + [ (u,v,) ] + right_extension
+        for i in range(len(left_extension)):  # reverse edges of left extension, recall G^R
+            x, y = left_extension[i]
+            left_extension[i] = (y, x)
 
-        if no_duplicates:
-            sequences.add(tuple(seq))
-        else:
-            sequences.append(seq)
+        seq = left_extension[::-1] + [(u, v,)] + right_extension
+
+        return tuple(seq) if no_duplicates else seq
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+        results = list(executor.map(process_edge, edges_to_cover))
+
+    if no_duplicates:
+        sequences.update(results)
+    else:
+        sequences.extend(results)
 
     if no_duplicates:
         return list(sequences)
     else:
         return sequences
 
-def safe_paths_of_base_edges(G : stdigraph.stDiGraph, no_duplicates = False) -> list :
+def safe_paths_of_base_edges(G : stdigraph.stDiGraph, no_duplicates = False, threads: int = 4) -> list :
 
     return safe_paths(G, G.base_graph.edges(), no_duplicates)
 
-def safe_paths(G : stdigraph.stDiGraph, edges_to_cover: list, no_duplicates = False) -> list :
+def safe_paths(G : stdigraph.stDiGraph, edges_to_cover: list, no_duplicates = False, threads: int = 4) -> list :
     
     paths = set() if no_duplicates else []
 
-    for e in edges_to_cover:
+    import concurrent.futures
+
+    def process_edge(e):
         path = []
-        u,v = e
-        
+        u, v = e
+
         while G.in_degree(u) == 1:
             x = next(G.predecessors(u))
-            path.append( (x,u) )
+            path.append((x, u))
             u = x
 
         path = path[::-1]
         path.append(e)
-        
+
         while G.out_degree(v) == 1:
             x = next(G.successors(v))
-            path.append( (v,x) )
+            path.append((v, x))
             v = x
 
-        if no_duplicates:
-            paths.add(tuple(path))
-        else:
-            paths.append(path)
+        return tuple(path) if no_duplicates else path
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+        results = list(executor.map(process_edge, edges_to_cover))
+
+    if no_duplicates:
+        paths.update(results)
+    else:
+        paths.extend(results)
 
     if no_duplicates:
         return list(paths)

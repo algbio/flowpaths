@@ -51,6 +51,8 @@ class TestMinFlowDecomp(unittest.TestCase):
                                             optimize_with_greedy=settings[4], 
                                             external_solver=settings[5])
                 mfd_model.solve()
+                print(mfd_model.kwargs)
+                print(mfd_model.solve_statistics)
                 self.assertTrue(mfd_model.solved, "Model should be solved")
                 self.assertTrue(mfd_model.check_solution(), "The solution is not a valid flow decomposition, under the default tolerance.")
 
