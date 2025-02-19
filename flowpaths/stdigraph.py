@@ -232,5 +232,55 @@ class stDiGraph(nx.DiGraph):
             weights.append(bottleneck)
             
         return (paths, weights)
+    
+    def get_non_zero_flow_edges(self, flow_attr:str, edges_to_ignore: set = set()) -> set:
+        """
+        Get all edges with non-zero flow values.
+
+        Returns
+        -------
+        set
+            A set of edges (tuples) that have non-zero flow values.
+        """
+        
+        non_zero_flow_edges = set()
+        for u, v, data in self.edges(data=True):
+            if (u,v) not in edges_to_ignore and data.get(flow_attr, 0) != 0:
+                non_zero_flow_edges.add((u,v))
+
+        return non_zero_flow_edges
+    
+    def get_max_flow_value_and_check_positive_flow(self, flow_attr:str, edges_to_ignore: set = set()) -> float:
+        """
+        Determines the maximum flow value in the graph and checks for positive flow values.
+
+        This method iterates over all edges in the graph, ignoring edges specified in 
+        `self.edges_to_ignore`. It checks if each edge has the required flow attribute 
+        specified by `self.flow_attr`. If an edge does not have this attribute, a 
+        ValueError is raised. If an edge has a negative flow value, a ValueError is 
+        raised. The method returns the maximum flow value found among all edges.
+
+        Returns
+        -------
+        - float: The maximum flow value among all edges in the graph.
+
+        Raises
+        -------
+        - ValueError: If an edge does not have the required flow attribute.
+        - ValueError: If an edge has a negative flow value.
+        """
+
+        w_max = float('-inf')   
+
+        for u, v, data in self.edges(data=True):
+            if (u,v) in edges_to_ignore:
+                continue
+            if not flow_attr in data:
+                raise ValueError(f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data.")
+            if data[flow_attr] < 0:
+                raise ValueError(f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0.")
+            w_max = max(w_max, data[flow_attr])
+
+        return w_max
 
 

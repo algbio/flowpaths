@@ -64,7 +64,7 @@ class kMinPathError(dagmodel.GenericDAGModel):
         self.solve_statistics = {}
 
         # Call the constructor of the parent class genericDagModel
-        kwargs["trusted_edges_for_safety"] = self.get_non_zero_flow_edges().difference(self.edges_to_ignore)
+        kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore).difference(self.edges_to_ignore)
         kwargs["solve_statistics"] = self.solve_statistics
         super().__init__(self.G, num_paths, subpath_constraints = self.subpath_constraints, **kwargs)
 
@@ -110,22 +110,7 @@ class kMinPathError(dagmodel.GenericDAGModel):
 
         return w_max
 
-    def get_non_zero_flow_edges(self):
-        """
-        Get all edges with non-zero flow values.
-
-        Returns
-        -------
-        set
-            A set of edges (tuples) that have non-zero flow values.
-        """
-        
-        non_zero_flow_edges = set()
-        for u, v, data in self.G.edges(data=True):
-            if (u,v) not in self.edges_to_ignore and data.get(self.flow_attr, 0) != 0:
-                non_zero_flow_edges.add((u,v))
-
-        return non_zero_flow_edges
+    
 
     def encode_minpatherror_decomposition(self):
         """
@@ -175,12 +160,12 @@ class kMinPathError(dagmodel.GenericDAGModel):
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
-        Otherwise, it checks if the problem has been solved, computes the solution paths and weights,
+        Otherwise, it checks if the problem has been solved, computes the solution paths, weights, slacks
         and caches the solution.
 
         Returns
         -------
-        - tuple: A tuple containing the solution paths and their corresponding weights.
+        - tuple: A tuple containing the solution paths, their corresponding weights, and their corresponding slacks.
 
         Raises:
         - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
