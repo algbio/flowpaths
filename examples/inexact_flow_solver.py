@@ -35,7 +35,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         # This method is called from the current class
         self.encode_inexact_flow_decomposition()
 
-        # We encode the objective
+        # We encode the objective, from the current class
         self.encode_objective()
             
     def encode_inexact_flow_decomposition(self):
@@ -105,6 +105,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
 
     def encode_objective(self):
 
+        # We set the objective to minimize the sum of the path weights
         self.solver.set_objective(
             sum(self.path_weights_vars[(i)] for i in range(self.k)), 
             sense="minimize",
