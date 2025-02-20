@@ -1,10 +1,11 @@
+import highspy
+
 class SolverWrapper:
     def __init__(self, solver_type="highs", **kwargs):
         self.solver_type = solver_type
         self.tolerance = kwargs.get("tolerance", 1e-4)  # Default tolerance value
 
         if solver_type == "highs":
-            import highspy
 
             self.solver = highspy.Highs()
             self.solver.setOptionValue("threads", kwargs.get("threads", 4))
@@ -39,7 +40,6 @@ class SolverWrapper:
 
     def add_variables(self, indexes, lb=0, ub=1, var_type="integer", name_prefix=""):
         if self.solver_type == "highs":
-            import highspy
 
             var_type_map = {
                 "integer": highspy.HighsVarType.kInteger,
