@@ -76,7 +76,7 @@ class SolverWrapper:
         elif self.solver_type == "gurobi":
             self.solver.addConstr(expr, name=name)
 
-    def add_product_constraint(self, binary_var, product_var, equal_var, bound, name):
+    def add_product_constraint(self, binary_var, product_var, equal_var, bound, name: str):
         """
         This function adds constraints to model the equality:
             binary_var * product_var = equal_var

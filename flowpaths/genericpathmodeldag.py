@@ -128,9 +128,10 @@ class GenericPathModelDAG:
             (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
         ]
         self.path_indexes = [(i) for i in range(self.k)]
-        self.subpath_indexes = [
-            (i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))
-        ]
+        if self.subpath_constraints:
+            self.subpath_indexes = [
+                (i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))
+            ]
 
         self.edge_vars = self.solver.add_variables(
             self.edge_indexes, lb=0, ub=1, var_type="integer", name_prefix="e"

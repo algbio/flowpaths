@@ -50,9 +50,8 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
             )
         self.weight_type = weight_type
 
-        self.edges_to_ignore = (
-            set(edges_to_ignore) | set(self.G.source_edges) | set(self.G.sink_edges)
-        )
+        self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
+
         self.flow_attr = flow_attr
         self.w_max = num_paths * self.weight_type(
             self.G.get_max_flow_value_and_check_positive_flow(

@@ -60,6 +60,8 @@ class stDiGraph(nx.DiGraph):
         self.source_edges = list(self.out_edges(self.source))
         self.sink_edges = list(self.in_edges(self.sink))
 
+        self.source_sink_edges = set(self.source_edges + self.sink_edges)
+
         self.width = None
 
     def get_width(self) -> int:

@@ -62,8 +62,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
             raise ValueError("The graph G does not satisfy flow conservation.")
 
         # Check that the flow is positive and get max flow value
-        self.edges_to_ignore = set(self.G.source_edges)
-        self.edges_to_ignore.update(self.G.sink_edges)
+        self.edges_to_ignore = self.G.source_sink_edges
         self.flow_attr = flow_attr
         self.w_max = self.weight_type(
             self.G.get_max_flow_value_and_check_positive_flow(
