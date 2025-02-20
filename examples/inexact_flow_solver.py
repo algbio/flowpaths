@@ -15,6 +15,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         self.G = fp.stDiGraph(G)
         self.lb = lb
         self.ub = ub  
+        # self.k = num_paths will be available from the superclass GenericPathModelDAG
 
         # We declare the solution attribute, to be able to cache it.
         self.solution = None      
@@ -38,16 +39,17 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
             
     def encode_inexact_flow_decomposition(self):
 
-        # Get the maximum data in an edge indexed under self.lb
+        # Get the maximum data in an edge indexed under self.lb.
+        # This will be used to set the upper bound of the path weights, since a path weight larger than this
+        # would not "fit" inside the flow interval of an edge.
         maximum_allowed_path_weight = max(data.get(self.ub,0) for u, v, data in self.G.edges(data=True))
 
-        # pi vars from https://arxiv.org/pdf/2201.10923 page 14
-        self.pi_vars = self.solver.add_variables(
-            self.edge_indexes,
-            name_prefix="p",
-            lb=0,
-            ub=maximum_allowed_path_weight,
-        )
+        # From the super class, we already have the edge_vars, such that
+        # edge_vars[(u,v,i)] = 1 if path i goes through edge (u,v), 0 otherwise
+        
+        # We now declare the path_weights_vars, such that
+        # path_weights_vars[(i)] = the weight of path i
+        # Note that the weights are non-negative, and we set the upper bound to the maximum allowed path weight
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
             name_prefix="w",
@@ -55,14 +57,27 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
             ub=maximum_allowed_path_weight,
         )
 
-        # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
+        # The pi_vars will be used to encode the product of edge_vars and path_weights_vars
+        # Specifically, pi_vars[(u,v,i)] = edge_vars[(u,v,i)] * path_weights_vars[(i)]
+        # This means pi_vars[(u,v,i)] equals path_weights_vars[(i)] if path i goes through edge (u,v), otherwise it is 0
+        self.pi_vars = self.solver.add_variables(
+            self.edge_indexes,
+            name_prefix="p",
+            lb=0,
+            ub=maximum_allowed_path_weight,
+        )
+
+        # We encode that for each edge (u,v), the sum of the weights of the paths 
+        # going through the edge is in the flow interval of the edge.
         for u, v, data in self.G.edges(data=True):
             # We ignore edges incident to the artificial global source and sink
             if (u, v) in self.G.source_sink_edges:
                 continue
 
-            # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
-            # assuming self.w_max is a bound for self.path_weights_vars[(i)]
+            # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)]
+            # Since this is a non-linear term, we will use the add_product_constraint method that 
+            # will introduce additional constraints to linearize it for us, assuming that
+            # 0 <= path_weights_vars[(i)] <= maximum_allowed_path_weight, which is the case
             for i in range(self.k):
                 self.solver.add_product_constraint(
                     binary_var=self.edge_vars[(u, v, i)],
@@ -72,11 +87,16 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
                     name=f"product_u={u}_v={v}_i={i}",
                 )
 
+            # We next encode that the sum of the weights of the paths going through the edge 
+            # is at least the lowerbound, and at most the upper bound of the edge.
+            
+            # That is, the sum of the pi_vars for edge (u,v) is at least the lowerbound of the edge,
             self.solver.add_constraint(
                 sum(self.pi_vars[(u, v, i)] for i in range(self.k)) >= data[self.lb],
                 name=f"lowerbound_u={u}_v={v}_i={i}",
             )
 
+            # and at most the upperbound of the edge.
             self.solver.add_constraint(
                 sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= data[self.ub],
                 name=f"upperbound_u={u}_v={v}_i={i}",
