@@ -2,9 +2,9 @@ import time
 import networkx as nx
 import stdigraph
 import utils.graphutils as gu
-import genericdagmodel as dagmodel
+import genericpathmodeldag as pathmodel
 
-class kFlowDecomp(dagmodel.GenericDAGModel):
+class kFlowDecomp(pathmodel.GenericPathModelDAG):
 
     def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = float, subpath_constraints: list = [], **kwargs):
         """

@@ -1,10 +1,8 @@
-import time
 import networkx as nx
 import stdigraph
-import genericdagmodel as dagmodel
-import graphviz as gv
+import genericpathmodeldag as pathmodel
 
-class kMinPathError(dagmodel.GenericDAGModel):
+class kMinPathError(pathmodel.GenericPathModelDAG):
 
     def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = float, subpath_constraints: list = [], edges_to_ignore: list = [], **kwargs):
         """

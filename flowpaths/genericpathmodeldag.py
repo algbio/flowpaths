@@ -3,7 +3,7 @@ from utils import safety
 from utils import solverwrapper
 import time
 
-class GenericDAGModel:
+class GenericPathModelDAG:
     def __init__(self, G: stdigraph.stDiGraph, num_paths: int, subpath_constraints: list = None, **kwargs):
         """
         This is a generic class modelling a path finding ILP in a DAG.
