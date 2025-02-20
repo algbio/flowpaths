@@ -72,7 +72,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
 
         self.solve_statistics = {}
 
-        # Call the constructor of the parent class genericDagModel
+        # Call the constructor of the parent class GenericPathModelDAG
         kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
             flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
         ).difference(self.edges_to_ignore)
@@ -81,10 +81,10 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
             self.G, num_paths, subpath_constraints=self.subpath_constraints, **kwargs
         )
 
-        # This method is called from the super class genericDagModel
+        # This method is called from the super class GenericPathModelDAG
         self.create_solver_and_paths()
 
-        # This method is called from the current class
+        # This method is called from the current class 
         self.encode_minpatherror_decomposition()
 
         # This method is called from the current class to add the objective function

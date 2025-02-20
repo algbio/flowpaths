@@ -86,7 +86,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
             if self.get_solution_with_greedy():
                 greedy_solution_paths = self.solution[0]
 
-        # Call the constructor of the parent class genericDagModel
+        # Call the constructor of the parent class GenericPathModelDAG
         kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
             flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
         )
@@ -100,10 +100,10 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         if self.solved:
             return
 
-        # This method is called from the super class genericDagModel
+        # This method is called from the super class GenericPathModelDAG
         self.create_solver_and_paths()
 
-        # This method is called from the current class modelMFD
+        # This method is called from the current class to encode the flow decomposition
         self.encode_flow_decomposition()
 
     def encode_flow_decomposition(self):
