@@ -23,7 +23,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         
         # To be able to apply the safety optimizations, we get the edges that 
         # must appear in some solution path. For this problem, these are the edges 
-        # that have a non-zero flow lowerbound.
+        # that have a non-zero flow lowerbound, since they appear in at least one source-to-sink path.
         trusted_edges_for_safety = self.G.get_non_zero_flow_edges(flow_attr=self.lb)
 
         # We initialize the super class with the graph, the number of paths, and the trusted edges.
