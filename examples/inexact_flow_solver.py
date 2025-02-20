@@ -75,7 +75,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
             if (u, v) in self.G.source_sink_edges:
                 continue
 
-            # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)]
+            # We encode that edge_vars[(u,v,i)] * path_weights_vars[(i)] = pi_vars[(u,v,i)]
             # Since this is a non-linear term, we will use the add_product_constraint method that 
             # will introduce additional constraints to linearize it for us, assuming that
             # 0 <= path_weights_vars[(i)] <= maximum_allowed_path_weight, which is the case
@@ -119,7 +119,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         solution_weights_dict = self.solver.get_variable_values("w", [int])
         self.solution = (
             self.get_solution_paths(), 
-            [round(solution_weights_dict[i]) for i in range(self.k)]
+            [solution_weights_dict[i] for i in range(self.k)]
         )
 
         return self.solution
