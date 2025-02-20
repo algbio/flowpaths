@@ -1,10 +1,18 @@
 import time
 import networkx as nx
-import stdigraph
-import kflowdecomp as kflowdecomp    
+import flowpaths.stdigraph as stdigraph
+import flowpaths.kflowdecomp as kflowdecomp
+
 
 class MinFlowDecomp:
-    def __init__(self, G: nx.DiGraph, flow_attr: str, weight_type: type = float, subpath_constraints: list = [], **kwargs):
+    def __init__(
+        self,
+        G: nx.DiGraph,
+        flow_attr: str,
+        weight_type: type = float,
+        subpath_constraints: list = [],
+        **kwargs,
+    ):
         """
         Initialize the Minimum Flow Decompostion model, minimizing the number of paths.
 
@@ -17,17 +25,17 @@ class MinFlowDecomp:
         - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
         - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
         - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
-        - optimize_with_greedy (bool, optional): Whether to optimize with a greedy algorithm. Default is True. 
-            If set to True, the model will first try to solve the problem with a greedy algorithm based on 
+        - optimize_with_greedy (bool, optional): Whether to optimize with a greedy algorithm. Default is True.
+            If set to True, the model will first try to solve the problem with a greedy algorithm based on
             always removing the path of maximum bottleneck. If the size of such greedy decomposition matches the width of the graph,
-            the greedy decomposition is optimal, and the model will return the greedy decomposition as the solution. 
+            the greedy decomposition is optimal, and the model will return the greedy decomposition as the solution.
             If the greedy decomposition does not match the width, then the model will proceed to solve the problem with the MILP model.
         - threads (int, optional): Number of threads to use. Default is 4.
         - time_limit (int, optional): Time limit for the solver in seconds. Default is 300.
         - presolve (str, optional): Presolve option for the solver. Default is "on".
         - log_to_console (str, optional): Whether to log solver output to console. Default is "false".
         - external_solver (str, optional): External solver to use. Default is "highs".
-        
+
         Raises
         ----------
         - ValueError: If weight_type is not int or float.
@@ -36,7 +44,7 @@ class MinFlowDecomp:
         - ValueError: If the graph contains edges with negative (<0) flow values.
         - ValueError: If the graph is not acyclic.
         """
-        
+
         stG = stdigraph.stDiGraph(G)
         self.lowerbound = stG.get_width()
 
@@ -63,9 +71,15 @@ class MinFlowDecomp:
         """
         start_time = time.time()
         for i in range(self.lowerbound, self.G.number_of_edges()):
-            fd_model = kflowdecomp.kFlowDecomp(G = self.G, flow_attr = self.flow_attr, num_paths = i, weight_type = self.weight_type, \
-                                               subpath_constraints = self.subpath_constraints, **self.kwargs)
-            
+            fd_model = kflowdecomp.kFlowDecomp(
+                G=self.G,
+                flow_attr=self.flow_attr,
+                num_paths=i,
+                weight_type=self.weight_type,
+                subpath_constraints=self.subpath_constraints,
+                **self.kwargs,
+            )
+
             fd_model.solve()
 
             if fd_model.solved:
@@ -78,22 +92,21 @@ class MinFlowDecomp:
                 self.fd_model = fd_model
                 return True
         return False
-    
+
     def get_solution(self):
-        
+
         self.check_solved()
         return self.solution
-    
-    def check_solved(self):       
+
+    def check_solved(self):
         if not self.solved or self.solution is None:
-            raise Exception("Model not solved. If you want to solve it, call the solve method first. \
-                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
-        
+            raise Exception(
+                "Model not solved. If you want to solve it, call the solve method first. \
+                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
+            )
+
     def check_solution(self) -> bool:
         return self.fd_model.check_solution()
-    
+
     def draw_solution(self, show_flow_attr=True):
         self.fd_model.draw_solution(show_flow_attr)
-
-
-

@@ -1,103 +1,136 @@
 class SolverWrapper:
-    def __init__(self, solver_type='highs', **kwargs):
+    def __init__(self, solver_type="highs", **kwargs):
         self.solver_type = solver_type
-        self.tolerance = kwargs.get('tolerance', 1e-4)  # Default tolerance value
+        self.tolerance = kwargs.get("tolerance", 1e-4)  # Default tolerance value
 
-        if solver_type == 'highs':
+        if solver_type == "highs":
             import highspy
+
             self.solver = highspy.Highs()
-            self.solver.setOptionValue("threads", kwargs.get('threads', 4))
-            self.solver.setOptionValue("time_limit", kwargs.get('time_limit', 300))
-            self.solver.setOptionValue("presolve", kwargs.get('presolve', "choose"))
-            self.solver.setOptionValue("log_to_console", kwargs.get('log_to_console', "false"))
+            self.solver.setOptionValue("threads", kwargs.get("threads", 4))
+            self.solver.setOptionValue("time_limit", kwargs.get("time_limit", 300))
+            self.solver.setOptionValue("presolve", kwargs.get("presolve", "choose"))
+            self.solver.setOptionValue(
+                "log_to_console", kwargs.get("log_to_console", "false")
+            )
             self.solver.setOptionValue("mip_rel_gap", self.tolerance)
-        elif solver_type == 'gurobi':
+        elif solver_type == "gurobi":
             import gurobipy
+
             self.env = gurobipy.Env(empty=True)
-            self.env.setParam('OutputFlag', 0)
-            self.env.setParam('LogToConsole', 1 if kwargs.get('log_to_console', "false") == "true" else 0)
-            self.env.setParam('OutputFlag', 1 if kwargs.get('log_to_console', "false") == "true" else 0)
-            self.env.setParam('TimeLimit', kwargs.get('time_limit', 300))
-            self.env.setParam('Threads', kwargs.get('threads', 4))
-            self.env.setParam('MIPGap', self.tolerance)
+            self.env.setParam("OutputFlag", 0)
+            self.env.setParam(
+                "LogToConsole",
+                1 if kwargs.get("log_to_console", "false") == "true" else 0,
+            )
+            self.env.setParam(
+                "OutputFlag",
+                1 if kwargs.get("log_to_console", "false") == "true" else 0,
+            )
+            self.env.setParam("TimeLimit", kwargs.get("time_limit", 300))
+            self.env.setParam("Threads", kwargs.get("threads", 4))
+            self.env.setParam("MIPGap", self.tolerance)
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
         else:
-            raise ValueError(f"Unsupported solver type `{solver_type}`, supported solvers are `highs` and `gurobi`.")
+            raise ValueError(
+                f"Unsupported solver type `{solver_type}`, supported solvers are `highs` and `gurobi`."
+            )
 
-    def add_variables(self, indexes, lb=0, ub=1, var_type='integer', name_prefix=''):
-        if self.solver_type == 'highs':
+    def add_variables(self, indexes, lb=0, ub=1, var_type="integer", name_prefix=""):
+        if self.solver_type == "highs":
             import highspy
+
             var_type_map = {
-                'integer': highspy.HighsVarType.kInteger,
-                'continuous': highspy.HighsVarType.kContinuous
+                "integer": highspy.HighsVarType.kInteger,
+                "continuous": highspy.HighsVarType.kContinuous,
             }
-            return self.solver.addVariables(indexes, lb=lb, ub=ub, type=var_type_map[var_type], name_prefix=name_prefix)
-        elif self.solver_type == 'gurobi':
+            return self.solver.addVariables(
+                indexes,
+                lb=lb,
+                ub=ub,
+                type=var_type_map[var_type],
+                name_prefix=name_prefix,
+            )
+        elif self.solver_type == "gurobi":
             import gurobipy
+
             var_type_map = {
-                'integer': gurobipy.GRB.INTEGER,
-                'continuous': gurobipy.GRB.CONTINUOUS
+                "integer": gurobipy.GRB.INTEGER,
+                "continuous": gurobipy.GRB.CONTINUOUS,
             }
             vars = {}
             for index in indexes:
-                vars[index] = self.solver.addVar(lb=lb, ub=ub, vtype=var_type_map[var_type], name=f"{name_prefix}{index}")
+                vars[index] = self.solver.addVar(
+                    lb=lb,
+                    ub=ub,
+                    vtype=var_type_map[var_type],
+                    name=f"{name_prefix}{index}",
+                )
             self.solver.update()
             return vars
 
-    def add_constraint(self, expr, name=''):
-        if self.solver_type == 'highs':
+    def add_constraint(self, expr, name=""):
+        if self.solver_type == "highs":
             self.solver.addConstr(expr, name=name)
-        elif self.solver_type == 'gurobi':
+        elif self.solver_type == "gurobi":
             self.solver.addConstr(expr, name=name)
 
     def add_product_constraint(self, binary_var, product_var, equal_var, bound, name):
         self.add_constraint(equal_var <= binary_var * bound, name=name + "_a")
         self.add_constraint(equal_var <= product_var, name=name + "_b")
-        self.add_constraint(equal_var >= product_var - (1 - binary_var) * bound, name=name + "_c")
+        self.add_constraint(
+            equal_var >= product_var - (1 - binary_var) * bound, name=name + "_c"
+        )
 
-    def set_objective(self, expr, sense='minimize'):
-        if self.solver_type == 'highs':
-            if sense == 'minimize':
+    def set_objective(self, expr, sense="minimize"):
+        if self.solver_type == "highs":
+            if sense == "minimize":
                 self.solver.minimize(expr)
             else:
                 self.solver.maximize(expr)
-        elif self.solver_type == 'gurobi':
+        elif self.solver_type == "gurobi":
             import gurobipy
-            self.solver.setObjective(expr, gurobipy.GRB.MINIMIZE if sense == 'minimize' else gurobipy.GRB.MAXIMIZE)
+
+            self.solver.setObjective(
+                expr,
+                gurobipy.GRB.MINIMIZE if sense == "minimize" else gurobipy.GRB.MAXIMIZE,
+            )
 
     def optimize(self):
-        if self.solver_type == 'highs':
+        if self.solver_type == "highs":
             self.solver.optimize()
-        elif self.solver_type == 'gurobi':
+        elif self.solver_type == "gurobi":
             self.solver.optimize()
 
     def write_model(self, filename):
-        if self.solver_type == 'highs':
+        if self.solver_type == "highs":
             self.solver.writeModel(filename)
-        elif self.solver_type == 'gurobi':
+        elif self.solver_type == "gurobi":
             self.solver.write(filename)
 
     def get_model_status(self):
-        if self.solver_type == 'highs':
+        if self.solver_type == "highs":
             return self.solver.getModelStatus().name
-        elif self.solver_type == 'gurobi':
+        elif self.solver_type == "gurobi":
             return self.solver.status
 
     def get_all_variable_values(self):
-        if self.solver_type == 'highs':
+        if self.solver_type == "highs":
             return self.solver.allVariableValues()
-        elif self.solver_type == 'gurobi':
+        elif self.solver_type == "gurobi":
             return [var.X for var in self.solver.getVars()]
 
     def get_all_variable_names(self):
-        if self.solver_type == 'highs':
+        if self.solver_type == "highs":
             return self.solver.allVariableNames()
-        elif self.solver_type == 'gurobi':
+        elif self.solver_type == "gurobi":
             return [var.VarName for var in self.solver.getVars()]
-        
-    def get_variable_values(self, name_prefix, index_types: list, allowed_values: list=None) -> dict:
-        
+
+    def get_variable_values(
+        self, name_prefix, index_types: list, allowed_values: list = None
+    ) -> dict:
+
         varNames = self.get_all_variable_names()
         varValues = self.get_all_variable_values()
 
@@ -105,25 +138,45 @@ class SolverWrapper:
 
         for index, var in enumerate(varNames):
             if var.startswith(name_prefix):
-                if var.count('(') == 1:
-                    elements = [elem.strip(' \'') for elem in var.replace(name_prefix,'', 1).replace('(','').replace(')','').split(',')]
-                    tuple_index = tuple([index_types[i](elements[i]) for i in range(len(elements))])
-                   
+                if var.count("(") == 1:
+                    elements = [
+                        elem.strip(" '")
+                        for elem in var.replace(name_prefix, "", 1)
+                        .replace("(", "")
+                        .replace(")", "")
+                        .split(",")
+                    ]
+                    tuple_index = tuple(
+                        [index_types[i](elements[i]) for i in range(len(elements))]
+                    )
+
                     if len(index_types) != len(elements):
-                        raise Exception(f"We are getting the value of variable {var}, indexed by ({tuple_index}), but the provided list of var_types ({index_types}) has different length.")
-                   
-                    values[tuple_index] = round(varValues[index])  # TODO: check if we can add tolerance here, how does it work with other solvers?
-                    if allowed_values != None and values[tuple_index] not in allowed_values:
-                        raise Exception(f"Variable {var} has value {values[tuple_index]} different from {allowed_values}.")
+                        raise Exception(
+                            f"We are getting the value of variable {var}, indexed by ({tuple_index}), but the provided list of var_types ({index_types}) has different length."
+                        )
+
+                    values[tuple_index] = round(
+                        varValues[index]
+                    )  # TODO: check if we can add tolerance here, how does it work with other solvers?
+                    if (
+                        allowed_values != None
+                        and values[tuple_index] not in allowed_values
+                    ):
+                        raise Exception(
+                            f"Variable {var} has value {values[tuple_index]} different from {allowed_values}."
+                        )
                 else:
-                    element = var.replace(name_prefix,'',1)
+                    element = var.replace(name_prefix, "", 1)
                     if len(index_types) != 1:
-                        raise Exception(f"We are getting the value of variable {var}, with only one index ({element}), but the provided list of var_types is not of length one ({index_types}).")
-                    
+                        raise Exception(
+                            f"We are getting the value of variable {var}, with only one index ({element}), but the provided list of var_types is not of length one ({index_types})."
+                        )
+
                     index = index_types[0](element)
                     values[index] = round(varValues[index])
                     if allowed_values != None and values[index] not in allowed_values:
-                        raise Exception(f"Variable {var} has value {values[var]} different from {allowed_values}.")
+                        raise Exception(
+                            f"Variable {var} has value {values[var]} different from {allowed_values}."
+                        )
 
         return values
-

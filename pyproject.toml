@@ -1,5 +1,5 @@
 [project]
-name = "Flow Paths"
+name = "flowpaths"
 version = "0.1.0"
 description = "A Python package to decompose weighted graphs into weights paths, under various models."
 readme = "README.md"

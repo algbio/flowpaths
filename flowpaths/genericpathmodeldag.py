@@ -1,10 +1,17 @@
-import stdigraph
-from utils import safety
-from utils import solverwrapper
+import flowpaths.stdigraph as stdigraph
+from flowpaths.utils import safety
+from flowpaths.utils import solverwrapper
 import time
 
+
 class GenericPathModelDAG:
-    def __init__(self, G: stdigraph.stDiGraph, num_paths: int, subpath_constraints: list = None, **kwargs):
+    def __init__(
+        self,
+        G: stdigraph.stDiGraph,
+        num_paths: int,
+        subpath_constraints: list = None,
+        **kwargs,
+    ):
         """
         This is a generic class modelling a path finding ILP in a DAG.
 
@@ -24,7 +31,7 @@ class GenericPathModelDAG:
         - presolve (str, optional): Presolve option. Defaults to "on".
         - log_to_console (str, optional): Log to console option. Defaults to "false".
         - external_solver (str, optional): External solver to use. Defaults to "highs".
-        
+
         Raises
         ----------
         - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with safe lists.
@@ -54,25 +61,41 @@ class GenericPathModelDAG:
             self.solved = True
 
         # optimizations
-        self.optimize_with_safe_zero_edges = kwargs.get("optimize_with_safe_zero_edges", False)
+        self.optimize_with_safe_zero_edges = kwargs.get(
+            "optimize_with_safe_zero_edges", False
+        )
         self.optimize_with_safe_paths = kwargs.get("optimize_with_safe_paths", False)
-        self.optimize_with_safe_sequences = kwargs.get("optimize_with_safe_sequences", False)
+        self.optimize_with_safe_sequences = kwargs.get(
+            "optimize_with_safe_sequences", False
+        )
         self.trusted_edges_for_safety = kwargs.get("trusted_edges_for_safety", None)
 
         self.safe_lists = None
         if self.optimize_with_safe_paths and not self.solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_paths(self.G, self.trusted_edges_for_safety, no_duplicates=False, threads=self.threads)
+            self.safe_lists = safety.safe_paths(
+                self.G,
+                self.trusted_edges_for_safety,
+                no_duplicates=False,
+                threads=self.threads,
+            )
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
         if self.optimize_with_safe_sequences and not self.solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_sequences(self.G, self.trusted_edges_for_safety, no_duplicates=False, threads=self.threads)
+            self.safe_lists = safety.safe_sequences(
+                self.G,
+                self.trusted_edges_for_safety,
+                no_duplicates=False,
+                threads=self.threads,
+            )
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
 
         # some checks
         if self.safe_lists is not None and self.trusted_edges_for_safety is None:
-            raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")
+            raise ValueError(
+                "trusted_edges_for_safety must be provided when optimizing with safe lists"
+            )
         if self.optimize_with_safe_paths and self.optimize_with_safe_sequences:
             raise ValueError("Cannot optimize with both safe paths and safe sequences")
 
@@ -81,85 +104,141 @@ class GenericPathModelDAG:
         Creates a solver instance and encodes the paths in the graph.
 
         This method initializes the solver with the specified parameters and encodes the paths
-        by creating variables for edges and subpaths. 
-        
+        by creating variables for edges and subpaths.
+
         If external solution paths are provided, it skips the solver creation.
         """
         if self.external_solution_paths is not None:
             return
 
-        self.solver = solverwrapper.SolverWrapper(solver_type=self.external_solver, 
-                                                  threads=self.threads, 
-                                                  time_limit=self.time_limit, 
-                                                  presolve=self.presolve, 
-                                                  log_to_console=self.log_to_console)
-        
+        self.solver = solverwrapper.SolverWrapper(
+            solver_type=self.external_solver,
+            threads=self.threads,
+            time_limit=self.time_limit,
+            presolve=self.presolve,
+            log_to_console=self.log_to_console,
+        )
+
         self.encode_paths()
 
     def encode_paths(self):
         """
         Encodes the paths in the graph by creating variables for edges and subpaths.
-        
+
         This method initializes the edge and subpath variables for the solver and adds constraints
         to ensure the paths are valid according to the given subpath constraints and safe lists.
         """
-        self.edge_indexes = [(u, v, i) for i in range(self.k) for (u, v) in self.G.edges()]
+        self.edge_indexes = [
+            (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
+        ]
         self.path_indexes = [(i) for i in range(self.k)]
-        self.subpath_indexes = [(i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))]
+        self.subpath_indexes = [
+            (i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))
+        ]
 
-        self.edge_vars = self.solver.add_variables(self.edge_indexes, lb=0, ub=1, var_type='integer', name_prefix='e')
+        self.edge_vars = self.solver.add_variables(
+            self.edge_indexes, lb=0, ub=1, var_type="integer", name_prefix="e"
+        )
         if self.subpath_constraints:
-            self.subpaths_vars = self.solver.add_variables(self.subpath_indexes, lb=0, ub=1, var_type='integer', name_prefix='r')
+            self.subpaths_vars = self.solver.add_variables(
+                self.subpath_indexes, lb=0, ub=1, var_type="integer", name_prefix="r"
+            )
 
         # The identifiers of the constraints come from https://arxiv.org/pdf/2201.10923 page 14-15
 
         for i in range(self.k):
-            self.solver.add_constraint(sum(self.edge_vars[(self.G.source, v, i)] for v in self.G.successors(self.G.source)) == 1, name="10a_i={}".format(i))
-            self.solver.add_constraint(sum(self.edge_vars[(u, self.G.sink, i)] for u in self.G.predecessors(self.G.sink)) == 1, name="10b_i={}".format(i))
+            self.solver.add_constraint(
+                sum(
+                    self.edge_vars[(self.G.source, v, i)]
+                    for v in self.G.successors(self.G.source)
+                )
+                == 1,
+                name="10a_i={}".format(i),
+            )
+            self.solver.add_constraint(
+                sum(
+                    self.edge_vars[(u, self.G.sink, i)]
+                    for u in self.G.predecessors(self.G.sink)
+                )
+                == 1,
+                name="10b_i={}".format(i),
+            )
 
         for i in range(self.k):
             for v in self.G.nodes:  # find all edges u->v->w for v in V\{s,t}
                 if v == self.G.source or v == self.G.sink:
                     continue
-                self.solver.add_constraint(sum(self.edge_vars[(u, v, i)] for u in self.G.predecessors(v)) -
-                                           sum(self.edge_vars[(v, w, i)] for w in self.G.successors(v)) == 0, "10c_v={}_i={}".format(v, i))
+                self.solver.add_constraint(
+                    sum(self.edge_vars[(u, v, i)] for u in self.G.predecessors(v))
+                    - sum(self.edge_vars[(v, w, i)] for w in self.G.successors(v))
+                    == 0,
+                    "10c_v={}_i={}".format(v, i),
+                )
 
         # Example of a subpath constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 paths to cover, the first one is 1-3-5. the second path is just a single edge 0-1
         if self.subpath_constraints:
             for i in range(self.k):
                 for j in range(len(self.subpath_constraints)):
-                    edgevars_on_subpath = list(map(lambda e: self.edge_vars[(e[0], e[1], i)], self.subpath_constraints[j]))
-                    self.solver.add_constraint(sum(edgevars_on_subpath) >= len(self.subpath_constraints[j]) * self.subpaths_vars[(i, j)], name="7a_i={}_j={}".format(i, j))
+                    edgevars_on_subpath = list(
+                        map(
+                            lambda e: self.edge_vars[(e[0], e[1], i)],
+                            self.subpath_constraints[j],
+                        )
+                    )
+                    self.solver.add_constraint(
+                        sum(edgevars_on_subpath)
+                        >= len(self.subpath_constraints[j])
+                        * self.subpaths_vars[(i, j)],
+                        name="7a_i={}_j={}".format(i, j),
+                    )
             for j in range(len(self.subpath_constraints)):
-                self.solver.add_constraint(sum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1, name="7b_j={}".format(j))
+                self.solver.add_constraint(
+                    sum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
+                    name="7b_j={}".format(j),
+                )
 
         # Fixing variables based on safe lists
         if self.safe_lists is not None:
             paths_to_fix = self.__get_paths_to_fix_from_safe_lists()
-            
+
             # iterating over safe lists
             for i in range(min(len(paths_to_fix), self.k)):
                 # print("Fixing variables for safe list #", i)
                 # iterate over the edges in the safe list to fix variables to 1
-                for (u, v) in paths_to_fix[i]:
-                    self.solver.add_constraint(self.edge_vars[(u, v, i)] == 1, name="safe_list_u={}_v={}_i={}".format(u, v, i))
-                
+                for u, v in paths_to_fix[i]:
+                    self.solver.add_constraint(
+                        self.edge_vars[(u, v, i)] == 1,
+                        name="safe_list_u={}_v={}_i={}".format(u, v, i),
+                    )
+
                 if self.optimize_with_safe_zero_edges:
                     # get the endpoints of the longest safe path in the sequence
-                    first_node, last_node = safety.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])                            
+                    first_node, last_node = (
+                        safety.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
+                    )
                     # get the reachable nodes from the last node
                     reachable_nodes = self.G.get_reachable_nodes_from(last_node)
                     # get the backwards reachable nodes from the first node
-                    reachable_nodes_reverse = self.G.get_reachable_nodes_reverse_from(first_node)                   
+                    reachable_nodes_reverse = self.G.get_reachable_nodes_reverse_from(
+                        first_node
+                    )
                     # get the edges in the path
-                    path_edges = set((u,v) for (u, v) in paths_to_fix[i])
+                    path_edges = set((u, v) for (u, v) in paths_to_fix[i])
 
-                    for (u, v) in self.G.base_graph.edges():
-                        if (u, v) not in path_edges and \
-                            u not in reachable_nodes and v not in reachable_nodes_reverse:
+                    for u, v in self.G.base_graph.edges():
+                        if (
+                            (u, v) not in path_edges
+                            and u not in reachable_nodes
+                            and v not in reachable_nodes_reverse
+                        ):
                             # print(f"Adding zero constraint for edge ({u}, {v}) in path {i}")
-                            self.solver.add_constraint(self.edge_vars[(u, v, i)] == 0, name="safe_list_zero_edge_u={}_v={}_i={}".format(u, v, i))
-                    
+                            self.solver.add_constraint(
+                                self.edge_vars[(u, v, i)] == 0,
+                                name="safe_list_zero_edge_u={}_v={}_i={}".format(
+                                    u, v, i
+                                ),
+                            )
+
     def __get_paths_to_fix_from_safe_lists(self):
         longest_safe_list = dict()
         for i, safe_list in enumerate(self.safe_lists):
@@ -169,11 +248,18 @@ class GenericPathModelDAG:
                 elif len(self.safe_lists[longest_safe_list[edge]]) < len(safe_list):
                     longest_safe_list[edge] = i
 
-        len_of_longest_safe_list = {edge: len(self.safe_lists[longest_safe_list[edge]]) for edge in longest_safe_list}
+        len_of_longest_safe_list = {
+            edge: len(self.safe_lists[longest_safe_list[edge]])
+            for edge in longest_safe_list
+        }
 
-        _, edge_antichain = self.G.compute_max_edge_antichain(get_antichain=True, weight_function=len_of_longest_safe_list)
-        
-        paths_to_fix = list(map(lambda edge: self.safe_lists[longest_safe_list[edge]], edge_antichain))
+        _, edge_antichain = self.G.compute_max_edge_antichain(
+            get_antichain=True, weight_function=len_of_longest_safe_list
+        )
+
+        paths_to_fix = list(
+            map(lambda edge: self.safe_lists[longest_safe_list[edge]], edge_antichain)
+        )
 
         return paths_to_fix
 
@@ -185,12 +271,12 @@ class GenericPathModelDAG:
         ----------
         - True if the model is solved successfully, False otherwise.
 
-        The method first checks if an external solution is already provided. If so, it sets the 
+        The method first checks if an external solution is already provided. If so, it sets the
         solved attribute to True and returns True.
 
-        If not, it optimizes the model using the solver, and records the solve time and solver status 
-        in the solve_statistics dictionary. If the solver status indicates an optimal solution 
-        (either 'kOptimal' (highs) or status code 2 (gurobi)), it sets the solved attribute to True and returns True. 
+        If not, it optimizes the model using the solver, and records the solve time and solver status
+        in the solve_statistics dictionary. If the solver status indicates an optimal solution
+        (either 'kOptimal' (highs) or status code 2 (gurobi)), it sets the solved attribute to True and returns True.
         Otherwise, it sets the solved attribute to False and returns False.
         """
         # If we already received an external solution, we don't need to solve the model
@@ -201,17 +287,24 @@ class GenericPathModelDAG:
         # self.write_model(f"model-{self.id}.lp")
         start_time = time.time()
         self.solver.optimize()
-        self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = time.time() - start_time
+        self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = (
+            time.time() - start_time
+        )
 
-        self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = self.solver.get_model_status()
-        
-        if self.solver.get_model_status() == 'kOptimal' or self.solver.get_model_status() == 2:
+        self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = (
+            self.solver.get_model_status()
+        )
+
+        if (
+            self.solver.get_model_status() == "kOptimal"
+            or self.solver.get_model_status() == 2
+        ):
             self.solved = True
             return True
-        
+
         self.solved = False
         return False
-    
+
     def write_model(self, filename: str):
         """
         Writes the current model to a file.
@@ -222,17 +315,19 @@ class GenericPathModelDAG:
         """
         self.solver.write_model(filename)
 
-    def check_solved(self):       
+    def check_solved(self):
         if not self.solved:
-            raise Exception("Model not solved. If you want to solve it, call the solve method first. \
-                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit.")
+            raise Exception(
+                "Model not solved. If you want to solve it, call the solve method first. \
+                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
+            )
 
     def get_solution_paths(self) -> list:
         """
         Retrieves the solution paths from the graph.
 
         This method returns the solution paths either from the external solution paths
-        if they are provided at initialization time, or by calculating them based on the 
+        if they are provided at initialization time, or by calculating them based on the
         edge variable solutions.
 
         Returns
@@ -243,7 +338,9 @@ class GenericPathModelDAG:
             return self.external_solution_paths
 
         if self.edge_vars_sol == {}:
-            self.edge_vars_sol = self.solver.get_variable_values('e', [str, str, int], [0, 1])
+            self.edge_vars_sol = self.solver.get_variable_values(
+                "e", [str, str, int], [0, 1]
+            )
 
         paths = []
         for i in range(self.k):
@@ -258,4 +355,3 @@ class GenericPathModelDAG:
             paths.append(path)
 
         return paths
-

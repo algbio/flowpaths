@@ -1,10 +1,20 @@
 import networkx as nx
-import stdigraph
-import genericpathmodeldag as pathmodel
+import flowpaths.stdigraph as stdigraph
+import flowpaths.genericpathmodeldag as pathmodel
+
 
 class kMinPathError(pathmodel.GenericPathModelDAG):
 
-    def __init__(self, G: nx.DiGraph, flow_attr: str, num_paths: int, weight_type: type = float, subpath_constraints: list = [], edges_to_ignore: list = [], **kwargs):
+    def __init__(
+        self,
+        G: nx.DiGraph,
+        flow_attr: str,
+        num_paths: int,
+        weight_type: type = float,
+        subpath_constraints: list = [],
+        edges_to_ignore: list = [],
+        **kwargs,
+    ):
         """
         Initialize the Min Path Error model for a given number of paths.
 
@@ -35,20 +45,28 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         self.G = stdigraph.stDiGraph(G)
 
         if weight_type not in [int, float]:
-            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
+            raise ValueError(
+                f"weight_type must be either int or float, not {weight_type}"
+            )
         self.weight_type = weight_type
 
-        self.edges_to_ignore = set(edges_to_ignore) | set(self.G.source_edges) | set(self.G.sink_edges)
+        self.edges_to_ignore = (
+            set(edges_to_ignore) | set(self.G.source_edges) | set(self.G.sink_edges)
+        )
         self.flow_attr = flow_attr
-        self.w_max = num_paths * self.weight_type(self.G.get_max_flow_value_and_check_positive_flow(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
-    
+        self.w_max = num_paths * self.weight_type(
+            self.G.get_max_flow_value_and_check_positive_flow(
+                flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
+            )
+        )
+
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
 
         self.pi_vars = {}
         self.path_weights_vars = {}
         self.path_slacks_vars = {}
-    
+
         self.path_weights_sol = None
         self.path_slacks_sol = None
         self.solution = None
@@ -56,9 +74,13 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         self.solve_statistics = {}
 
         # Call the constructor of the parent class genericDagModel
-        kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore).difference(self.edges_to_ignore)
+        kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
+            flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
+        ).difference(self.edges_to_ignore)
         kwargs["solve_statistics"] = self.solve_statistics
-        super().__init__(self.G, num_paths, subpath_constraints = self.subpath_constraints, **kwargs)
+        super().__init__(
+            self.G, num_paths, subpath_constraints=self.subpath_constraints, **kwargs
+        )
 
         # This method is called from the super class genericDagModel
         self.create_solver_and_paths()
@@ -74,44 +96,82 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         Encodes the minimum path error decomposition variables and constraints for the optimization problem.
         """
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
-        self.pi_vars            = self.solver.add_variables(self.edge_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='p')
-        self.path_weights_vars  = self.solver.add_variables(self.path_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='w')
-        
-        # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content 
-        self.gamma_vars         = self.solver.add_variables(self.edge_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='g')
-        self.path_slacks_vars    = self.solver.add_variables(self.path_indexes, lb=0, ub=self.w_max, var_type='integer' if self.weight_type == int else 'continuous', name_prefix='s')
+        self.pi_vars = self.solver.add_variables(
+            self.edge_indexes,
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+            name_prefix="p",
+        )
+        self.path_weights_vars = self.solver.add_variables(
+            self.path_indexes,
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+            name_prefix="w",
+        )
+
+        # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content
+        self.gamma_vars = self.solver.add_variables(
+            self.edge_indexes,
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+            name_prefix="g",
+        )
+        self.path_slacks_vars = self.solver.add_variables(
+            self.path_indexes,
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+            name_prefix="s",
+        )
 
         for u, v, data in self.G.edges(data=True):
-            if (u,v) in self.edges_to_ignore:
+            if (u, v) in self.edges_to_ignore:
                 continue
-            
+
             f_u_v = data[self.flow_attr]
 
-            # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)], 
+            # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
             for i in range(self.k):
-                self.solver.add_product_constraint(binary_var  = self.edge_vars[(u,v,i)],
-                                                   product_var = self.path_weights_vars[(i)], 
-                                                   equal_var   = self.pi_vars[(u,v,i)],
-                                                   bound       = self.w_max, 
-                                                   name        = "10_u={}_v={}_i={}".format(u,v,i))
-                
-            # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)], 
+                self.solver.add_product_constraint(
+                    binary_var=self.edge_vars[(u, v, i)],
+                    product_var=self.path_weights_vars[(i)],
+                    equal_var=self.pi_vars[(u, v, i)],
+                    bound=self.w_max,
+                    name="10_u={}_v={}_i={}".format(u, v, i),
+                )
+
+            # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
             for i in range(self.k):
-                self.solver.add_product_constraint(binary_var  = self.edge_vars[(u,v,i)],
-                                                   product_var = self.path_slacks_vars[(i)], 
-                                                   equal_var   = self.gamma_vars[(u,v,i)],
-                                                   bound       = self.w_max, 
-                                                   name        = "12_u={}_v={}_i={}".format(u,v,i))
+                self.solver.add_product_constraint(
+                    binary_var=self.edge_vars[(u, v, i)],
+                    product_var=self.path_slacks_vars[(i)],
+                    equal_var=self.gamma_vars[(u, v, i)],
+                    bound=self.w_max,
+                    name="12_u={}_v={}_i={}".format(u, v, i),
+                )
 
-            self.solver.add_constraint(f_u_v - sum(self.pi_vars[(u,v,i)] for i in range(self.k)) <=  sum(self.gamma_vars[(u,v,i)] for i in range(self.k)), name="9a_u={}_v={}_i={}".format(u,v,i))
-            self.solver.add_constraint(f_u_v - sum(self.pi_vars[(u,v,i)] for i in range(self.k)) >= -sum(self.gamma_vars[(u,v,i)] for i in range(self.k)), name="9a_u={}_v={}_i={}".format(u,v,i))
+            self.solver.add_constraint(
+                f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))
+                <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                name="9a_u={}_v={}_i={}".format(u, v, i),
+            )
+            self.solver.add_constraint(
+                f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))
+                >= -sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                name="9a_u={}_v={}_i={}".format(u, v, i),
+            )
 
     def encode_objective(self):
 
-        self.solver.set_objective(sum(self.path_slacks_vars[(i)] for i in range(self.k)), sense='minimize')
-    
+        self.solver.set_objective(
+            sum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
+        )
+
     def get_solution(self):
         """
         Retrieves the solution for the flow decomposition problem.
@@ -133,16 +193,34 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
 
         self.check_solved()
 
-        weights_sol_dict      = self.solver.get_variable_values('w', [int])
-        self.path_weights_sol = [abs(round(weights_sol_dict[i])) if self.weight_type == int else abs(float(weights_sol_dict[i])) for i in range(self.k)]
-        slacks_sol_dict       = self.solver.get_variable_values('s', [int])
-        self.path_slacks_sol  = [abs(round(slacks_sol_dict[i])) if self.weight_type == int else abs(float(slacks_sol_dict[i])) for i in range(self.k)]
+        weights_sol_dict = self.solver.get_variable_values("w", [int])
+        self.path_weights_sol = [
+            (
+                abs(round(weights_sol_dict[i]))
+                if self.weight_type == int
+                else abs(float(weights_sol_dict[i]))
+            )
+            for i in range(self.k)
+        ]
+        slacks_sol_dict = self.solver.get_variable_values("s", [int])
+        self.path_slacks_sol = [
+            (
+                abs(round(slacks_sol_dict[i]))
+                if self.weight_type == int
+                else abs(float(slacks_sol_dict[i]))
+            )
+            for i in range(self.k)
+        ]
 
-        self.solution = (self.get_solution_paths(), self.path_weights_sol, self.path_slacks_sol)
+        self.solution = (
+            self.get_solution_paths(),
+            self.path_weights_sol,
+            self.path_slacks_sol,
+        )
 
         return self.solution
-    
-    def check_solution(self, tolerance = 0.001):
+
+    def check_solution(self, tolerance=0.001):
         """
         Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
 
@@ -157,7 +235,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         Notes
         -------
         - get_solution() must be called before this method.
-        - The solution is considered valid if the flow from paths is equal 
+        - The solution is considered valid if the flow from paths is equal
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
@@ -167,20 +245,28 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         solution_paths = self.solution[0]
         solution_weights = self.solution[1]
         solution_slacks = self.solution[2]
-        solution_paths_of_edges = [[(path[i],path[i+1]) for i in range(len(path)-1)] for path in solution_paths]
+        solution_paths_of_edges = [
+            [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+            for path in solution_paths
+        ]
 
-        weight_from_paths = {(u,v):0 for (u,v) in self.G.edges()}
-        slack_from_paths = {(u,v):0 for (u,v) in self.G.edges()}
-        num_paths_on_edges = {e:0 for e in self.G.edges()}
-        for weight, slack, path in zip(solution_weights, solution_slacks, solution_paths_of_edges):
+        weight_from_paths = {(u, v): 0 for (u, v) in self.G.edges()}
+        slack_from_paths = {(u, v): 0 for (u, v) in self.G.edges()}
+        num_paths_on_edges = {e: 0 for e in self.G.edges()}
+        for weight, slack, path in zip(
+            solution_weights, solution_slacks, solution_paths_of_edges
+        ):
             for e in path:
                 weight_from_paths[e] += weight
                 slack_from_paths[e] += slack
                 num_paths_on_edges[e] += 1
 
-        for (u, v, data) in self.G.edges(data=True):
+        for u, v, data in self.G.edges(data=True):
             if self.flow_attr in data:
-                if abs(data[self.flow_attr] - weight_from_paths[(u, v)]) <= tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]:
+                if (
+                    abs(data[self.flow_attr] - weight_from_paths[(u, v)])
+                    <= tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
+                ):
                     return False
 
         return True
