@@ -13,9 +13,10 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
     def __init__(self, G: nx.DiGraph, lb:str, ub:str, num_paths:int):
 
         self.G = fp.stDiGraph(G)
-        self.lb = lb
-        self.ub = ub  
-        # self.k = num_paths will be available from the superclass GenericPathModelDAG
+        self.lb = lb # We assume all lowerbounds are >= 0
+        self.ub = ub # We assume all lowerbounds are >= 0
+        # self.k = num_paths will be available from the superclass GenericPathModelDAG, 
+        # after calling super().__init__(...), which happens below.
 
         # We declare the solution attribute, to be able to cache it.
         self.solution = None      
