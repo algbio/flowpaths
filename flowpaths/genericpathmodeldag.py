@@ -134,11 +134,11 @@ class GenericPathModelDAG:
             ]
 
         self.edge_vars = self.solver.add_variables(
-            self.edge_indexes, lb=0, ub=1, var_type="integer", name_prefix="e"
+            self.edge_indexes, name_prefix="e", lb=0, ub=1, var_type="integer"
         )
         if self.subpath_constraints:
             self.subpaths_vars = self.solver.add_variables(
-                self.subpath_indexes, lb=0, ub=1, var_type="integer", name_prefix="r"
+                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer"
             )
 
         # The identifiers of the constraints come from https://arxiv.org/pdf/2201.10923 page 14-15

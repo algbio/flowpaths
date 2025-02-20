@@ -38,7 +38,7 @@ class SolverWrapper:
                 f"Unsupported solver type `{solver_type}`, supported solvers are `highs` and `gurobi`."
             )
 
-    def add_variables(self, indexes, lb=0, ub=1, var_type="integer", name_prefix=""):
+    def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
         if self.solver_type == "highs":
 
             var_type_map = {

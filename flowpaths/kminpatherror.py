@@ -97,33 +97,33 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
+            name_prefix="p",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
-            name_prefix="p",
         )
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
+            name_prefix="w",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
-            name_prefix="w",
         )
 
         # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content
         self.gamma_vars = self.solver.add_variables(
             self.edge_indexes,
+            name_prefix="g",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
-            name_prefix="g",
         )
         self.path_slacks_vars = self.solver.add_variables(
             self.path_indexes,
+            name_prefix="s",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
-            name_prefix="s",
         )
 
         for u, v, data in self.G.edges(data=True):

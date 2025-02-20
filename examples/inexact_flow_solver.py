@@ -44,15 +44,15 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
+            name_prefix="p",
             lb=0,
             ub=maximum_allowed_path_weight,
-            name_prefix="p",
         )
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
+            name_prefix="w",
             lb=0,
             ub=maximum_allowed_path_weight,
-            name_prefix="w",
         )
 
         # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
@@ -84,7 +84,10 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
 
     def encode_objective(self):
 
-        self.solver.set_objective(sum(self.path_weights_vars[(i)] for i in range(self.k)), sense="minimize")
+        self.solver.set_objective(
+            sum(self.path_weights_vars[(i)] for i in range(self.k)), 
+            sense="minimize",
+        )
 
     def get_solution(self):
 
@@ -92,7 +95,10 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
             return self.solution
     
         solution_weights_dict = self.solver.get_variable_values("w", [int])
-        self.solution = (self.get_solution_paths(), [round(solution_weights_dict[i]) for i in range(self.k)])
+        self.solution = (
+            self.get_solution_paths(), 
+            [round(solution_weights_dict[i]) for i in range(self.k)]
+        )
 
         return self.solution
 
