@@ -48,4 +48,5 @@ mfd_model_slow = fp.MinFlowDecomp(
     optimize_with_greedy=False,
 )
 mfd_model_slow.solve()
+print("mfd_model_slow.check_solution()", mfd_model_slow.check_solution())
 process_solution(mfd_model_slow)

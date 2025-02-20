@@ -262,7 +262,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         for u, v, data in self.G.edges(data=True):
             if self.flow_attr in data:
                 if (
-                    flow_from_paths[(u, v)] - data[self.flow_attr]
+                    abs(flow_from_paths[(u, v)] - data[self.flow_attr])
                     > tolerance * num_paths_on_edges[(u, v)]
                 ):
                     return False

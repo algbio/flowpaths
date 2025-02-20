@@ -172,9 +172,9 @@ class SolverWrapper:
                             f"We are getting the value of variable {var}, with only one index ({element}), but the provided list of var_types is not of length one ({index_types})."
                         )
 
-                    index = index_types[0](element)
-                    values[index] = round(varValues[index])
-                    if allowed_values != None and values[index] not in allowed_values:
+                    elem_index = index_types[0](element)
+                    values[elem_index] = round(varValues[index])
+                    if allowed_values != None and values[elem_index] not in allowed_values:
                         raise Exception(
                             f"Variable {var} has value {values[var]} different from {allowed_values}."
                         )
