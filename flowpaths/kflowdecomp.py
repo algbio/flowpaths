@@ -129,17 +129,17 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
+            name_prefix="p",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
-            name_prefix="p",
         )
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
+            name_prefix="w",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
-            name_prefix="w",
         )
 
         # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
