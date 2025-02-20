@@ -128,9 +128,31 @@ class SolverWrapper:
             return [var.VarName for var in self.solver.getVars()]
 
     def get_variable_values(
-        self, name_prefix, index_types: list, allowed_values: list = None
+        self, name_prefix, index_types: list, binary_values: bool = False 
     ) -> dict:
+        """
+        Retrieve the values of variables whose names start with a given prefix.
 
+        This method extracts variable values from the solver, filters them based on a 
+        specified prefix, and returns them in a dictionary with appropriate indexing.
+
+        Args:
+            name_prefix (str): The prefix of the variable names to filter.
+            index_types (list): A list of types corresponding to the indices of the variables.
+                                Each type in the list is used to cast the string indices to 
+                                the appropriate type.
+            binary_values (bool, optional): If True, ensures that the variable values (rounded) are 
+                                            binary (0 or 1). Defaults to False.
+
+        Returns:
+            dict: A dictionary where the keys are the indices of the variables (as tuples or 
+                  single values) and the values are the corresponding variable values.
+
+        Raises:
+            Exception: If the length of `index_types` does not match the number of indices 
+                       in a variable name.
+            Exception: If `binary_values` is True and a variable value (rounded) is not binary.
+        """
         varNames = self.get_all_variable_names()
         varValues = self.get_all_variable_values()
 
@@ -155,15 +177,13 @@ class SolverWrapper:
                             f"We are getting the value of variable {var}, indexed by ({tuple_index}), but the provided list of var_types ({index_types}) has different length."
                         )
 
-                    values[tuple_index] = round(
-                        varValues[index]
-                    )  # TODO: check if we can add tolerance here, how does it work with other solvers?
+                    values[tuple_index] = varValues[index]  # TODO: check if we can add tolerance here, how does it work with other solvers?
                     if (
-                        allowed_values != None
-                        and values[tuple_index] not in allowed_values
+                        binary_values
+                        and round(values[tuple_index]) not in [0,1]
                     ):
                         raise Exception(
-                            f"Variable {var} has value {values[tuple_index]} different from {allowed_values}."
+                            f"Variable {var} has value {values[tuple_index]}, which is not binary."
                         )
                 else:
                     element = var.replace(name_prefix, "", 1)
@@ -174,9 +194,12 @@ class SolverWrapper:
 
                     elem_index = index_types[0](element)
                     values[elem_index] = round(varValues[index])
-                    if allowed_values != None and values[elem_index] not in allowed_values:
+                    if (
+                        binary_values 
+                        and round(values[elem_index]) not in [0,1]
+                    ):
                         raise Exception(
-                            f"Variable {var} has value {values[var]} different from {allowed_values}."
+                            f"Variable {var} has value {values[elem_index]}, which is not binary."
                         )
 
         return values

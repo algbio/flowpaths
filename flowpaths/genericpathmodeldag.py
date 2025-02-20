@@ -339,7 +339,8 @@ class GenericPathModelDAG:
 
         if self.edge_vars_sol == {}:
             self.edge_vars_sol = self.solver.get_variable_values(
-                "e", [str, str, int], [0, 1]
+                "e", [str, str, int], 
+                binary_values=True,
             )
 
         paths = []
