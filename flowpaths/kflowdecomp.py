@@ -15,7 +15,7 @@ class kFlowDecomp(dagmodel.GenericDAGModel):
         - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
         - flow_attr (str): The attribute name from where to get the flow values on the edges.
         - num_paths (int): The number of paths to decompose in.
-        - weight_type (type, optional): The type of weights (int or float). Default is int.
+        - weight_type (type, optional): The type of weights (int or float). Default is float.
         - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
         - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
         - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
