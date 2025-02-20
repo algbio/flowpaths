@@ -14,7 +14,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
 
         self.G = fp.stDiGraph(G)
         self.lb = lb # We assume all lowerbounds are >= 0
-        self.ub = ub # We assume all lowerbounds are >= 0
+        self.ub = ub # We assume all upperbounds are >= 0
         # self.k = num_paths will be available from the superclass GenericPathModelDAG, 
         # after calling super().__init__(...), which happens below.
 
