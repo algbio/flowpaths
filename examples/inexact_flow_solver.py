@@ -3,7 +3,7 @@
 # decompose an inexact flow (given as intervals [lb,ub] for each edge) into 
 # a given number of weighted paths, # while minimizing the sum of the weights of the paths.
 # 
-# NOTE: See kflowdecomp.py for best practices on how to implement a new decomposition model.
+# NOTE: See kflowdecomp.py or kminpatherror.py for best practices on how to implement a new decomposition model.
 ######################
 
 import flowpaths as fp
