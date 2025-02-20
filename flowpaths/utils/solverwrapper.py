@@ -147,6 +147,13 @@ class SolverWrapper:
         elif self.solver_type == "gurobi":
             return [var.VarName for var in self.solver.getVars()]
 
+    def print_variable_names_values(self):
+        varNames = self.get_all_variable_names()
+        varValues = self.get_all_variable_values()
+
+        for index, var in enumerate(varNames):
+            print(f"{var} = {varValues[index]}")
+
     def get_variable_values(
         self, name_prefix, index_types: list, binary_values: bool = False 
     ) -> dict:
@@ -197,7 +204,7 @@ class SolverWrapper:
                             f"We are getting the value of variable {var}, indexed by ({tuple_index}), but the provided list of var_types ({index_types}) has different length."
                         )
 
-                    values[tuple_index] = varValues[index]  # TODO: check if we can add tolerance here, how does it work with other solvers?
+                    values[tuple_index] = varValues[index]
                     if (
                         binary_values
                         and round(values[tuple_index]) not in [0,1]
@@ -213,7 +220,7 @@ class SolverWrapper:
                         )
 
                     elem_index = index_types[0](element)
-                    values[elem_index] = round(varValues[index])
+                    values[elem_index] = varValues[index]
                     if (
                         binary_values 
                         and round(values[elem_index]) not in [0,1]
