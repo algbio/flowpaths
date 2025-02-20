@@ -352,6 +352,9 @@ class GenericPathModelDAG:
                         vertex = out_neighbor
                         break
                 path.append(vertex)
-            paths.append(path)
+            if len(path) < 2:
+                raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. this should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
+                
+            paths.append(path[1:-1])
 
         return paths
