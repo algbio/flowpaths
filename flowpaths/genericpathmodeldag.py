@@ -61,14 +61,10 @@ class GenericPathModelDAG:
             self.solved = True
 
         # optimizations
-        self.optimize_with_safe_zero_edges = kwargs.get(
-            "optimize_with_safe_zero_edges", False
-        )
-        self.optimize_with_safe_paths = kwargs.get("optimize_with_safe_paths", False)
-        self.optimize_with_safe_sequences = kwargs.get(
-            "optimize_with_safe_sequences", False
-        )
+        self.optimize_with_safe_paths = kwargs.get("optimize_with_safe_paths", True)
+        self.optimize_with_safe_sequences = kwargs.get("optimize_with_safe_sequences", False)
         self.trusted_edges_for_safety = kwargs.get("trusted_edges_for_safety", None)
+        self.optimize_with_safe_zero_edges = kwargs.get("optimize_with_safe_zero_edges", True)
 
         self.safe_lists = None
         if self.optimize_with_safe_paths and not self.solved:
