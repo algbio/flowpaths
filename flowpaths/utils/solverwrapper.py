@@ -77,11 +77,31 @@ class SolverWrapper:
             self.solver.addConstr(expr, name=name)
 
     def add_product_constraint(self, binary_var, product_var, equal_var, bound, name):
+        """
+        This function adds constraints to model the equality:
+            binary_var * product_var = equal_var
+
+        Assumptions
+        -----------
+        - binary_var in [0,1]
+        - 0 <= product_var <= bound
+
+        Parameters
+        ----------
+        binary_var : Variable
+            The binary variable.
+        product_var : Variable
+            The product variable.
+        equal_var : Variable
+            The variable that should be equal to the product of the binary and product variables.
+        bound : float
+            The upper bound of the product variable.
+        name : str
+            The name of the constraint
+        """
         self.add_constraint(equal_var <= binary_var * bound, name=name + "_a")
         self.add_constraint(equal_var <= product_var, name=name + "_b")
-        self.add_constraint(
-            equal_var >= product_var - (1 - binary_var) * bound, name=name + "_c"
-        )
+        self.add_constraint(equal_var >= product_var - (1 - binary_var) * bound, name=name + "_c")
 
     def set_objective(self, expr, sense="minimize"):
         if self.solver_type == "highs":
