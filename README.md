@@ -1,4 +1,4 @@
-# Flow Papths Python Package
+# Flow Paths Python Package
 
 Usage example (check also `__main__.py`):
 
