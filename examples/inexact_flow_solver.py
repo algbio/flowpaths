@@ -10,7 +10,7 @@ import flowpaths as fp
 import networkx as nx
 
 class kInexactFlowDecomposition(fp.GenericPathModelDAG):
-    def __init__(self, G: nx.DiGraph, lb:str, ub:str, num_paths:int):
+    def __init__(self, G: nx.DiGraph, lb:str, ub:str, num_paths:int, threads:int=4):
 
         self.G = fp.stDiGraph(G)
         self.lb = lb # We assume all lowerbounds are >= 0
@@ -27,7 +27,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         trusted_edges_for_safety = self.G.get_non_zero_flow_edges(flow_attr=self.lb)
 
         # We initialize the super class with the graph, the number of paths, and the trusted edges.
-        super().__init__(self.G, num_paths, trusted_edges_for_safety=trusted_edges_for_safety)
+        super().__init__(self.G, num_paths, trusted_edges_for_safety=trusted_edges_for_safety, threads=threads)
 
         # This method is called from the super class GenericPathModelDAG
         self.create_solver_and_paths()
