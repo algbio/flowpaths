@@ -147,7 +147,7 @@ if __name__ == "__main__":
     kifd_model.solve()
 
     # We process its solution
-    if kifd_model.solved:
+    if kifd_model.is_solved:
         solution = kifd_model.get_solution()
         print(
             "Solution paths, weights, solve statistics: ",

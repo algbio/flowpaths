@@ -190,7 +190,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         if self.solution is not None:
             return self.solution
 
-        self.check_solved()
+        self.check_is_solved()
 
         weights_sol_dict = self.solver.get_variable_values("w", [int])
         self.path_weights_sol = [
@@ -219,7 +219,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
 
         return self.solution
 
-    def check_solution(self, tolerance=0.001):
+    def verify_solution(self, tolerance=0.001):
         """
         Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
 

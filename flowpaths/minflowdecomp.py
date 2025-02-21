@@ -56,7 +56,7 @@ class MinFlowDecomp:
 
         self.solve_statistics = {}
         self.solution = None
-        self.solved = False
+        self.is_solved = False
 
     def solve(self) -> bool:
         """
@@ -82,9 +82,9 @@ class MinFlowDecomp:
 
             fd_model.solve()
 
-            if fd_model.solved:
+            if fd_model.is_solved:
                 self.solution = fd_model.get_solution()
-                self.solved = True
+                self.is_solved = True
                 self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.time() - start_time
 
@@ -99,13 +99,13 @@ class MinFlowDecomp:
         return self.solution
 
     def check_solved(self):
-        if not self.solved or self.solution is None:
+        if not self.is_solved or self.solution is None:
             raise Exception(
                 "Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
             )
 
-    def check_solution(self) -> bool:
+    def verify_solution(self) -> bool:
         return self.fd_model.check_solution()
 
     def draw_solution(self, show_flow_attr=True):

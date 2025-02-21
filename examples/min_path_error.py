@@ -33,7 +33,7 @@ def main():
     process_solution(mpe_model_2)
 
 def process_solution(model: fp.MinFlowDecomp):
-    if model.solved:
+    if model.is_solved:
         solution = model.get_solution()
         print(
             "Solution paths, weights, slacks, solve statistics: ",

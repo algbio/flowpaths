@@ -66,9 +66,9 @@ class TestMinFlowDecomp(unittest.TestCase):
                 mfd_model.solve()
                 print(mfd_model.kwargs)
                 print(mfd_model.solve_statistics)
-                self.assertTrue(mfd_model.solved, "Model should be solved")
+                self.assertTrue(mfd_model.is_solved, "Model should be solved")
                 self.assertTrue(
-                    mfd_model.check_solution(),
+                    mfd_model.verify_solution(),
                     "The solution is not a valid flow decomposition, under the default tolerance.",
                 )
 

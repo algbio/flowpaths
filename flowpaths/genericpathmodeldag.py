@@ -56,9 +56,9 @@ class GenericPathModelDAG:
 
         self.external_solution_paths = kwargs.get("external_solution_paths", None)
         if self.external_solution_paths is None:
-            self.solved = None
+            self.is_solved = None
         else:
-            self.solved = True
+            self.is_solved = True
 
         # optimizations
         self.optimize_with_safe_paths = kwargs.get("optimize_with_safe_paths", True)
@@ -67,7 +67,7 @@ class GenericPathModelDAG:
         self.optimize_with_safe_zero_edges = kwargs.get("optimize_with_safe_zero_edges", True)
 
         self.safe_lists = None
-        if self.optimize_with_safe_paths and not self.solved:
+        if self.optimize_with_safe_paths and not self.is_solved:
             start_time = time.time()
             self.safe_lists = safety.safe_paths(
                 self.G,
@@ -77,7 +77,7 @@ class GenericPathModelDAG:
             )
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
-        if self.optimize_with_safe_sequences and not self.solved:
+        if self.optimize_with_safe_sequences and not self.is_solved:
             start_time = time.time()
             self.safe_lists = safety.safe_sequences(
                 self.G,
@@ -278,7 +278,7 @@ class GenericPathModelDAG:
         """
         # If we already received an external solution, we don't need to solve the model
         if self.external_solution_paths is not None:
-            self.solved = True
+            self.is_solved = True
             return True
 
         # self.write_model(f"model-{self.id}.lp")
@@ -296,10 +296,10 @@ class GenericPathModelDAG:
             self.solver.get_model_status() == "kOptimal"
             or self.solver.get_model_status() == 2
         ):
-            self.solved = True
+            self.is_solved = True
             return True
 
-        self.solved = False
+        self.is_solved = False
         return False
 
     def write_model(self, filename: str):
@@ -312,12 +312,15 @@ class GenericPathModelDAG:
         """
         self.solver.write_model(filename)
 
-    def check_solved(self):
-        if not self.solved:
+    def check_is_solved(self):
+        if not self.is_solved:
             raise Exception(
                 "Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
             )
+        
+    def is_solved(self):
+        return self.is_solved
 
     def get_solution_paths(self) -> list:
         """

@@ -97,7 +97,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         )
 
         # If already solved with a previous method, we don't create solver, not add paths
-        if self.solved:
+        if self.is_solved:
             return
 
         # This method is called from the super class GenericPathModelDAG
@@ -123,7 +123,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         """
 
         # If already solved, no need to encode further
-        if self.solved:
+        if self.is_solved:
             return
 
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
@@ -181,7 +181,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
         if len(paths) <= self.k:
             self.solution = (paths, weights)
-            self.solved = True
+            self.is_solved = True
             self.solve_statistics = {}
             self.solve_statistics["greedy_solve_time"] = time.time() - start_time
             return True
@@ -207,7 +207,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         if self.solution is not None:
             return self.solution
 
-        self.check_solved()
+        self.check_is_solved()
         weights_sol_dict = self.solver.get_variable_values("w", [int])
         self.path_weights_sol = [
             (
@@ -272,7 +272,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
 
         import graphviz as gv
 
-        self.check_solved()
+        self.check_is_solved()
 
         dot = gv.Digraph(format="pdf")
         dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
