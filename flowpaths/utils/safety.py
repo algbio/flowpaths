@@ -50,11 +50,11 @@ def find_all_bridges(adj_dict, s, t) -> list:
                     component[v] = i
         i = i + 1
 
-    # #recover original adjacency relation
-    # for i in range(len(p)-1):
-    #     u,v = p[i],p[i+1]
-    #     adj_dict[v].pop()      #remove reversed edges
-    #     adj_dict[u].append(v)  #reinsert removed edges
+    #recover original adjacency relation
+    for i in range(len(p)-1):
+        u,v = p[i],p[i+1]
+        adj_dict[v].pop()      #remove reversed edges
+        adj_dict[u].append(v)  #reinsert removed edges
 
     return bridges
 
@@ -82,51 +82,53 @@ def safe_sequences(
         for v in G.predecessors(u):
             adj_dict_rev[u].append(v)
 
+    adj_dict_pool = [deepcopy(adj_dict) for _ in range(threads)]
+    adj_dict_rev_pool = [deepcopy(adj_dict_rev) for _ in range(threads)]
+
+    import threading
     import concurrent.futures
 
-    def process_edge(edge):
-        u, v = edge
-        left_extension = find_all_bridges(deepcopy(adj_dict_rev), u, G.source)
-        right_extension = find_all_bridges(deepcopy(adj_dict), v, G.sink)
-
-        for i in range(
-            len(left_extension)
-        ):  # reverse edges of left extension, recall G^R
-            x, y = left_extension[i]
-            left_extension[i] = (y, x)
-
-        seq = (
-            left_extension[::-1]
-            + [
-                (
-                    u,
-                    v,
-                )
-            ]
-            + right_extension
-        )
-
-        return tuple(seq) if no_duplicates else seq
-
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-        results = list(executor.map(process_edge, edges_to_cover))
-
-    if no_duplicates:
-        sequences.update(results)
-    else:
-        sequences.extend(results)
-
-    if no_duplicates:
-        return list(sequences)
-    else:
-        return sequences
+        # Create a lock per worker to serialize access to per-worker data structures
+        worker_locks = [threading.Lock() for _ in range(threads)]
+    
+        def process_edge_locked(edge, worker_id: int):
+            # This lock ensures that tasks for the same worker_id do not run concurrently
+            with worker_locks[worker_id]:
+                u, v = edge
+                left_extension = find_all_bridges(adj_dict_rev_pool[worker_id], u, G.source)
+                right_extension = find_all_bridges(adj_dict_pool[worker_id], v, G.sink)
+    
+                # reverse left_extension edges
+                for i in range(len(left_extension)):
+                    x, y = left_extension[i]
+                    left_extension[i] = (y, x)
+    
+                seq = (
+                    left_extension[::-1]
+                    + [(u, v)]
+                    + right_extension
+                )
+                return tuple(seq) if no_duplicates else seq
+    
+        # Distribute each edge along with its worker id (using modulo)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+            work_items = [(i % threads, edge) for i, edge in enumerate(edges_to_cover)]
+            results = list(executor.map(lambda args: process_edge_locked(args[1], args[0]), work_items))
+    
+        if no_duplicates:
+            sequences.update(results)
+        else:
+            sequences.extend(results)
+    
+    return list(sequences) if no_duplicates else sequences
 
 
 def safe_paths_of_base_edges(
     G: stdigraph.stDiGraph, no_duplicates=False, threads: int = 4
 ) -> list:
 
-    return safe_paths(G, G.base_graph.edges(), no_duplicates)
+    return safe_paths(G, G.base_graph.edges(), no_duplicates, threads=threads)
 
 
 def safe_paths(

@@ -41,11 +41,10 @@ class TestMinFlowDecomp(unittest.TestCase):
                 # safe paths and safe sequences cannot be both True
                 if settings[1] == True and settings[2] == True:
                     continue
-                # if safe paths and safe sequences are False, then it makes no sense to optimize_with_safe_zero_edges
+                # we don't allow safe paths and safe sequences both False
                 if (
                     settings[1] == False
                     and settings[2] == False
-                    and settings[3] == True
                 ):
                     continue
                 # if optimize_with_greedy, it makes no sense to try the safety optimizations
