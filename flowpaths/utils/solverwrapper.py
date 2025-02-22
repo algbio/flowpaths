@@ -3,7 +3,9 @@ import highspy
 class SolverWrapper:
     def __init__(self, solver_type="highs", **kwargs):
         self.solver_type = solver_type
-        self.tolerance = kwargs.get("tolerance", 1e-4)  # Default tolerance value
+        self.tolerance = kwargs.get("tolerance", 1e-9)  # Default tolerance value
+        if self.tolerance < 1e-9:
+            raise ValueError("The tolerance value must be smaller than 1e-9.")
 
         if solver_type == "highs":
 
@@ -11,26 +13,25 @@ class SolverWrapper:
             self.solver.setOptionValue("threads", kwargs.get("threads", 4))
             self.solver.setOptionValue("time_limit", kwargs.get("time_limit", 300))
             self.solver.setOptionValue("presolve", kwargs.get("presolve", "choose"))
-            self.solver.setOptionValue(
-                "log_to_console", kwargs.get("log_to_console", "false")
-            )
+            self.solver.setOptionValue("log_to_console", kwargs.get("log_to_console", "false"))
             self.solver.setOptionValue("mip_rel_gap", self.tolerance)
+            self.solver.setOptionValue("mip_feasibility_tolerance", self.tolerance)
+            self.solver.setOptionValue("mip_abs_gap", self.tolerance)
+            self.solver.setOptionValue("mip_rel_gap", self.tolerance)
+            self.solver.setOptionValue("primal_feasibility_tolerance", self.tolerance)
         elif solver_type == "gurobi":
             import gurobipy
 
             self.env = gurobipy.Env(empty=True)
             self.env.setParam("OutputFlag", 0)
-            self.env.setParam(
-                "LogToConsole",
-                1 if kwargs.get("log_to_console", "false") == "true" else 0,
-            )
-            self.env.setParam(
-                "OutputFlag",
-                1 if kwargs.get("log_to_console", "false") == "true" else 0,
-            )
+            self.env.setParam("LogToConsole", 1 if kwargs.get("log_to_console", "false") == "true" else 0)
+            self.env.setParam("OutputFlag", 1 if kwargs.get("log_to_console", "false") == "true" else 0)
             self.env.setParam("TimeLimit", kwargs.get("time_limit", 300))
             self.env.setParam("Threads", kwargs.get("threads", 4))
             self.env.setParam("MIPGap", self.tolerance)
+            self.env.setParam("IntFeasTol", self.tolerance)
+            self.env.setParam("FeasibilityTol", self.tolerance)
+            
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
         else:

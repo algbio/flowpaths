@@ -141,7 +141,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
                     product_var=self.path_weights_vars[(i)],
                     equal_var=self.pi_vars[(u, v, i)],
                     bound=self.w_max,
-                    name="10_u={}_v={}_i={}".format(u, v, i),
+                    name=f"10_u={u}_v={v}_i={i}",
                 )
 
             # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
@@ -152,18 +152,18 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
                     product_var=self.path_slacks_vars[(i)],
                     equal_var=self.gamma_vars[(u, v, i)],
                     bound=self.w_max,
-                    name="12_u={}_v={}_i={}".format(u, v, i),
+                    name=f"12_u={u}_v={v}_i={i}",
                 )
 
             self.solver.add_constraint(
                 f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))
                 <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
-                name="9a_u={}_v={}_i={}".format(u, v, i),
+                name=f"9aa_u={u}_v={v}_i={i}",
             )
             self.solver.add_constraint(
                 f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))
                 >= -sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
-                name="9a_u={}_v={}_i={}".format(u, v, i),
+                name=f"9ab_u={u}_v={v}_i={i}",
             )
 
     def encode_objective(self):
@@ -196,18 +196,18 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         weights_sol_dict = self.solver.get_variable_values("weights", [int])
         self.path_weights_sol = [
             (
-                abs(round(weights_sol_dict[i]))
+                round(weights_sol_dict[i])
                 if self.weight_type == int
-                else abs(float(weights_sol_dict[i]))
+                else float(weights_sol_dict[i])
             )
             for i in range(self.k)
         ]
         slacks_sol_dict = self.solver.get_variable_values("slack", [int])
         self.path_slacks_sol = [
             (
-                abs(round(slacks_sol_dict[i]))
+                round(slacks_sol_dict[i])
                 if self.weight_type == int
-                else abs(float(slacks_sol_dict[i]))
+                else float(slacks_sol_dict[i])
             )
             for i in range(self.k)
         ]
@@ -273,6 +273,11 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
                     print("data[self.flow_attr] = ", data[self.flow_attr])
                     print(f"weight_from_paths[({u}, {v})]) = ", weight_from_paths[(u, v)])
                     print("> ", tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)])
+
+                    var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
+                    print(var_dict)
+
+                    exit(1)
                     # return False
 
         return True

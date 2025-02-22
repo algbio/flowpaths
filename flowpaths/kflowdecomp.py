@@ -155,7 +155,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
                     binary_var=self.edge_vars[(u, v, i)],
                     product_var=self.path_weights_vars[(i)],
                     equal_var=self.pi_vars[(u, v, i)],
-                    bound=self.w_max,
+                    bound=f_u_v,
                     name="10_u={}_v={}_i={}".format(u, v, i),
                 )
 
@@ -211,9 +211,9 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
         weights_sol_dict = self.solver.get_variable_values("w", [int])
         self.path_weights_sol = [
             (
-                abs(round(weights_sol_dict[i]))
+                round(weights_sol_dict[i])
                 if self.weight_type == int
-                else abs(float(weights_sol_dict[i]))
+                else float(weights_sol_dict[i])
             )
             for i in range(self.k)
         ]

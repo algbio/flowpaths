@@ -64,7 +64,8 @@ class TestkMinPathError(unittest.TestCase):
                     external_solver=settings[4],
                 )
                 kmpe_model.solve()
-                print(kmpe_model.kwargs)
+                # print(kmpe_model.kwargs)
+                print(settings)
                 print(kmpe_model.solve_statistics)
                 self.assertTrue(kmpe_model.is_solved, "Model should be solved")
                 self.assertTrue(
