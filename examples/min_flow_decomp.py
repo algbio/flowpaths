@@ -183,7 +183,7 @@ def process_solution(model: fp.MinFlowDecomp):
             model.solve_statistics,
         )
         # model.draw_solution()
-        draw_graph(model.G, paths = solution[0], weights = solution[1], id = model.G.graph["id"])
+        # draw_graph(model.G, paths = solution[0], weights = solution[1], id = model.G.graph["id"])
     else:
         print("Model could not be solved.")
 

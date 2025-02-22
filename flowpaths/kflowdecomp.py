@@ -156,12 +156,12 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
                     product_var=self.path_weights_vars[(i)],
                     equal_var=self.pi_vars[(u, v, i)],
                     bound=self.w_max,
-                    name="10_u={}_v={}_i={}".format(u, v, i),
+                    name=f"10_u={u}_v={v}_i={i}",
                 )
 
             self.solver.add_constraint(
                 sum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
-                name="10d_u={}_v={}_i={}".format(u, v, i),
+                name=f"10d_u={u}_v={v}_i={i}",
             )
 
     def get_solution_with_greedy(self):
