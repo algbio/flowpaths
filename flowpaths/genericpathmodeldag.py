@@ -10,6 +10,7 @@ class GenericPathModelDAG:
         G: stdigraph.stDiGraph,
         num_paths: int,
         subpath_constraints: list = None,
+        encode_position_vars: bool = False,
         **kwargs,
     ):
         """
@@ -47,6 +48,8 @@ class GenericPathModelDAG:
         self.edge_vars = {}
         self.edge_vars_sol = {}
         self.subpaths_vars = {}
+        self.encode_position_vars = encode_position_vars
+        self.edge_position_vars = {}
 
         self.threads = kwargs.get("threads", 4)
         self.time_limit = kwargs.get("time_limit", 300)
@@ -193,6 +196,21 @@ class GenericPathModelDAG:
                     sum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
                     name="7b_j={}".format(j),
                 )
+
+        # Encoding position variables
+
+        # edge_position_vars[(u, v, i)] = position (i.e., index) 
+        # of the edge (u, v) in the path i, starting from position 0. 
+        if self.encode_position_vars:
+            self.edge_position_vars = self.solver.add_variables(
+                self.edge_indexes, name_prefix="position", lb=0, ub=self.G.number_of_nodes(), var_type="integer"
+            )
+            for i in range(self.k):
+                for (u,v) in self.G.edges():
+                    self.solver.add_constraint(
+                        self.edge_position_vars[(u, v, i)] == sum(self.edge_vars[(a, b, i)] for (a,b) in self.G.reachable_edges_rev_from[u]),
+                        name=f"position_u={u}_v={v}_i={i}"
+                    )
 
         # Fixing variables based on safe lists
         if self.safe_lists is not None:
