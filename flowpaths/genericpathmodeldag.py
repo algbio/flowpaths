@@ -10,7 +10,7 @@ class GenericPathModelDAG:
         G: stdigraph.stDiGraph,
         num_paths: int,
         subpath_constraints: list = None,
-        encode_position_vars: bool = False,
+        encode_edge_position: bool = False,
         **kwargs,
     ):
         """
@@ -48,7 +48,7 @@ class GenericPathModelDAG:
         self.edge_vars = {}
         self.edge_vars_sol = {}
         self.subpaths_vars = {}
-        self.encode_position_vars = encode_position_vars
+        self.encode_edge_position = encode_edge_position
         self.edge_position_vars = {}
 
         self.threads = kwargs.get("threads", 4)
@@ -201,14 +201,18 @@ class GenericPathModelDAG:
 
         # edge_position_vars[(u, v, i)] = position (i.e., index) 
         # of the edge (u, v) in the path i, starting from position 0. 
-        if self.encode_position_vars:
+        if self.encode_edge_position:
             self.edge_position_vars = self.solver.add_variables(
                 self.edge_indexes, name_prefix="position", lb=0, ub=self.G.number_of_nodes(), var_type="integer"
             )
+            # print("Adding position constraints")
+            # print("self.G.edges()", self.G.edges())
             for i in range(self.k):
                 for (u,v) in self.G.edges():
+                    # print(f"Adding position constraint for edge ({u}, {v}) in path {i}")
+                    # print(self.G.reachable_edges_rev_from[u])
                     self.solver.add_constraint(
-                        self.edge_position_vars[(u, v, i)] == sum(self.edge_vars[(a, b, i)] for (a,b) in self.G.reachable_edges_rev_from[u]),
+                        self.edge_position_vars[(u, v, i)] == sum(self.edge_vars[(edge[0], edge[1], i)] for edge in self.G.reachable_edges_rev_from[u]),
                         name=f"position_u={u}_v={v}_i={i}"
                     )
 
@@ -373,3 +377,24 @@ class GenericPathModelDAG:
             paths.append(path[1:-1])
 
         return paths
+
+
+    def verify_edge_position(self):
+        
+        if not self.encode_edge_position:
+            return True
+        
+        self.check_is_solved()
+
+        paths = self.get_solution_paths()
+
+        edge_position_sol = self.solver.get_variable_values(
+                "position", [str, str, int]
+            )
+
+        for path_index, path in enumerate(paths):
+            for edge_position, (u,v) in enumerate(zip(path[:-1], path[1:])):
+                # +1 because the solution paths don't have the edge from global source
+                if int(edge_position_sol[(str(u), str(v), path_index)]) != edge_position + 1:
+                    return False
+        return True

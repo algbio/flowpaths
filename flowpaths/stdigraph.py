@@ -69,7 +69,7 @@ class stDiGraph(nx.DiGraph):
 
         # These two dict store the set of node (resp. edges) reachable from each node, including the node itself
         self.reachable_nodes_from = {node:{node} for node in self.nodes()}
-        self.reachable_edges_from = {node:{} for node in self.nodes()}
+        self.reachable_edges_from = {node:set() for node in self.nodes()}
         # Initialize reachable_nodes_from and reachable_edges_from by 
         # traversing the nodes in reverse topoloigical order.
         for node in self.topological_order_rev:
@@ -80,7 +80,7 @@ class stDiGraph(nx.DiGraph):
                 
         # These two dict store the set of node (resp. edges) reverse reachable from each node
         self.reachable_nodes_rev_from = {node:{node} for node in self.nodes()}
-        self.reachable_edges_rev_from = {node:{} for node in self.nodes()}
+        self.reachable_edges_rev_from = {node:set() for node in self.nodes()}
         # Initialize reachable_nodes_from and reachable_edges_from by 
         # traversing the nodes in reverse topoloigical order.
         for node in self.topological_order:
@@ -88,6 +88,14 @@ class stDiGraph(nx.DiGraph):
                 self.reachable_nodes_rev_from[node] |= self.reachable_nodes_rev_from[v]
                 self.reachable_edges_rev_from[node] |= self.reachable_edges_rev_from[v]
                 self.reachable_edges_rev_from[node] |= {(v, node)}
+
+        # print(self.edges())
+        # print(self.topological_order)
+        # print(self.reachable_nodes_from)
+        # print("self.reachable_edges_from", self.reachable_edges_from)
+        # print(self.reachable_nodes_rev_from)
+        # print("self.reachable_edges_rev_from", self.reachable_edges_rev_from)
+
 
     def get_width(self) -> int:
         """

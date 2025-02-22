@@ -61,6 +61,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
 
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
+        self.kwargs = kwargs
 
         self.pi_vars = {}
         self.path_weights_vars = {}
@@ -78,7 +79,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         ).difference(self.edges_to_ignore)
         kwargs["solve_statistics"] = self.solve_statistics
         super().__init__(
-            self.G, num_paths, subpath_constraints=self.subpath_constraints, **kwargs
+            self.G, num_paths, subpath_constraints=self.subpath_constraints, encode_edge_position=True, **kwargs
         )
 
         # This method is called from the super class GenericPathModelDAG
@@ -239,7 +240,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         """
 
         if self.solution is None:
-            raise ValueError("Solution is not available. Call get_solution() first.")
+            self.get_solution()
 
         solution_paths = self.solution[0]
         solution_weights = self.solution[1]
@@ -264,8 +265,11 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
             if self.flow_attr in data:
                 if (
                     abs(data[self.flow_attr] - weight_from_paths[(u, v)])
-                    <= tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
+                    > tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
                 ):
+                    print("data[self.flow_attr] = ", data[self.flow_attr])
+                    print(f"weight_from_paths[({u}, {v})]) = ", weight_from_paths[(u, v)])
+                    print("> ", tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)])
                     return False
 
         return True
