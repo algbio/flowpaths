@@ -134,7 +134,7 @@ class GenericPathModelDAG:
             ]
 
         self.edge_vars = self.solver.add_variables(
-            self.edge_indexes, name_prefix="e", lb=0, ub=1, var_type="integer"
+            self.edge_indexes, name_prefix="edge", lb=0, ub=1, var_type="integer"
         )
         if self.subpath_constraints:
             self.subpaths_vars = self.solver.add_variables(
@@ -335,7 +335,7 @@ class GenericPathModelDAG:
 
         if self.edge_vars_sol == {}:
             self.edge_vars_sol = self.solver.get_variable_values(
-                "e", [str, str, int], 
+                "edge", [str, str, int], 
                 binary_values=True,
             )
 

@@ -97,14 +97,14 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
-            name_prefix="p",
+            name_prefix="pi",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
         )
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
-            name_prefix="w",
+            name_prefix="weights",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
@@ -113,14 +113,14 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
         # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content
         self.gamma_vars = self.solver.add_variables(
             self.edge_indexes,
-            name_prefix="g",
+            name_prefix="gamma",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
         )
         self.path_slacks_vars = self.solver.add_variables(
             self.path_indexes,
-            name_prefix="s",
+            name_prefix="slack",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
@@ -192,7 +192,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_variable_values("w", [int])
+        weights_sol_dict = self.solver.get_variable_values("weights", [int])
         self.path_weights_sol = [
             (
                 abs(round(weights_sol_dict[i]))
@@ -201,7 +201,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
             )
             for i in range(self.k)
         ]
-        slacks_sol_dict = self.solver.get_variable_values("s", [int])
+        slacks_sol_dict = self.solver.get_variable_values("slack", [int])
         self.path_slacks_sol = [
             (
                 abs(round(slacks_sol_dict[i]))
@@ -269,3 +269,10 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
                     return False
 
         return True
+
+    def get_objective_value(self):
+
+        self.check_is_solved()
+
+        # sum of slacks
+        return sum(self.solution[2])

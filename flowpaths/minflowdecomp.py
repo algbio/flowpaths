@@ -97,6 +97,13 @@ class MinFlowDecomp:
 
         self.check_solved()
         return self.solution
+    
+    def get_objective_value(self):
+
+        self.check_solved()
+
+        # Number of paths
+        return len(self.solution[0])
 
     def check_solved(self):
         if not self.is_solved or self.solution is None:

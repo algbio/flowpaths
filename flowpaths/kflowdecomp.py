@@ -267,6 +267,12 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
                     return False
 
         return True
+    
+    def get_objective_value(self):
+        
+        self.check_is_solved()
+
+        return self.num_paths
 
     def draw_solution(self, show_flow_attr=True):
 
