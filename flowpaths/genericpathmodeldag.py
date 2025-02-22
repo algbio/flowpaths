@@ -399,9 +399,7 @@ class GenericPathModelDAG:
 
         paths = self.get_solution_paths()
 
-        edge_position_sol = self.solver.get_variable_values(
-                "position", [str, str, int]
-            )
+        edge_position_sol = self.solver.get_variable_values("position", [str, str, int])
 
         for path_index, path in enumerate(paths):
             for edge_position, (u,v) in enumerate(zip(path[:-1], path[1:])):
