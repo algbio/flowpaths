@@ -156,82 +156,77 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
 
     return True
 
+def draw_graph(graph: nx.DiGraph):
 
-#  # gv.render(dot, engine='dot', filepath=str(self.G.id), format='pdf')
+    import matplotlib.pyplot as plt
+    import pydot
 
-#     dot.render(filename=str(self.G.id),directory='.', view=True)
+    pydot_graph = nx.drawing.nx_pydot.to_pydot(graph)
+    pydot_graph.set_graph_defaults(rankdir='LR')
+    pydot_graph.set_graph_defaults(shape='rectangle')
+    pydot_graph.write_dot("output_pydot.dot")
+    pydot_graph.write_png("output_pydot.png")
 
-#     G = nx.cubical_graph()
+    # pydot_graph.get_node("0").
 
-#     import matplotlib.pyplot as plt
-#     import pydot
-#     from IPython.display import Image, display
+    tmp_G = graph # pydot.Dot(pydot_graph)
 
-#     tmp_G = nx.DiGraph(self.G)
-#     tmp_G.remove_nodes_from([self.G.source, self.G.sink])
+    pydotg2 = pydot.Dot(pydot_graph)
 
-#     pydot_graph = nx.drawing.nx_pydot.to_pydot(tmp_G)
-#     pydot_graph.set_graph_defaults(rankdir='LR')
-#     pydot_graph.set_graph_defaults(shape='rectangle')
-#     pydot_graph.write_dot("output_graphviz.dot")
-#     pydot_graph.write_png("output_graphviz.png")
+    print(pydotg2.get_node(0)[0].get_attributes())
 
-#     graph = pydot.Dot(pydot_graph)
+    pos = nx.nx_pydot.pydot_layout(tmp_G, prog="dot")
 
-#     graph.no
+    print(pos)
 
-#     display(Image(filename='output_graphviz.png'))
+    plt.figure()
 
-#     pos = nx.nx_pydot.pydot_layout(tmp_G, prog="dot")
+    # nodes
+    options = {"edgecolors": "tab:gray", "node_size": 800, "alpha": 0.9}
+    # nx.draw_networkx_nodes(G, pos, nodelist=[0, 1, 2, 3], node_color="tab:red", **options)
+    # nx.draw_networkx_nodes(G, pos, nodelist=[4, 5, 6, 7], node_color="tab:blue", **options)
+    nx.draw_networkx_nodes(tmp_G, pos, nodelist=tmp_G.nodes(), node_color="tab:blue", **options)
 
-#     print(pos)
-
-#     # nodes
-#     options = {"edgecolors": "tab:gray", "node_size": 800, "alpha": 0.9}
-#     # nx.draw_networkx_nodes(G, pos, nodelist=[0, 1, 2, 3], node_color="tab:red", **options)
-#     # nx.draw_networkx_nodes(G, pos, nodelist=[4, 5, 6, 7], node_color="tab:blue", **options)
-#     nx.draw_networkx_nodes(tmp_G, pos, nodelist=tmp_G.nodes(), node_color="tab:blue", **options)
-
-#     # edges
-#     nx.draw_networkx_edges(tmp_G, pos, width=1.0, alpha=0.5)
-#     # nx.draw_networkx_edges(
-#     #     G,
-#     #     pos,
-#     #     edgelist=[(0, 1), (1, 2), (2, 3), (3, 0)],
-#     #     width=15,
-#     #     alpha=0.5,
-#     #     edge_color="tab:red",
-#     # )
-#     # nx.draw_networkx_edges(
-#     #     G,
-#     #     pos,
-#     #     edgelist=[(0, 1), (1, 2), (2, 3), (3, 0)],
-#     #     width=5,
-#     #     alpha=0.5,
-#     #     edge_color="tab:blue",
-#     # )
-#     # nx.draw_networkx_edges(
-#     #     G,
-#     #     pos,
-#     #     edgelist=[(4, 5), (5, 6), (6, 7), (7, 4)],
-#     #     width=8,
-#     #     alpha=0.5,
-#     #     edge_color="tab:blue",
-#     # )
+    # edges
+    nx.draw_networkx_edges(tmp_G, pos, width=1.0, alpha=0.5)
+    # nx.draw_networkx_edges(
+    #     G,
+    #     pos,
+    #     edgelist=[(0, 1), (1, 2), (2, 3), (3, 0)],
+    #     width=15,
+    #     alpha=0.5,
+    #     edge_color="tab:red",
+    # )
+    # nx.draw_networkx_edges(
+    #     G,
+    #     pos,
+    #     edgelist=[(0, 1), (1, 2), (2, 3), (3, 0)],
+    #     width=5,
+    #     alpha=0.5,
+    #     edge_color="tab:blue",
+    # )
+    # nx.draw_networkx_edges(
+    #     G,
+    #     pos,
+    #     edgelist=[(4, 5), (5, 6), (6, 7), (7, 4)],
+    #     width=8,
+    #     alpha=0.5,
+    #     edge_color="tab:blue",
+    # )
 
 
-#     # # some math labels
-#     # labels = {}
-#     # labels[0] = r"$a$"
-#     # labels[1] = r"$b$"
-#     # labels[2] = r"$c$"
-#     # labels[3] = r"$d$"
-#     # labels[4] = r"$\alpha$"
-#     # labels[5] = r"$\beta$"
-#     # labels[6] = r"$\gamma$"
-#     # labels[7] = r"$\delta$"
-#     # nx.draw_networkx_labels(G, pos, labels, font_size=22, font_color="whitesmoke")
+    # # some math labels
+    # labels = {}
+    # labels[0] = r"$a$"
+    # labels[1] = r"$b$"
+    # labels[2] = r"$c$"
+    # labels[3] = r"$d$"
+    # labels[4] = r"$\alpha$"
+    # labels[5] = r"$\beta$"
+    # labels[6] = r"$\gamma$"
+    # labels[7] = r"$\delta$"
+    # nx.draw_networkx_labels(G, pos, labels, font_size=22, font_color="whitesmoke")
 
-#     plt.tight_layout()
-#     plt.axis("off")
-#     plt.savefig("cubical_graph.pdf")
+    plt.tight_layout()
+    plt.axis("off")
+    plt.savefig("output_pydot_nx.pdf")
