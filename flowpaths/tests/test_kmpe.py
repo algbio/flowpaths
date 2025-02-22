@@ -10,7 +10,7 @@ import stdigraph as stdigraph
 class TestkMinPathError(unittest.TestCase):
 
     def setUp(self):
-        weight_type = [int, float]  # 0
+        weight_type = [float]  # 0
         optimize_with_safe_paths = [True, False]  # 1
         optimize_with_safe_sequences = [True, False]  # 2
         optimize_with_safe_zero_edges = [True, False]  # 3

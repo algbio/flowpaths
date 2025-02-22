@@ -364,17 +364,28 @@ class GenericPathModelDAG:
         paths = []
         for i in range(self.k):
             vertex = self.G.source
-            path = [vertex]
-            while vertex != self.G.sink:
-                for out_neighbor in self.G.successors(vertex):
-                    if self.edge_vars_sol[(str(vertex), str(out_neighbor), i)] == 1:
-                        vertex = out_neighbor
-                        break
-                path.append(vertex)
-            if len(path) < 2:
-                raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. this should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
+            # checking if there is a path from source to sink
+            found_path = False
+            for out_neighbor in self.G.successors(vertex):
+                if self.edge_vars_sol[(str(vertex), str(out_neighbor), i)] == 1:
+                    found_path = True
+                    break
+            if not found_path:
+                path = []
+                paths.append(path)
+                print("Warning: No path found for path index", i)
+            else:
+                path = [vertex]
+                while vertex != self.G.sink:
+                    for out_neighbor in self.G.successors(vertex):
+                        if self.edge_vars_sol[(str(vertex), str(out_neighbor), i)] == 1:
+                            vertex = out_neighbor
+                            break
+                    path.append(vertex)
+                if len(path) < 2:
+                    raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. this should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
                 
-            paths.append(path[1:-1])
+                paths.append(path[1:-1])
 
         return paths
 
@@ -395,6 +406,6 @@ class GenericPathModelDAG:
         for path_index, path in enumerate(paths):
             for edge_position, (u,v) in enumerate(zip(path[:-1], path[1:])):
                 # +1 because the solution paths don't have the edge from global source
-                if int(edge_position_sol[(str(u), str(v), path_index)]) != edge_position + 1:
+                if round(edge_position_sol[(str(u), str(v), path_index)]) != edge_position + 1:
                     return False
         return True

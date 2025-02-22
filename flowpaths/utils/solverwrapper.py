@@ -229,4 +229,8 @@ class SolverWrapper:
                             f"Variable {var} has value {values[elem_index]}, which is not binary."
                         )
 
+        if binary_values:
+            for key in values.keys():
+                values[key] = round(values[key])
+
         return values
