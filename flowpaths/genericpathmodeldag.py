@@ -214,11 +214,9 @@ class GenericPathModelDAG:
                         safety.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
                     )
                     # get the reachable nodes from the last node
-                    reachable_nodes = self.G.get_reachable_nodes_from(last_node)
+                    reachable_nodes = self.G.reachable_nodes_from[last_node]
                     # get the backwards reachable nodes from the first node
-                    reachable_nodes_reverse = self.G.get_reachable_nodes_reverse_from(
-                        first_node
-                    )
+                    reachable_nodes_reverse = self.G.reachable_nodes_rev_from[first_node]
                     # get the edges in the path
                     path_edges = set((u, v) for (u, v) in paths_to_fix[i])
 
@@ -231,9 +229,7 @@ class GenericPathModelDAG:
                             # print(f"Adding zero constraint for edge ({u}, {v}) in path {i}")
                             self.solver.add_constraint(
                                 self.edge_vars[(u, v, i)] == 0,
-                                name="safe_list_zero_edge_u={}_v={}_i={}".format(
-                                    u, v, i
-                                ),
+                                name=f"safe_list_zero_edge_u={u}_v={v}_i={i}",
                             )
 
     def __get_paths_to_fix_from_safe_lists(self):

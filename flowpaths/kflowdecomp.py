@@ -312,3 +312,6 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
                 )  # label=str(weight)
             if len(path) == 1:
                 dot.node(str(path[0]), color=pathColor, penwidth="2.0")
+        
+
+        dot.render("output_graphviz.pdf", view=False)

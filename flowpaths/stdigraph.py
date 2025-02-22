@@ -64,6 +64,31 @@ class stDiGraph(nx.DiGraph):
 
         self.width = None
 
+        self.topological_order = list(nx.topological_sort(self))
+        self.topological_order_rev = list(reversed(self.topological_order))
+
+        # These two dict store the set of node (resp. edges) reachable from each node, including the node itself
+        self.reachable_nodes_from = {node:{node} for node in self.nodes()}
+        self.reachable_edges_from = {node:{} for node in self.nodes()}
+        # Initialize reachable_nodes_from and reachable_edges_from by 
+        # traversing the nodes in reverse topoloigical order.
+        for node in self.topological_order_rev:
+            for v in self.successors(node):
+                self.reachable_nodes_from[node] |= self.reachable_nodes_from[v]
+                self.reachable_edges_from[node] |= self.reachable_edges_from[v]
+                self.reachable_edges_from[node] |= {(node, v)}
+                
+        # These two dict store the set of node (resp. edges) reverse reachable from each node
+        self.reachable_nodes_rev_from = {node:{node} for node in self.nodes()}
+        self.reachable_edges_rev_from = {node:{} for node in self.nodes()}
+        # Initialize reachable_nodes_from and reachable_edges_from by 
+        # traversing the nodes in reverse topoloigical order.
+        for node in self.topological_order:
+            for v in self.predecessors(node):
+                self.reachable_nodes_rev_from[node] |= self.reachable_nodes_rev_from[v]
+                self.reachable_edges_rev_from[node] |= self.reachable_edges_rev_from[v]
+                self.reachable_edges_rev_from[node] |= {(v, node)}
+
     def get_width(self) -> int:
         """
         Calculate and return the width of the graph.
@@ -162,57 +187,6 @@ class stDiGraph(nx.DiGraph):
             return minFlowCost, antichain
 
         return minFlowCost
-
-    def get_reachable_nodes_from(self, v) -> set:
-        """
-        Get all nodes reachable from a given node in the graph.
-        This method performs a depth-first search (DFS) starting from the specified node
-        and returns a set of all nodes that can be reached from it, including the given node `v`.
-
-        Args
-        ----------
-        - v: The starting node from which to find all reachable nodes.
-
-        Returns
-        ----------
-        - A set of nodes that are reachable from the given node `v`.
-        """
-
-        successors = nx.dfs_successors(self, source=v)
-        reachable_nodes = {v} | {
-            reachable_node for node in successors for reachable_node in successors[node]
-        }
-
-        return reachable_nodes
-
-    def get_reachable_nodes_reverse_from(self, v) -> set:
-        """
-        Get the set of nodes that are reachable in reverse from a given node `v`.
-        This method computes the set of nodes that can reach the given node `v`, including node `v`,
-        by traversing the graph in reverse. If the given node `v` is the source
-        node, it returns a set containing only `v`.
-
-        Parameters
-        ----------
-        - v The node from which to find all reachable nodes in reverse.
-
-        Returns
-        ----------
-        - A set of nodes that can reach the given node `v` by traversing the graph in reverse.
-        """
-
-        if v == self.source:
-            return {v}
-
-        rev_G = nx.DiGraph(self).reverse()
-        predecessors = nx.dfs_successors(rev_G, source=v)
-        reachable_nodes_reverse = {v} | {
-            reachable_node_reverse
-            for node in predecessors
-            for reachable_node_reverse in predecessors[node]
-        }
-
-        return reachable_nodes_reverse
 
     def decompose_using_max_bottleck(self, flow_attr: str):
         """
