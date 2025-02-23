@@ -248,3 +248,9 @@ class SolverWrapper:
                 values[key] = round(values[key])
 
         return values
+
+    def get_objective_value(self):
+        if self.solver_type == "highs":
+            return self.solver.getObjectiveValue()
+        elif self.solver_type == "gurobi":
+            return self.solver.objVal
