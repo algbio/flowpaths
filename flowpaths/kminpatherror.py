@@ -4,7 +4,19 @@ import flowpaths.abstractpathmodeldag as pathmodel
 
 
 class kMinPathError(pathmodel.AbstractPathModelDAG):
+    """
+    This class implements the k-MinPathError model from 
+    Dias, Tomescu, "Accurate Flow Decomposition via Robust Integer Linear Programming", IEEE/ACM TCBB 2024
+    https://doi.org/10.1109/TCBB.2024.3433523
+    (see also https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content)
 
+    This model looks for k paths, with associated weights and slacks, such that for every edge (u,v) in the graph, 
+    the sum of the weights of the paths going through (u,v) minus the flow value of (u,v) is at most 
+    the sum of the slacks of the paths going through (u,v). The objective is to minimize the sum of the slacks.
+
+    The paths start in any source node of the graph and end in any sink node of the graph. You can allow for additional 
+    start or end nodes by specifying them in the `additional_starts` and `additional_ends` parameters.
+    """
     def __init__(
         self,
         G: nx.DiGraph,
