@@ -42,7 +42,7 @@ def process_solution(model: fp.kLeastAbsErrors):
             solution[2],
             model.solve_statistics,
         )
-        print("model.verify_solution()", model.is_valid_solution())
+        print("model.is_valid_solution()", model.is_valid_solution())
     else:
         print("Model could not be solved.")
 

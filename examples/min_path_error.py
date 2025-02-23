@@ -42,6 +42,7 @@ def process_solution(model: fp.kMinPathError):
             solution[2],
             model.solve_statistics,
         )
+        print("model.is_valid_solution()", model.is_valid_solution())
     else:
         print("Model could not be solved.")
 

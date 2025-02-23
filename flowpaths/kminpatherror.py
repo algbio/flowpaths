@@ -278,6 +278,9 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
                     # print(var_dict)
                     return False
 
+        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
+            return False
+
         return True
 
     def get_objective_value(self):

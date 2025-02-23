@@ -123,19 +123,25 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         )
 
         return self.solution
+    
+    def is_solution_valid(self):
+        pass 
+        # We recommend implementing a basic check that the solution is valid.
+        # This could be done by checking that, for each edge, the sum of the path weights going through it
+        # is within the flow interval of the edge. 
 
 if __name__ == "__main__":
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"
-    graph.add_edge(0, "a", lb=2, ub=6)
-    graph.add_edge(0, "b", lb=7, ub=7)
+    graph.add_edge("0", "a", lb=2, ub=6)
+    graph.add_edge("0", "b", lb=7, ub=7)
     graph.add_edge("a", "b", lb=1, ub=2)
     graph.add_edge("a", "c", lb=3, ub=5)
     graph.add_edge("b", "c", lb=5, ub=9)
     graph.add_edge("c", "d", lb=3, ub=6)
-    graph.add_edge("c", 1, lb=4, ub=7)
-    graph.add_edge("d", 1, lb=2, ub=6)
+    graph.add_edge("c", "1", lb=4, ub=7)
+    graph.add_edge("d", "1", lb=2, ub=6)
 
     # We create a kInexactFlowDecomposition model
     # with the flow lower bounds in the attribute `lb` of the edges,
