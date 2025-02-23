@@ -4,9 +4,9 @@ from flowpaths.utils import solverwrapper
 import time
 from abc import ABC, abstractmethod
 
-class GenericPathModelDAG(ABC):
+class AbstractPathModelDAG(ABC):
     """
-    This is a generic class modelling a path-finding (M)ILP in a DAG. The desing of this package is based on the
+    This is an abstract class modelling a path-finding (M)ILP in a DAG. The desing of this package is based on the
     following principles:
     - The class is designed to be extended by other classes that model specific path-finding problems in DAGs.
     In this way, they all benefit from the variables it encodes, and the safety optimizations it provides.

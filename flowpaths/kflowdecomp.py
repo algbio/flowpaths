@@ -2,10 +2,10 @@ import time
 import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.utils.graphutils as gu
-import flowpaths.genericpathmodeldag as pathmodel
+import flowpaths.abstractpathmodeldag as pathmodel
 
 
-class kFlowDecomp(pathmodel.GenericPathModelDAG):
+class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
     def __init__(
         self,

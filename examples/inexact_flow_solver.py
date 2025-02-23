@@ -1,5 +1,5 @@
 ######################
-# This is a minimal example of how to use the GenericPathModelDAG class to 
+# This is a minimal example of how to use the abstract class AbstractPathModelDAG to 
 # decompose an inexact flow (given as intervals [lb,ub] for each edge) into 
 # a given number of weighted paths, # while minimizing the sum of the weights of the paths.
 # 
@@ -9,13 +9,13 @@
 import flowpaths as fp
 import networkx as nx
 
-class kInexactFlowDecomposition(fp.GenericPathModelDAG):
+class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
     def __init__(self, G: nx.DiGraph, lb:str, ub:str, num_paths:int, threads:int=4):
 
         self.G = fp.stDiGraph(G)
         self.lb = lb # We assume all lowerbounds are >= 0
         self.ub = ub # We assume all upperbounds are >= 0
-        # self.k = num_paths will be available from the superclass GenericPathModelDAG, 
+        # self.k = num_paths will be available from the superclass AbstractPathModelDAG, 
         # after calling super().__init__(...), which happens below.
 
         # We declare the solution attribute, to be able to cache it.
@@ -29,7 +29,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         # We initialize the super class with the graph, the number of paths, and the trusted edges.
         super().__init__(self.G, num_paths, trusted_edges_for_safety=trusted_edges_for_safety, threads=threads)
 
-        # This method is called from the super class GenericPathModelDAG
+        # This method is called from the super class AbstractPathModelDAG
         self.create_solver_and_paths()
 
         # This method is called from the current class
@@ -125,7 +125,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         return self.solution
     
     def is_valid_solution(self):
-        # GenericPathModelDAG requires implementing a basic check that the solution is valid, 
+        # AbstractPathModelDAG requires implementing a basic check that the solution is valid, 
         # to make sure there were no errors in the encoding.
         # This could be done by checking that, for each edge, the sum of the path weights going through it
         # is within the flow interval of the edge. self.solver.get_objective_value() could also be checked, 
@@ -134,7 +134,7 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
         return True
     
     def get_objective_value(self):
-        # GenericPathModelDAG requires implementing a method to get the objective value.
+        # AbstractPathModelDAG requires implementing a method to get the objective value.
         # This could be done by returning the sum of the path weights, as returned by the solver.
         # This is useful if we want to compute the safe paths of any solution to our kInexactFlowDecomposition, 
         # namely those paths that are guaranteed to appear as subpath in some path of any optimal solution.

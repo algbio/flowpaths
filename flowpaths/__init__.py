@@ -1,4 +1,4 @@
-from .genericpathmodeldag import GenericPathModelDAG
+from .abstractpathmodeldag import AbstractPathModelDAG
 from .minflowdecomp import MinFlowDecomp
 from .kflowdecomp import kFlowDecomp
 from .kminpatherror import kMinPathError
@@ -7,7 +7,7 @@ from .stdigraph import stDiGraph
 from .utils import graphutils as graphutils
 
 __all__ = [
-    "GenericPathModelDAG",
+    "AbstractPathModelDAG",
     "MinFlowDecomp",
     "kFlowDecomp",
     "kMinPathError",

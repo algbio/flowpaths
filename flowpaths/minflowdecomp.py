@@ -2,9 +2,12 @@ import time
 import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.kflowdecomp as kflowdecomp
+import flowpaths.abstractpathmodeldag as pathmodel
 
-
-class MinFlowDecomp:
+class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
+    """
+    Class to decompose a flow into a minimum number of weighted paths.
+    """
     def __init__(
         self,
         G: nx.DiGraph,

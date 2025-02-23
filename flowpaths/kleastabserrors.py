@@ -1,9 +1,9 @@
 import networkx as nx
 import flowpaths.stdigraph as stdigraph
-import flowpaths.genericpathmodeldag as pathmodel
+import flowpaths.abstractpathmodeldag as pathmodel
 
 
-class kLeastAbsErrors(pathmodel.GenericPathModelDAG):
+class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
     def __init__(
         self,
@@ -13,6 +13,8 @@ class kLeastAbsErrors(pathmodel.GenericPathModelDAG):
         weight_type: type = float,
         subpath_constraints: list = [],
         edges_to_ignore: list = [],
+        additional_starts: list = [],
+        additional_ends: list = [],
         **kwargs,
     ):
         """
@@ -26,6 +28,8 @@ class kLeastAbsErrors(pathmodel.GenericPathModelDAG):
         - weight_type (type, optional): The type of the weights and slacks (int or float). Default is float.
         - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
         - edges_to_ignore (list, optional): List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack. Default is an empty list.
+        - additional_starts (list, optional): List of additional start nodes of the paths. Default is an empty list.
+        - additional_ends (list, optional): List of additional end nodes of the paths. Default is an empty list.
         - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
         - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
         - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
@@ -42,7 +46,7 @@ class kLeastAbsErrors(pathmodel.GenericPathModelDAG):
         - ValueError: If the graph contains edges with negative (<0) flow values.
         """
 
-        self.G = stdigraph.stDiGraph(G)
+        self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
 
         if weight_type not in [int, float]:
             raise ValueError(
@@ -73,7 +77,7 @@ class kLeastAbsErrors(pathmodel.GenericPathModelDAG):
 
         self.solve_statistics = {}
 
-        # Call the constructor of the parent class GenericPathModelDAG
+        # Call the constructor of the parent class AbstractPathModelDAG
         kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
             flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
         ).difference(self.edges_to_ignore)
@@ -82,7 +86,7 @@ class kLeastAbsErrors(pathmodel.GenericPathModelDAG):
             self.G, num_paths, subpath_constraints=self.subpath_constraints, encode_edge_position=True, **kwargs
         )
 
-        # This method is called from the super class GenericPathModelDAG
+        # This method is called from the super class AbstractPathModelDAG
         self.create_solver_and_paths()
 
         # This method is called from the current class 
