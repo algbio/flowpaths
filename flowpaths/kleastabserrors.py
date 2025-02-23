@@ -4,7 +4,12 @@ import flowpaths.abstractpathmodeldag as pathmodel
 
 
 class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
-
+    """
+    This class implements the k-LeastAbsoluteErrors, namely it looks for a decomposition of a weighted DAG into 
+    k weighted paths (specified by `num_paths`), minimizing the absolute errors on the edges. The error on an edge 
+    is defiened as the absolute value of the difference between the weight of the edge and the sum of the weights of 
+    the paths that go through it.
+    """
     def __init__(
         self,
         G: nx.DiGraph,
@@ -145,8 +150,14 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
             # Encoding the error on the edge (u, v) as the difference between 
             # the flow value of the edge and the sum of the weights of the paths that go through it (pi variables)
+            # If we minimize the sum of edge_errors_vars, then we are minimizing the sum of the absolute errors.
             self.solver.add_constraint(
-                f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k)) == self.edge_errors_vars[(u, v)],
+                f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= self.edge_errors_vars[(u, v)],
+                name=f"9aa_u={u}_v={v}_i={i}",
+            )
+
+            self.solver.add_constraint(
+                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) - f_u_v <= self.edge_errors_vars[(u, v)],
                 name=f"9aa_u={u}_v={v}_i={i}",
             )
 

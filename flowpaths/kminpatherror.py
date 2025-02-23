@@ -10,7 +10,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
     https://doi.org/10.1109/TCBB.2024.3433523
     (see also https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content)
 
-    This model looks for k paths, with associated weights and slacks, such that for every edge (u,v) in the graph, 
+    Given an edge-weighted DAG, this model looks for k paths, with associated weights and slacks, such that for every edge (u,v), 
     the sum of the weights of the paths going through (u,v) minus the flow value of (u,v) is at most 
     the sum of the slacks of the paths going through (u,v). The objective is to minimize the sum of the slacks.
 
