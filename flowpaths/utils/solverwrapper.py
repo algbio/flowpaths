@@ -7,6 +7,8 @@ class SolverWrapper:
         if self.tolerance < 1e-9:
             raise ValueError("The tolerance value must be smaller than 1e-9.")
 
+        self.variable_name_prefixes = []
+
         if solver_type == "highs":
 
             self.solver = highspy.Highs()
@@ -40,6 +42,17 @@ class SolverWrapper:
             )
 
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
+        
+        # Check if there is already a variable name prefix which has as prefix the current one
+        # of if the current one has as prefix an existing one
+        for prefix in self.variable_name_prefixes:
+            if prefix.startswith(name_prefix) or name_prefix.startswith(prefix):
+                raise ValueError(
+                    f"Variable name prefix {name_prefix} conflicts with existing variable name prefix {prefix}. Use a different name prefix."
+                )
+            
+        self.variable_name_prefixes.append(name_prefix)
+        
         if self.solver_type == "highs":
 
             var_type_map = {
