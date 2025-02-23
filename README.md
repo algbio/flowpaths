@@ -10,14 +10,14 @@ def main():
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"
-    graph.add_edge(0, "a", flow=6)
-    graph.add_edge(0, "b", flow=7)
+    graph.add_edge("0", "a", flow=6)
+    graph.add_edge("0", "b", flow=7)
     graph.add_edge("a", "b", flow=2)
     graph.add_edge("a", "c", flow=4)
     graph.add_edge("b", "c", flow=9)
     graph.add_edge("c", "d", flow=6)
-    graph.add_edge("c", 1, flow=7)
-    graph.add_edge("d", 1, flow=6)
+    graph.add_edge("c", "1", flow=7)
+    graph.add_edge("d", "1", flow=6)
 
     # We create a Minimum Flow Decomposition solver with default settings,
     # by specifying that the flow value of each edge is in the attribute `flow` of the edges.
