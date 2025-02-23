@@ -1,6 +1,6 @@
 # The _flowpaths_ Python Package
 
-This package implements various models for decomposing a weighted directed acyclic graph (DAG) into weighted paths, based on (Mixed) Integer Linear Programming ((M)ILP) formulations. It also supports the easy creation of new models.
+This package implements various solvers for decomposing a weighted directed acyclic graph (DAG) into weighted paths, based on (Mixed) Integer Linear Programming ((M)ILP) formulations. It also supports the easy creation of solvers for new decomposition models.
 
 ### Design principles
 
