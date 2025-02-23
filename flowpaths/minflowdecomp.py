@@ -112,8 +112,8 @@ class MinFlowDecomp:
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
             )
 
-    def verify_solution(self) -> bool:
-        return self.fd_model.check_solution()
+    def is_valid_solution(self) -> bool:
+        return self.fd_model.is_valid_solution()
 
     def draw_solution(self, show_flow_attr=True):
         self.fd_model.draw_solution(show_flow_attr)

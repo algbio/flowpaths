@@ -69,7 +69,7 @@ class TestkMinPathError(unittest.TestCase):
                 print(kmpe_model.solve_statistics)
                 self.assertTrue(kmpe_model.is_solved, "Model should be solved")
                 self.assertTrue(
-                    kmpe_model.verify_solution(),
+                    kmpe_model.is_valid_solution(),
                     "The solution is not a valid flow decomposition, under the default tolerance.",
                 )
                 self.assertTrue(

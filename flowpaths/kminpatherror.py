@@ -220,7 +220,7 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
 
         return self.solution
 
-    def verify_solution(self, tolerance=0.001):
+    def is_valid_solution(self, tolerance=0.001):
         """
         Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
 
@@ -262,23 +262,21 @@ class kMinPathError(pathmodel.GenericPathModelDAG):
                 num_paths_on_edges[e] += 1
 
         for u, v, data in self.G.edges(data=True):
-            if self.flow_attr in data:
+            if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
                 if (
                     abs(data[self.flow_attr] - weight_from_paths[(u, v)])
                     > tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
                 ):
-                    print(self.solution)
-                    print("num_paths_on_edges[(u, v)]", num_paths_on_edges[(u, v)])
-                    print("slack_from_paths[(u, v)]", slack_from_paths[(u, v)])
-                    print("data[self.flow_attr] = ", data[self.flow_attr])
-                    print(f"weight_from_paths[({u}, {v})]) = ", weight_from_paths[(u, v)])
-                    print("> ", tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)])
+                    # print(self.solution)
+                    # print("num_paths_on_edges[(u, v)]", num_paths_on_edges[(u, v)])
+                    # print("slack_from_paths[(u, v)]", slack_from_paths[(u, v)])
+                    # print("data[self.flow_attr] = ", data[self.flow_attr])
+                    # print(f"weight_from_paths[({u}, {v})]) = ", weight_from_paths[(u, v)])
+                    # print("> ", tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)])
 
                     var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
-                    print(var_dict)
-
-                    exit(1)
-                    # return False
+                    # print(var_dict)
+                    return False
 
         return True
 

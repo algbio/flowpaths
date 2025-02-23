@@ -222,7 +222,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
 
         return self.solution
 
-    def check_solution(self, tolerance=0.001):
+    def is_valid_solution(self, tolerance=0.001):
         """
         Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
 
@@ -259,7 +259,7 @@ class kFlowDecomp(pathmodel.GenericPathModelDAG):
                 num_paths_on_edges[e] += 1
 
         for u, v, data in self.G.edges(data=True):
-            if self.flow_attr in data:
+            if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
                 if (
                     abs(flow_from_paths[(u, v)] - data[self.flow_attr])
                     > tolerance * num_paths_on_edges[(u, v)]
