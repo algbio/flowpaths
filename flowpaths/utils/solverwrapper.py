@@ -1,35 +1,56 @@
 import highspy
 
 class SolverWrapper:
-    def __init__(self, solver_type="highs", **kwargs):
-        self.solver_type = solver_type
-        self.tolerance = kwargs.get("tolerance", 1e-9)  # Default tolerance value
+    """
+    A wrapper class for the both the HiGHS (highspy) and Gurobi (gurobipy) solvers.
+
+    This supports the following functionalities:
+    - Adding:
+        - Variables
+        - Constraints
+        - Product Constraints, encoding the product of a binary variable and a positive continuous / integer variable
+    - Setting the objective
+    - Optimizing, and getting the model status
+    - Writing the model to a file
+    - Getting variable names and values
+    - Getting the objective value
+    """
+    # storing some defaults
+    threads = 4
+    time_limit = 300
+    presolve = "choose"
+    log_to_console = "false"
+    external_solver = "highs"
+    tolerance = 1e-9
+
+    def __init__(self, external_solver="highs", **kwargs):
+        self.external_solver = external_solver
+        self.tolerance = kwargs.get("tolerance", SolverWrapper.tolerance)  # Default tolerance value
         if self.tolerance < 1e-9:
             raise ValueError("The tolerance value must be smaller than 1e-9.")
 
         self.variable_name_prefixes = []
 
-        if solver_type == "highs":
-
+        if external_solver == "highs":
             self.solver = highspy.Highs()
-            self.solver.setOptionValue("threads", kwargs.get("threads", 4))
-            self.solver.setOptionValue("time_limit", kwargs.get("time_limit", 300))
-            self.solver.setOptionValue("presolve", kwargs.get("presolve", "choose"))
-            self.solver.setOptionValue("log_to_console", kwargs.get("log_to_console", "false"))
+            self.solver.setOptionValue("threads", kwargs.get("threads", SolverWrapper.threads))
+            self.solver.setOptionValue("time_limit", kwargs.get("time_limit", SolverWrapper.time_limit))
+            self.solver.setOptionValue("presolve", kwargs.get("presolve", SolverWrapper.presolve))
+            self.solver.setOptionValue("log_to_console", kwargs.get("log_to_console", SolverWrapper.log_to_console))
             self.solver.setOptionValue("mip_rel_gap", self.tolerance)
             self.solver.setOptionValue("mip_feasibility_tolerance", self.tolerance)
             self.solver.setOptionValue("mip_abs_gap", self.tolerance)
             self.solver.setOptionValue("mip_rel_gap", self.tolerance)
             self.solver.setOptionValue("primal_feasibility_tolerance", self.tolerance)
-        elif solver_type == "gurobi":
+        elif external_solver == "gurobi":
             import gurobipy
 
             self.env = gurobipy.Env(empty=True)
             self.env.setParam("OutputFlag", 0)
-            self.env.setParam("LogToConsole", 1 if kwargs.get("log_to_console", "false") == "true" else 0)
-            self.env.setParam("OutputFlag", 1 if kwargs.get("log_to_console", "false") == "true" else 0)
-            self.env.setParam("TimeLimit", kwargs.get("time_limit", 300))
-            self.env.setParam("Threads", kwargs.get("threads", 4))
+            self.env.setParam("LogToConsole", 1 if kwargs.get("log_to_console", SolverWrapper.log_to_console) == "true" else 0)
+            self.env.setParam("OutputFlag", 1 if kwargs.get("log_to_console", SolverWrapper.log_to_console) == "true" else 0)
+            self.env.setParam("TimeLimit", kwargs.get("time_limit", SolverWrapper.time_limit))
+            self.env.setParam("Threads", kwargs.get("threads", SolverWrapper.threads))
             self.env.setParam("MIPGap", self.tolerance)
             self.env.setParam("IntFeasTol", self.tolerance)
             self.env.setParam("FeasibilityTol", self.tolerance)
@@ -38,7 +59,7 @@ class SolverWrapper:
             self.solver = gurobipy.Model(env=self.env)
         else:
             raise ValueError(
-                f"Unsupported solver type `{solver_type}`, supported solvers are `highs` and `gurobi`."
+                f"Unsupported solver type `{external_solver}`, supported solvers are `highs` and `gurobi`."
             )
 
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
@@ -53,7 +74,7 @@ class SolverWrapper:
             
         self.variable_name_prefixes.append(name_prefix)
         
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
 
             var_type_map = {
                 "integer": highspy.HighsVarType.kInteger,
@@ -66,7 +87,7 @@ class SolverWrapper:
                 type=var_type_map[var_type],
                 name_prefix=name_prefix,
             )
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             import gurobipy
 
             var_type_map = {
@@ -85,9 +106,9 @@ class SolverWrapper:
             return vars
 
     def add_constraint(self, expr, name=""):
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
             self.solver.addConstr(expr, name=name)
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             self.solver.addConstr(expr, name=name)
 
     def add_product_constraint(self, binary_var, product_var, equal_var, bound, name: str):
@@ -118,12 +139,16 @@ class SolverWrapper:
         self.add_constraint(equal_var >= product_var - (1 - binary_var) * bound, name=name + "_c")
 
     def set_objective(self, expr, sense="minimize"):
-        if self.solver_type == "highs":
+
+        if sense not in ["minimize", "maximize"]:
+            raise ValueError(f"Objective sense {sense} is not supported. Only [\"minimize\", \"maximize\"] are supported.")
+
+        if self.external_solver == "highs":
             if sense == "minimize":
                 self.solver.minimize(expr)
             else:
                 self.solver.maximize(expr)
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             import gurobipy
 
             self.solver.setObjective(
@@ -132,33 +157,33 @@ class SolverWrapper:
             )
 
     def optimize(self):
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
             self.solver.optimize()
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             self.solver.optimize()
 
     def write_model(self, filename):
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
             self.solver.writeModel(filename)
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             self.solver.write(filename)
 
     def get_model_status(self):
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
             return self.solver.getModelStatus().name
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             return self.solver.status
 
     def get_all_variable_values(self):
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
             return self.solver.allVariableValues()
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             return [var.X for var in self.solver.getVars()]
 
     def get_all_variable_names(self):
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
             return self.solver.allVariableNames()
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             return [var.VarName for var in self.solver.getVars()]
 
     def print_variable_names_values(self):
@@ -250,7 +275,7 @@ class SolverWrapper:
         return values
 
     def get_objective_value(self):
-        if self.solver_type == "highs":
+        if self.external_solver == "highs":
             return self.solver.getObjectiveValue()
-        elif self.solver_type == "gurobi":
+        elif self.external_solver == "gurobi":
             return self.solver.objVal

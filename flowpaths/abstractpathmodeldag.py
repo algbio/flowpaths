@@ -1,6 +1,6 @@
 import flowpaths.stdigraph as stdigraph
 from flowpaths.utils import safety
-from flowpaths.utils import solverwrapper
+from flowpaths.utils import solverwrapper as sw
 import time
 from abc import ABC, abstractmethod
 
@@ -79,11 +79,11 @@ class AbstractPathModelDAG(ABC):
         self.encode_edge_position = encode_edge_position
         self.edge_position_vars = {}
 
-        self.threads = kwargs.get("threads", 4)
-        self.time_limit = kwargs.get("time_limit", 300)
-        self.presolve = kwargs.get("presolve", "on")
-        self.log_to_console = kwargs.get("log_to_console", "false")
-        self.external_solver = kwargs.get("external_solver", "highs")
+        self.threads = kwargs.get("threads", sw.SolverWrapper.threads)
+        self.time_limit = kwargs.get("time_limit", sw.SolverWrapper.time_limit)
+        self.presolve = kwargs.get("presolve", sw.SolverWrapper.presolve)
+        self.log_to_console = kwargs.get("log_to_console", sw.SolverWrapper.log_to_console)
+        self.external_solver = kwargs.get("external_solver", sw.SolverWrapper.external_solver)
 
         self.external_solution_paths = kwargs.get("external_solution_paths", None)
         if self.external_solution_paths is None:
@@ -138,8 +138,8 @@ class AbstractPathModelDAG(ABC):
         if self.external_solution_paths is not None:
             return
 
-        self.solver = solverwrapper.SolverWrapper(
-            solver_type=self.external_solver,
+        self.solver = sw.SolverWrapper(
+            external_solver=self.external_solver,
             threads=self.threads,
             time_limit=self.time_limit,
             presolve=self.presolve,

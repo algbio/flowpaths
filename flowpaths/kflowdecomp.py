@@ -6,7 +6,9 @@ import flowpaths.abstractpathmodeldag as pathmodel
 
 
 class kFlowDecomp(pathmodel.AbstractPathModelDAG):
-
+    """
+    Class to decompose a flow into a given number of weighted paths.
+    """
     def __init__(
         self,
         G: nx.DiGraph,
@@ -86,7 +88,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             if self.get_solution_with_greedy():
                 greedy_solution_paths = self.solution[0]
 
-        # Call the constructor of the parent class GenericPathModelDAG
+        # Call the constructor of the parent class AbstractPathModelDAG
         kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
             flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
         )
@@ -100,7 +102,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         if self.is_solved:
             return
 
-        # This method is called from the super class GenericPathModelDAG
+        # This method is called from the super class AbstractPathModelDAG
         self.create_solver_and_paths()
 
         # This method is called from the current class to encode the flow decomposition
