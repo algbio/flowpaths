@@ -9,6 +9,11 @@ class stDiGraph(nx.DiGraph):
         additional_starts: list = [],
         additional_ends: list = [],
     ):
+        # check that every node of base_graph is a string
+        for node in base_graph.nodes():
+            if not isinstance(node, str):
+                raise ValueError("Every node of the graph must be a string.")
+
         super().__init__()
         self.base_graph = base_graph
         if "id" in base_graph.graph:
