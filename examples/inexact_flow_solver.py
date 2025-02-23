@@ -124,11 +124,22 @@ class kInexactFlowDecomposition(fp.GenericPathModelDAG):
 
         return self.solution
     
-    def is_solution_valid(self):
-        pass 
-        # We recommend implementing a basic check that the solution is valid.
+    def is_valid_solution(self):
+        # GenericPathModelDAG requires implementing a basic check that the solution is valid, 
+        # to make sure there were no errors in the encoding.
         # This could be done by checking that, for each edge, the sum of the path weights going through it
-        # is within the flow interval of the edge. 
+        # is within the flow interval of the edge. self.solver.get_objective_value() could also be checked, 
+        # to make sure the sum of the path weights indeed equals the objective value returned by the solver.
+        
+        return True
+    
+    def get_objective_value(self):
+        # GenericPathModelDAG requires implementing a method to get the objective value.
+        # This could be done by returning the sum of the path weights, as returned by the solver.
+        # This is useful if we want to compute the safe paths of any solution to our kInexactFlowDecomposition, 
+        # namely those paths that are guaranteed to appear as subpath in some path of any optimal solution.
+        
+        return self.solver.get_objective_value()
 
 if __name__ == "__main__":
     # Create a simple graph
@@ -161,5 +172,6 @@ if __name__ == "__main__":
             solution[1],
             kifd_model.solve_statistics,
         )
+        print("model.is_valid_solution()", kifd_model.is_valid_solution())
     else:
         print("Model could not be solved.")

@@ -2,9 +2,37 @@ import flowpaths.stdigraph as stdigraph
 from flowpaths.utils import safety
 from flowpaths.utils import solverwrapper
 import time
+from abc import ABC, abstractmethod
 
+class GenericPathModelDAG(ABC):
+    """
+    This is a generic class modelling a path-finding (M)ILP in a DAG. The desing of this package is based on the
+    following principles:
+    - The class is designed to be extended by other classes that model specific path-finding problems in DAGs.
+    In this way, they all benefit from the variables it encodes, and the safety optimizations it provides.
+    - The class uses our custom SolverWrapper class, which is a wrapper around the solvers HiGHS (open source) and 
+    Gurobi (free with academic license). In this way, both solvers can be used interchangeably.
 
-class GenericPathModelDAG:
+    More in detail, this class encodes num_paths s-t paths in the DAG G, where s is the global source of the stDiGraph 
+    and t is the global sink. It also allows for subpath constraints that must appear in at least one of the s-t paths.
+
+    The class creates the following variables:
+    - edge_vars: edge_vars[(u, v, i)] = 1 if path i goes through edge (u, v), 0 otherwise
+    - subpaths_vars: subpaths_vars[(i, j)] = 1 if path i contains subpath j, 0 otherwise
+    - edge_position_vars: edge_position_vars[(u, v, i)] = position of edge (u, v) in path i, starting from position 0
+        - These variables are created only if encode_edge_position is set to True
+        - Note that positions are relative to the globals source s of the stDiGraph, thus the first edge in a path is 
+        the edge from s to the first vertex in the original graph, and this first edge has position 0
+    - solver: a solver object to solve the (M)ILP
+
+    This class uses the "safety information" (see https://doi.org/10.48550/arXiv.2411.03871) in the graph to fix some 
+    edge_vars to 1. The safety information consists of safe paths, or safe sequences, that are guaranteed to appear in at least 
+    one cover (made up of any number of s-t paths) of the edges in trusted_edges_for_safety. That is, when implementing a new
+    path-finding (M)ILP, you can guarantee that 
+    1. The solution is made up of s-t paths
+    2. Any solution covers all edges in trusted_edges_for_safety, then safety optimizations can be used to fix some edge_vars to 1, 
+    which can speed up the solving process, while guaranteeing global optimality.
+    """
     def __init__(
         self,
         G: stdigraph.stDiGraph,
@@ -14,7 +42,7 @@ class GenericPathModelDAG:
         **kwargs,
     ):
         """
-        This is a generic class modelling a path finding ILP in a DAG.
+        Initializes the class with the given parameters.
 
         Parameters
         ----------
@@ -320,16 +348,6 @@ class GenericPathModelDAG:
         self.is_solved = False
         return False
 
-    def write_model(self, filename: str):
-        """
-        Writes the current model to a file.
-
-        Parameters
-        ----------
-        - filename (str): The path to the file where the model will be written.
-        """
-        self.solver.write_model(filename)
-
     def check_is_solved(self):
         if not self.is_solved:
             raise Exception(
@@ -339,6 +357,14 @@ class GenericPathModelDAG:
         
     def is_solved(self):
         return self.is_solved
+
+    @abstractmethod
+    def get_solution(self):
+        """
+        Implement this class in the child class to return the full solution of the model.
+        The solution paths are obtained with the get_solution_paths method.
+        """
+        pass
 
     def get_solution_paths(self) -> list:
         """
@@ -389,6 +415,14 @@ class GenericPathModelDAG:
 
         return paths
 
+    @abstractmethod
+    def is_valid_solution(self) -> bool:
+        """
+        Implement this class in the child class to perform a basic check whether the solution is valid.
+        
+        If you cannot perform such a check, provide an implementation that always returns True.
+        """
+        pass
 
     def verify_edge_position(self):
         
@@ -407,3 +441,15 @@ class GenericPathModelDAG:
                 if round(edge_position_sol[(str(u), str(v), path_index)]) != edge_position + 1:
                     return False
         return True
+    
+    @abstractmethod
+    def get_objective_value(self):
+        """
+        Implement this class in the child class to return the objective value of the model. This is needed to be able to
+        compute the safe paths (i.e. those appearing any optimum solution) for any child class.
+
+        A basic objective value is the num_paths (when we're trying to minimize the number of paths). If your model has a different
+        objective, you should implement this method to return the objective value of the model. If your model has no objective value,
+        you should implement this method to return None.
+        """
+        pass
