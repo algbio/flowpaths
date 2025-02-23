@@ -198,7 +198,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         Returns
         -------
-        - tuple: A tuple containing the solution paths, their corresponding weights, and their corresponding slacks.
+        - tuple: A tuple containing
+            - the list ofsolution paths, 
+            - the list of their corresponding weights, 
+            - the list of their corresponding slacks.
 
         Raises:
         - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.

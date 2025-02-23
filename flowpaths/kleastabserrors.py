@@ -102,7 +102,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
     def encode_leastabserrors_decomposition(self):
         """
-        Encodes the minimum path error decomposition variables and constraints for the optimization problem.
+        Encodes the least absolute errors decomposition variables and constraints for the optimization problem.
         """
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
@@ -178,7 +178,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         Returns
         -------
-        - tuple: A tuple containing the solution paths, their corresponding weights, and their corresponding slacks.
+        - tuple: A tuple containing 
+            - the list of solution paths, 
+            - the list of their corresponding weights,
+            - a dictionary with keys (u,v) and values the error on the edge (u,v).
 
         Raises:
         - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.

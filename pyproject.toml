@@ -1,7 +1,7 @@
 [project]
 name = "flowpaths"
 version = "0.1.0"
-description = "A Python package to decompose weighted graphs into weights paths, under various models."
+description = "A Python package to quickly decompose weighted graphs into weights paths, under various models."
 readme = "README.md"
 
 requires-python = ">=3.8"

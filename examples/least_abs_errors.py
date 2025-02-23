@@ -27,7 +27,7 @@ def main():
 
     edges_to_ignore = [("a", "c")]
     # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
-    # when computing the path slacks (i.e. edge errors)
+    # when computing the edge errors
     lae_model_2 = fp.kLeastAbsErrors(graph, flow_attr="flow", num_paths=3, weight_type=float, edges_to_ignore=edges_to_ignore)
     lae_model_2.solve()
     process_solution(lae_model_2)

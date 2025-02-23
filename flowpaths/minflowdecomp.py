@@ -71,6 +71,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         Returns:
             bool: True if a solution is found, False otherwise.
+
+        Note:
+            This overloads the solve() method from the AbstractPathModelDAG class.
         """
         start_time = time.time()
         for i in range(self.lowerbound, self.G.number_of_edges()):
@@ -98,22 +101,15 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
     def get_solution(self):
 
-        self.check_solved()
+        self.check_is_solved()
         return self.solution
     
     def get_objective_value(self):
 
-        self.check_solved()
+        self.check_is_solved()
 
         # Number of paths
         return len(self.solution[0])
-
-    def check_solved(self):
-        if not self.is_solved or self.solution is None:
-            raise Exception(
-                "Model not solved. If you want to solve it, call the solve method first. \
-                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
-            )
 
     def is_valid_solution(self) -> bool:
         return self.fd_model.is_valid_solution()
