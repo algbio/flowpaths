@@ -23,6 +23,9 @@ class AbstractPathModelDAG(ABC):
         - These variables are created only if encode_edge_position is set to True
         - Note that positions are relative to the globals source s of the stDiGraph, thus the first edge in a path is 
         the edge from s to the first vertex in the original graph, and this first edge has position 0
+        - If you set `edge_length_attr`, then the positions are relative to the edge lengths, and not the number of edges
+        The first edge still gets position 0, and other edges get positions equal to the sum of the lengths of the edges before them in the path
+        - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
     - solver: a solver object to solve the (M)ILP
 
     This class uses the "safety information" (see https://doi.org/10.48550/arXiv.2411.03871) in the graph to fix some 
@@ -272,14 +275,21 @@ class AbstractPathModelDAG(ABC):
         # edge_position_vars[(u, v, i)] = position (i.e., index) 
         # of the edge (u, v) in the path i, starting from position 0. 
         if self.encode_edge_position:
+            max_length = self.G.number_of_nodes()
+            if self.edge_length_attr is not None:
+                max_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in self.G.edges())
             self.edge_position_vars = self.solver.add_variables(
-                self.edge_indexes, name_prefix="position", lb=0, ub=self.G.number_of_nodes(), var_type="integer"
+                self.edge_indexes, name_prefix="position", lb=0, ub=max_length, var_type="integer"
             )
             for i in range(self.k):
                 for (u,v) in self.G.edges():
-                    length_u_v = self.G[u][v].get(self.edge_length_attr, 1) if self.edge_length_attr is not None else 1
                     self.solver.add_constraint(
-                        self.edge_position_vars[(u, v, i)] == sum(self.edge_vars[(edge[0], edge[1], i) * length_u_v] for edge in self.G.reachable_edges_rev_from[u]),
+                        self.edge_position_vars[(u, v, i)] 
+                            == sum(
+                                self.edge_vars[(edge[0], edge[1], i)] 
+                                * self.G[edge[0]][edge[1]].get(self.edge_length_attr, 1) 
+                                for edge in self.G.reachable_edges_rev_from[u]
+                                ),
                         name=f"position_u={u}_v={v}_i={i}"
                     )
 
@@ -501,10 +511,12 @@ class AbstractPathModelDAG(ABC):
         edge_position_sol = self.solver.get_variable_values("position", [str, str, int])
 
         for path_index, path in enumerate(paths):
-            for edge_position, (u,v) in enumerate(zip(path[:-1], path[1:])):
-                # +1 because the solution paths don't have the edge from global source
-                if round(edge_position_sol[(str(u), str(v), path_index)]) != edge_position + 1:
+            current_edge_position = 0
+            path_temp = [self.G.source] + path
+            for (u,v) in zip(path_temp[:-1], path_temp[1:]):
+                if round(edge_position_sol[(str(u), str(v), path_index)]) != current_edge_position:
                     return False
+                current_edge_position += self.G[u][v].get(self.edge_length_attr, 1)
         return True
     
     @abstractmethod
