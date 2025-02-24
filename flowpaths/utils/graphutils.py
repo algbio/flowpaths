@@ -184,7 +184,47 @@ def max_occurrence(seq, paths_in_DAG, edge_lengths: dict = {}) -> int:
             
     return max_occurence
 
-def draw_graph(graph: nx.DiGraph):
+def draw_solution_basic(graph: nx.DiGraph, flow_attr: str, paths: list, weights: list, id:str):
+
+        import graphviz as gv
+
+        dot = gv.Digraph(format="pdf")
+        dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
+        dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
+
+        colors = [
+            "red",
+            "blue",
+            "green",
+            "purple",
+            "brown",
+            "cyan",
+            "yellow",
+            "pink",
+            "grey",
+        ]
+
+        for u, v, data in graph.edges(data=True):
+            dot.edge(str(u), str(v), str(data.get(flow_attr,"")))
+
+        for path in paths:
+            pathColor = colors[len(path) + 73 % len(colors)]
+            for i in range(len(path) - 1):
+                dot.edge(
+                    str(path[i]),
+                    str(path[i + 1]),
+                    fontcolor=pathColor,
+                    color=pathColor,
+                    penwidth="2.0",
+                )  # label=str(weight)
+            if len(path) == 1:
+                dot.node(str(path[0]), color=pathColor, penwidth="2.0")
+        
+
+        dot.render(f"{id}", view=False)
+
+
+def draw_solution(graph: nx.DiGraph, paths: list, weights: list, id:str):
 
     import matplotlib.pyplot as plt
     import pydot
@@ -192,33 +232,92 @@ def draw_graph(graph: nx.DiGraph):
     pydot_graph = nx.drawing.nx_pydot.to_pydot(graph)
     pydot_graph.set_graph_defaults(rankdir='LR')
     pydot_graph.set_graph_defaults(shape='rectangle')
-    pydot_graph.write_dot("output_pydot.dot")
-    pydot_graph.write_png("output_pydot.png")
+    
+    print("Hello")
+    pydot_graph.get_node("a")[0].get_pos()
+    pydot_graph.write_dot(f"{id}.dot")
+    
+    # Read the dot file and extract node positions
+    pos = {}
+    with open(f"{id}.dot", "r") as file:
+        lines = file.readlines()
+        for i, line in enumerate(lines):
+            if "pos=" in line and "->" not in lines[i - 1]:
+                node_id = lines[i - 1].split("[")[0].strip()
+                print("node_id", node_id)
+                pos_str = line.split("pos=")[1].split('"')[1]
+                x, y = map(float, pos_str.split(","))
+                pos[node_id] = (x, y)
+    
+    print(pos)
+    
+    # pydot_graph.write_png(f"{id}.png")
 
-    # pydot_graph.get_node("0").
+    # tmp_G = graph
 
-    tmp_G = graph # pydot.Dot(pydot_graph)
+    # g = pydot.Dot(graph_type="digraph")
+    
+    # print(pydot_graph.get_node("a")[0])
 
-    pydotg2 = pydot.Dot(pydot_graph)
-
-    print(pydotg2.get_node(0)[0].get_attributes())
-
-    pos = nx.nx_pydot.pydot_layout(tmp_G, prog="dot")
+    # pos = nx.nx_pydot.pydot_layout(graph, prog="dot")
 
     print(pos)
 
-    plt.figure()
+    # # Draw nodes
+    # for node, (x, y) in pos.items():
+    #     plt.scatter(x, y, s=800, edgecolors="tab:gray", alpha=0.9, color="tab:blue", marker='.')
+    #     plt.text(x, y + 4, str(node), fontsize=12, ha='center', va='center', color='black')
+
+    options = {"edgecolors": "tab:gray", "node_size": 800, "alpha": 0.9}
+    basic_line_width = 2.0
+    nx.draw_networkx_nodes(graph, pos, nodelist=graph.nodes(), node_color="tab:blue", **options)
+    nx.draw_networkx_edges(graph, pos, width=basic_line_width, alpha=0.5, arrowsize=2)
+    
+
+    # # Draw edges
+    # for (u, v, data) in graph.edges(data=True):
+    #     x1, y1 = pos[str(u)]
+    #     x2, y2 = pos[str(v)]
+    #     plt.plot([x1, x2], [y1, y2], color="tab:gray", alpha=0, linestyle='-', linewidth=basic_line_width)
+    #     # Optionally, add arrowheads
+    #     plt.arrow(x1, y1, x2 - x1, y2 - y1, head_width=1, head_length=1, fc='tab:gray', ec='tab:gray')
+
+    # Draw paths
+    # Sort paths by weight in decreasing order
+    sorted_paths = sorted(zip(paths, weights), key=lambda x: x[1], reverse=True)
+    total_weight = sum(weights)
+    colors = ["tab:red", "tab:green", "tab:blue", "tab:orange", "tab:purple", "tab:brown"]
+    separator = 2  # Smaller separator between paths
+    previous_shift = basic_line_width  # Initial shift up
+    linewidth = [0 for i in range(len(sorted_paths))]
+
+    for i, (path, weight) in enumerate(sorted_paths):
+        path_edges = list(zip(path[:-1], path[1:]))
+        x_coords = []
+        y_coords = []
+        linewidth[i] = max(2,(weight / total_weight) * 30)  # Set linewidth proportional to the path weight as a percentage of the total weight
+        print("linewidth", linewidth[i])
+        for (u, v) in path_edges:
+            x1, y1 = pos[str(u)]
+            x2, y2 = pos[str(v)]
+            x_coords.extend([x1, x2])
+            y_coords.extend([y1, y2])
+        plt.plot(x_coords, y_coords, color=colors[i % len(colors)], alpha=0.35, linestyle='-', linewidth=linewidth[i])
+        print("previous_shift", previous_shift)
+        previous_shift += linewidth[i]/8 + separator  # Shift up for the next path
 
     # nodes
     options = {"edgecolors": "tab:gray", "node_size": 800, "alpha": 0.9}
     # nx.draw_networkx_nodes(G, pos, nodelist=[0, 1, 2, 3], node_color="tab:red", **options)
     # nx.draw_networkx_nodes(G, pos, nodelist=[4, 5, 6, 7], node_color="tab:blue", **options)
-    nx.draw_networkx_nodes(tmp_G, pos, nodelist=tmp_G.nodes(), node_color="tab:blue", **options)
+    # nx.draw_networkx_nodes(tmp_G, pos, nodelist=tmp_G.nodes(), node_color="tab:blue", **options)
+
+
 
     # edges
-    nx.draw_networkx_edges(tmp_G, pos, width=1.0, alpha=0.5)
+    # nx.draw_networkx_edges(tmp_G, pos, width=1.0, alpha=0.5, connectionstyle="arc3,rad=0.1")
     # nx.draw_networkx_edges(
-    #     G,
+    #     tmp_G,
     #     pos,
     #     edgelist=[(0, 1), (1, 2), (2, 3), (3, 0)],
     #     width=15,
@@ -226,7 +325,7 @@ def draw_graph(graph: nx.DiGraph):
     #     edge_color="tab:red",
     # )
     # nx.draw_networkx_edges(
-    #     G,
+    #     tmp_G,
     #     pos,
     #     edgelist=[(0, 1), (1, 2), (2, 3), (3, 0)],
     #     width=5,
@@ -234,7 +333,7 @@ def draw_graph(graph: nx.DiGraph):
     #     edge_color="tab:blue",
     # )
     # nx.draw_networkx_edges(
-    #     G,
+    #     tmp_G,
     #     pos,
     #     edgelist=[(4, 5), (5, 6), (6, 7), (7, 4)],
     #     width=8,
@@ -253,8 +352,8 @@ def draw_graph(graph: nx.DiGraph):
     # labels[5] = r"$\beta$"
     # labels[6] = r"$\gamma$"
     # labels[7] = r"$\delta$"
-    # nx.draw_networkx_labels(G, pos, labels, font_size=22, font_color="whitesmoke")
+    # nx.draw_networkx_labels(tmp_G, pos, labels, font_size=22, font_color="whitesmoke")
 
     plt.tight_layout()
     plt.axis("off")
-    plt.savefig("output_pydot_nx.pdf")
+    plt.savefig(f"{id}.pdf")
