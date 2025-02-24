@@ -28,7 +28,7 @@ class SolverWrapper:
         self.external_solver = external_solver
         self.tolerance = kwargs.get("tolerance", SolverWrapper.tolerance)  # Default tolerance value
         if self.tolerance < 1e-9:
-            raise ValueError("The tolerance value must be smaller than 1e-9.")
+            raise ValueError("The tolerance value must be >=1e-9.")
         # change 
         self.optimization_sense = kwargs.get("optimization_sense", SolverWrapper.optimization_sense)  # Default optimization sense
         if self.optimization_sense not in ["minimize", "maximize"]:
