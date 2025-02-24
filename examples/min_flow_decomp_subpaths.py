@@ -63,12 +63,12 @@ def main():
     graph2 = nx.DiGraph()
     graph2.graph["id"] = "simple_graph"
     graph2.add_edge("s", "a", flow=3, length=2)
-    graph2.add_edge("a", "c", flow=3, length=4) #
+    graph2.add_edge("a", "c", flow=3, length=4) # in [("a", "c"),("c", "e")]
     graph2.add_edge("s", "b", flow=2, length=3)
     graph2.add_edge("b", "c", flow=2, length=7)
     graph2.add_edge("c", "d", flow=3, length=2)
     graph2.add_edge("d", "t", flow=3, length=1)
-    graph2.add_edge("c", "e", flow=2, length=16) #
+    graph2.add_edge("c", "e", flow=2, length=16) # in [("a", "c"),("c", "e")]
     graph2.add_edge("e", "t", flow=2, length=2)
 
     mfd_model5 = fp.MinFlowDecomp(
