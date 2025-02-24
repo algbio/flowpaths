@@ -24,9 +24,7 @@ def main():
         flow_attr="flow", 
         subpath_constraints=[[("a", "c"),("c", "e")]]
         )
-
     mfd_model.solve() # We solve it
-    
     process_solution(mfd_model) # We process its solution
 
     # We now create another solver, but require only half of the edges of each subpath to appear in the some solution path.
@@ -85,7 +83,7 @@ def main():
         flow_attr="flow", 
         edge_length_attr="length", 
         subpath_constraints=[[("a", "c"),("c", "e")]], 
-        subpath_constraints_coverage_length=0.5, 
+        subpath_constraints_coverage_length=0.7, 
         optimize_with_greedy=False
         )
     mfd_model6.solve()
