@@ -17,6 +17,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         num_paths: int,
         weight_type: type = float,
         subpath_constraints: list = [],
+        subpath_constraints_coverage: float = 1.0,
         edges_to_ignore: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
@@ -32,6 +33,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         - num_paths (int): The number of paths to decompose in.
         - weight_type (type, optional): The type of the weights and slacks (int or float). Default is float.
         - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
+        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
         - edges_to_ignore (list, optional): List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack. Default is an empty list.
         - additional_starts (list, optional): List of additional start nodes of the paths. Default is an empty list.
         - additional_ends (list, optional): List of additional end nodes of the paths. Default is an empty list.
@@ -70,6 +73,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
+        self.subpath_constraints_coverage = subpath_constraints_coverage
         self.kwargs = kwargs
 
         self.pi_vars = {}
@@ -88,7 +92,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         ).difference(self.edges_to_ignore)
         kwargs["solve_statistics"] = self.solve_statistics
         super().__init__(
-            self.G, num_paths, subpath_constraints=self.subpath_constraints, encode_edge_position=True, **kwargs
+            self.G, num_paths, subpath_constraints=self.subpath_constraints, subpath_constraints_coverage=self.subpath_constraints_coverage, **kwargs
         )
 
         # This method is called from the super class AbstractPathModelDAG

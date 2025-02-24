@@ -14,6 +14,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         flow_attr: str,
         weight_type: type = float,
         subpath_constraints: list = [],
+        subpath_constraints_coverage: float = 1.0,
         **kwargs,
     ):
         """
@@ -25,6 +26,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         - flow_attr (str): The attribute name from where to get the flow values on the edges.
         - weight_type (type, optional): The type of weights (int or float). Default is int.
         - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
+        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
         - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
         - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
         - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
@@ -55,6 +58,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.flow_attr = flow_attr
         self.weight_type = weight_type
         self.subpath_constraints = subpath_constraints
+        self.subpath_constraints_coverage = subpath_constraints_coverage
         self.kwargs = kwargs
 
         self.solve_statistics = {}
@@ -83,6 +87,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 num_paths=i,
                 weight_type=self.weight_type,
                 subpath_constraints=self.subpath_constraints,
+                subpath_constraints_coverage=self.subpath_constraints_coverage,
                 **self.kwargs,
             )
 

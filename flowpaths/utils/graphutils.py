@@ -156,6 +156,34 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
 
     return True
 
+def max_occurrence(seq, paths_in_DAG) -> int:
+    """
+    Check what is the maximum number of edges of seq that appear in some path in the list paths_in_DAG. 
+
+    This assumes paths_in_DAG are paths in a directed acyclic graph. 
+
+    Parameters
+    ----------
+    - seq (list): The sequence of edges to check.
+    - paths (list): The list of paths to check against, as lists of nodes.
+
+    Returns
+    -------
+    - int: the largest number of seq edges that appear in some path in paths_in_DAG
+    """
+    max_occurence = 0
+    for path in paths_in_DAG:
+        path_edges = set([(path[i], path[i + 1]) for i in range(len(path) - 1)])
+        # Check how many seq edges are in path_edges
+        occurence = 0
+        for edge in seq:
+            if edge in path_edges:
+                occurence += 1
+        if occurence > max_occurence:
+            max_occurence = occurence
+            
+    return max_occurence
+
 def draw_graph(graph: nx.DiGraph):
 
     import matplotlib.pyplot as plt

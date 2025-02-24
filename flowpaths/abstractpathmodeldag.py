@@ -38,6 +38,7 @@ class AbstractPathModelDAG(ABC):
         G: stdigraph.stDiGraph,
         num_paths: int,
         subpath_constraints: list = None,
+        subpath_constraints_coverage: float = 1,
         encode_edge_position: bool = False,
         **kwargs,
     ):
@@ -48,7 +49,11 @@ class AbstractPathModelDAG(ABC):
         ----------
         - G (stDiGraph.stDiGraph): The directed acyclic graph (DAG) to be used.
         - num_paths (int): The number of paths to be computed.
-        - subpath_constraints (list, optional): Constraints for subpaths. Defaults to None.
+        - subpath_constraints (list, optional): A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to None.
+            - Each sequence of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
+            then each sequence of edges must appear in at least subpath_constraints_coverage fraction of some solution path, see below.
+        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
         - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Defaults to False.
         - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Defaults to False.
         - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Defaults to False.
@@ -70,7 +75,15 @@ class AbstractPathModelDAG(ABC):
         self.G = G
         self.id = self.G.id
         self.k = num_paths
+        
         self.subpath_constraints = subpath_constraints
+        if self.subpath_constraints is not None:
+            self.__check_valid_subpath_constraints()
+
+        self.subpath_constraints_coverage = subpath_constraints_coverage
+        if subpath_constraints is not None:
+            if self.subpath_constraints_coverage <= 0 or self.subpath_constraints_coverage > 1:
+                raise ValueError("subpath_constraints_coverage must be in the range (0, 1]")
 
         self.solve_statistics = kwargs.get("solve_statistics", {})
         self.edge_vars = {}
@@ -207,15 +220,10 @@ class AbstractPathModelDAG(ABC):
         if self.subpath_constraints:
             for i in range(self.k):
                 for j in range(len(self.subpath_constraints)):
-                    edgevars_on_subpath = list(
-                        map(
-                            lambda e: self.edge_vars[(e[0], e[1], i)],
-                            self.subpath_constraints[j],
-                        )
-                    )
+                    edgevars_on_subpath = [self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j]]
                     self.solver.add_constraint(
                         sum(edgevars_on_subpath)
-                        >= len(self.subpath_constraints[j])
+                        >= len(self.subpath_constraints[j]) * self.subpath_constraints_coverage
                         * self.subpaths_vars[(i, j)],
                         name="7a_i={}_j={}".format(i, j),
                     )
@@ -305,6 +313,32 @@ class AbstractPathModelDAG(ABC):
         )
 
         return paths_to_fix
+    
+    def __check_valid_subpath_constraints(self):
+        """
+        Checks if the subpath constraints are valid.
+
+        Parameters
+        ----------
+        - subpath_constraints (list): The subpath constraints to be checked.
+
+        Returns
+        ----------
+        - True if the subpath constraints are valid, False otherwise.
+
+        The method checks if the subpath constraints are valid by ensuring that each subpath
+        is a valid path in the graph.
+        """
+
+        # Check that self.subpath_constraints is a list of lists of edges
+        if not all(isinstance(subpath, list) for subpath in self.subpath_constraints):
+            raise ValueError("subpath_constraints must be a list of lists of edges.")
+
+        for subpath in self.subpath_constraints:
+            for e in subpath:
+                if not self.G.has_edge(e[0], e[1]):
+                    raise ValueError(f"Subpath {subpath} contains the edge {e} which is not in the graph.")
+
 
     def solve(self) -> bool:
         """

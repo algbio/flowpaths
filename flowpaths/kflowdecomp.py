@@ -16,6 +16,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         num_paths: int,
         weight_type: type = float,
         subpath_constraints: list = [],
+        subpath_constraints_coverage: float = 1.0,
         **kwargs,
     ):
         """
@@ -28,6 +29,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - num_paths (int): The number of paths to decompose in.
         - weight_type (type, optional): The type of weights (int or float). Default is float.
         - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
+        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
         - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
         - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
         - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
@@ -74,6 +77,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
+        self.subpath_constraints_coverage = subpath_constraints_coverage
 
         self.pi_vars = {}
         self.path_weights_vars = {}
@@ -95,7 +99,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         kwargs["solve_statistics"] = self.solve_statistics
         kwargs["external_solution_paths"] = greedy_solution_paths
         super().__init__(
-            self.G, num_paths, subpath_constraints=self.subpath_constraints, **kwargs
+            self.G, num_paths, subpath_constraints=self.subpath_constraints, subpath_constraints_coverage=self.subpath_constraints_coverage, **kwargs
         )
 
         # If already solved with a previous method, we don't create solver, not add paths
@@ -181,6 +185,14 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         start_time = time.time()
         (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
+
+        # Check if the greedy decomposition satisfies the subpath contraints
+        if self.subpath_constraints:
+            for subpath in self.subpath_constraints:
+                # If the subpath is not covered enough by the greedy decomposition, we return False
+                if gu.max_occurrence(subpath, paths) < len(subpath) * self.subpath_constraints_coverage:
+                    return False
+            
         if len(paths) <= self.k:
             self.__solution = (paths, weights)
             self.is_solved = True
