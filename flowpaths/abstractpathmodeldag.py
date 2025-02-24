@@ -39,7 +39,9 @@ class AbstractPathModelDAG(ABC):
         num_paths: int,
         subpath_constraints: list = None,
         subpath_constraints_coverage: float = 1,
+        subpath_constraints_coverage_length: float = None,
         encode_edge_position: bool = False,
+        edge_length_attr: str = None,
         **kwargs,
     ):
         """
@@ -52,8 +54,15 @@ class AbstractPathModelDAG(ABC):
         - subpath_constraints (list, optional): A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to None.
             - Each sequence of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
             then each sequence of edges must appear in at least subpath_constraints_coverage fraction of some solution path, see below.
-        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of number of edges. 
             Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
+        - subpath_constraints_coverage_length (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of length of the subpath.
+            Defaults to None, meaning that this is not imposed. 
+            Setting this constraint overrides subpath_constraints_coverage, and you also need to set edge_length_attr. If an edge has missing edge length, it gets length 1.
+        - encode_edge_position (bool, optional): Whether to encode the position of the edges in the paths. Defaults to False.
+        - edge_length_attr (str, optional): The attribute name from where to get the edge lengths. Defaults to None.
+            If set, then the edge positions (above) are in terms of the edge lengths specified in the edge_length_attr field of each edge
+            If set, and an edge has a missing edge length, then it gets length 1.
         - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Defaults to False.
         - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Defaults to False.
         - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Defaults to False.
@@ -75,15 +84,22 @@ class AbstractPathModelDAG(ABC):
         self.G = G
         self.id = self.G.id
         self.k = num_paths
+        self.edge_length_attr = edge_length_attr
         
         self.subpath_constraints = subpath_constraints
         if self.subpath_constraints is not None:
             self.__check_valid_subpath_constraints()
 
         self.subpath_constraints_coverage = subpath_constraints_coverage
+        self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         if subpath_constraints is not None:
             if self.subpath_constraints_coverage <= 0 or self.subpath_constraints_coverage > 1:
                 raise ValueError("subpath_constraints_coverage must be in the range (0, 1]")
+            if self.subpath_constraints_coverage_length is not None:
+                if self.subpath_constraints_coverage_length <= 0 or self.subpath_constraints_coverage_length > 1:
+                    raise ValueError("If set, subpath_constraints_coverage_length must be in the range (0, 1]")
+                if self.edge_length_attr is None:
+                    raise ValueError("If subpath_constraints_coverage_length is set, edge_length_attr must be provided.")
 
         self.solve_statistics = kwargs.get("solve_statistics", {})
         self.edge_vars = {}
@@ -220,13 +236,31 @@ class AbstractPathModelDAG(ABC):
         if self.subpath_constraints:
             for i in range(self.k):
                 for j in range(len(self.subpath_constraints)):
-                    edgevars_on_subpath = [self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j]]
-                    self.solver.add_constraint(
-                        sum(edgevars_on_subpath)
-                        >= len(self.subpath_constraints[j]) * self.subpath_constraints_coverage
-                        * self.subpaths_vars[(i, j)],
-                        name="7a_i={}_j={}".format(i, j),
-                    )
+
+                    if self.subpath_constraints_coverage_length is None:
+                        # By default, the length of the constraints is its number of edges 
+                        constraint_length = len(self.subpath_constraints[j])
+                        # And the fraction of edges that we need to cover is self.subpath_constraints_coverage
+                        coverage_fraction = self.subpath_constraints_coverage
+                        self.solver.add_constraint(
+                            sum(self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j])
+                            >= constraint_length * coverage_fraction
+                            * self.subpaths_vars[(i, j)],
+                            name="7a_i={}_j={}".format(i, j),
+                        )
+                    else:
+                        # If however we specified that the coverage fraction is in terms of edge lengths
+                        # Then the constraints length is the sum of the lengths of the edges,
+                        # where each edge without a length gets length 1
+                        constraint_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in self.subpath_constraints[j])
+                        # And the fraction of edges that we need to cover is self.subpath_constraints_coverage_length
+                        coverage_fraction = self.subpath_constraints_coverage_length
+                        self.solver.add_constraint(
+                            sum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1) for e in self.subpath_constraints[j])
+                            >= constraint_length * coverage_fraction
+                            * self.subpaths_vars[(i, j)],
+                            name="7a_i={}_j={}".format(i, j),
+                        )
             for j in range(len(self.subpath_constraints)):
                 self.solver.add_constraint(
                     sum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
@@ -241,14 +275,11 @@ class AbstractPathModelDAG(ABC):
             self.edge_position_vars = self.solver.add_variables(
                 self.edge_indexes, name_prefix="position", lb=0, ub=self.G.number_of_nodes(), var_type="integer"
             )
-            # print("Adding position constraints")
-            # print("self.G.edges()", self.G.edges())
             for i in range(self.k):
                 for (u,v) in self.G.edges():
-                    # print(f"Adding position constraint for edge ({u}, {v}) in path {i}")
-                    # print(self.G.reachable_edges_rev_from[u])
+                    length_u_v = self.G[u][v].get(self.edge_length_attr, 1) if self.edge_length_attr is not None else 1
                     self.solver.add_constraint(
-                        self.edge_position_vars[(u, v, i)] == sum(self.edge_vars[(edge[0], edge[1], i)] for edge in self.G.reachable_edges_rev_from[u]),
+                        self.edge_position_vars[(u, v, i)] == sum(self.edge_vars[(edge[0], edge[1], i) * length_u_v] for edge in self.G.reachable_edges_rev_from[u]),
                         name=f"position_u={u}_v={v}_i={i}"
                     )
 

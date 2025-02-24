@@ -156,7 +156,7 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
 
     return True
 
-def max_occurrence(seq, paths_in_DAG) -> int:
+def max_occurrence(seq, paths_in_DAG, edge_lengths: dict = {}) -> int:
     """
     Check what is the maximum number of edges of seq that appear in some path in the list paths_in_DAG. 
 
@@ -178,7 +178,7 @@ def max_occurrence(seq, paths_in_DAG) -> int:
         occurence = 0
         for edge in seq:
             if edge in path_edges:
-                occurence += 1
+                occurence += edge_lengths.get(edge, 1)
         if occurence > max_occurence:
             max_occurence = occurence
             

@@ -18,6 +18,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
+        subpath_constraints_coverage_length: float = None,
+        edge_length_attr: str = None,
         edges_to_ignore: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
@@ -74,6 +76,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
+        self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
+        self.edge_length_attr = edge_length_attr
         self.kwargs = kwargs
 
         self.pi_vars = {}
@@ -92,7 +96,13 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         ).difference(self.edges_to_ignore)
         kwargs["solve_statistics"] = self.solve_statistics
         super().__init__(
-            self.G, num_paths, subpath_constraints=self.subpath_constraints, subpath_constraints_coverage=self.subpath_constraints_coverage, **kwargs
+            self.G, 
+            num_paths, 
+            subpath_constraints=self.subpath_constraints, 
+            subpath_constraints_coverage=self.subpath_constraints_coverage, 
+            subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+            edge_length_attr=self.edge_length_attr,
+            **kwargs
         )
 
         # This method is called from the super class AbstractPathModelDAG

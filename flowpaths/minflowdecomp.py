@@ -15,6 +15,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
+        subpath_constraints_coverage_length: float = None,
+        edge_length_attr: str = None,
         **kwargs,
     ):
         """
@@ -59,6 +61,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.weight_type = weight_type
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
+        self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
+        self.edge_length_attr = edge_length_attr
         self.kwargs = kwargs
 
         self.solve_statistics = {}
@@ -88,6 +92,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 weight_type=self.weight_type,
                 subpath_constraints=self.subpath_constraints,
                 subpath_constraints_coverage=self.subpath_constraints_coverage,
+                subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                edge_length_attr=self.edge_length_attr,
                 **self.kwargs,
             )
 

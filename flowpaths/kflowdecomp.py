@@ -17,6 +17,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
+        subpath_constraints_coverage_length: float = None,
+        edge_length_attr: str = None,
         **kwargs,
     ):
         """
@@ -78,6 +80,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.k = num_paths
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
+        self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
+        self.edge_length_attr = edge_length_attr
 
         self.pi_vars = {}
         self.path_weights_vars = {}
@@ -99,7 +103,13 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         kwargs["solve_statistics"] = self.solve_statistics
         kwargs["external_solution_paths"] = greedy_solution_paths
         super().__init__(
-            self.G, num_paths, subpath_constraints=self.subpath_constraints, subpath_constraints_coverage=self.subpath_constraints_coverage, **kwargs
+            self.G, 
+            num_paths, 
+            subpath_constraints=self.subpath_constraints, 
+            subpath_constraints_coverage=self.subpath_constraints_coverage, 
+            subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+            edge_length_attr=self.edge_length_attr, 
+            **kwargs
         )
 
         # If already solved with a previous method, we don't create solver, not add paths
@@ -189,8 +199,16 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # Check if the greedy decomposition satisfies the subpath contraints
         if self.subpath_constraints:
             for subpath in self.subpath_constraints:
+                if self.subpath_constraints_coverage_length is None:
+                    # By default, the length of the constraints is its number of edges 
+                    constraint_length = len(subpath)
+                    # And the fraction of edges that we need to cover is self.subpath_constraints_coverage
+                    coverage_fraction = self.subpath_constraints_coverage
+                else:
+                    constraint_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in subpath)
+                    coverage_fraction = self.subpath_constraints_coverage_length
                 # If the subpath is not covered enough by the greedy decomposition, we return False
-                if gu.max_occurrence(subpath, paths) < len(subpath) * self.subpath_constraints_coverage:
+                if gu.max_occurrence(subpath, paths, edge_lengths={(u,v): self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in subpath}) < constraint_length * coverage_fraction:
                     return False
             
         if len(paths) <= self.k:
