@@ -79,14 +79,14 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.path_weights_vars = {}
 
         self.path_weights_sol = None
-        self.solution = None
+        self.__solution = None
 
         greedy_solution_paths = None
         self.solve_statistics = {}
         self.optimize_with_greedy = kwargs.get("optimize_with_greedy", True)
         if self.optimize_with_greedy:
             if self.get_solution_with_greedy():
-                greedy_solution_paths = self.solution[0]
+                greedy_solution_paths = self.__solution[0]
 
         # Call the constructor of the parent class AbstractPathModelDAG
         kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
@@ -182,7 +182,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         start_time = time.time()
         (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
         if len(paths) <= self.k:
-            self.solution = (paths, weights)
+            self.__solution = (paths, weights)
             self.is_solved = True
             self.solve_statistics = {}
             self.solve_statistics["greedy_solve_time"] = time.time() - start_time
@@ -206,8 +206,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
         """
 
-        if self.solution is not None:
-            return self.solution
+        if self.__solution is not None:
+            return self.__solution
 
         self.check_is_solved()
         weights_sol_dict = self.solver.get_variable_values("w", [int])
@@ -220,9 +220,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             for i in range(self.k)
         ]
 
-        self.solution = (self.get_solution_paths(), self.path_weights_sol)
+        self.__solution = (self.get_solution_paths(), self.path_weights_sol)
 
-        return self.solution
+        return self.__solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -243,11 +243,11 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
-        if self.solution is None:
+        if self.__solution is None:
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_paths = self.solution[0]
-        solution_weights = self.solution[1]
+        solution_paths = self.__solution[0]
+        solution_weights = self.__solution[1]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
