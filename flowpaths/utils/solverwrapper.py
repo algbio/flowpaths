@@ -22,12 +22,17 @@ class SolverWrapper:
     log_to_console = "false"
     external_solver = "highs"
     tolerance = 1e-9
+    optimization_sense = "minimize"
 
     def __init__(self, external_solver="highs", **kwargs):
         self.external_solver = external_solver
         self.tolerance = kwargs.get("tolerance", SolverWrapper.tolerance)  # Default tolerance value
         if self.tolerance < 1e-9:
             raise ValueError("The tolerance value must be smaller than 1e-9.")
+        # change 
+        self.optimization_sense = kwargs.get("optimization_sense", SolverWrapper.optimization_sense)  # Default optimization sense
+        if self.optimization_sense not in ["minimize", "maximize"]:
+            raise ValueError(f"Optimization sense {self.optimization_sense} is not supported. Only [\"minimize\", \"maximize\"] are supported.")
 
         self.variable_name_prefixes = []
 
@@ -142,6 +147,7 @@ class SolverWrapper:
 
         if sense not in ["minimize", "maximize"]:
             raise ValueError(f"Objective sense {sense} is not supported. Only [\"minimize\", \"maximize\"] are supported.")
+        self.optimization_sense = sense
 
         if self.external_solver == "highs":
             if sense == "minimize":
