@@ -1,7 +1,13 @@
 ######################
 # This is a minimal example of how to use the abstract class AbstractPathModelDAG to 
 # decompose an inexact flow (given as intervals [lb,ub] for each edge) into 
-# a given number of weighted paths, # while minimizing the sum of the weights of the paths.
+# a given number of weighted paths.
+# 
+# This model was introduced by 
+# Williams, Reynolds and Mumey, "RNA Transcript Assembly Using Inexact Flows", 2019 IEEE International Conference on Bioinformatics and Biomedicine (BIBM)
+# https://doi.org/10.1109/BIBM47256.2019.8983180
+# 
+# In addition, to illustrate how to add an objective fuction to the model, we minimize the sum of the path weights.
 # 
 # NOTE: See kflowdecomp.py or kminpatherror.py for best practices on how to implement a new decomposition model.
 ######################
