@@ -57,6 +57,9 @@ def main():
     mfd_model4.solve()
     process_solution(mfd_model4) # We process its solution
 
+
+    # We now create another graph, where the edges also have lengths
+    # and we express the subpath coverage fraction in terms of the edge lengths
     graph2 = nx.DiGraph()
     graph2.graph["id"] = "simple_graph"
     graph2.add_edge("s", "a", flow=3, length=2)
@@ -86,6 +89,8 @@ def main():
         subpath_constraints_coverage_length=0.7, 
         optimize_with_greedy=False
         )
+    # Note that edge ("c", "e") has length 16, which is 0.8 * subpath length (4 + 16). 
+    # Thus already covering the edge ("c", "e") with a coverage_length = 0.7 is enough to satisfy the constraint.
     mfd_model6.solve()
     process_solution(mfd_model6)
 
