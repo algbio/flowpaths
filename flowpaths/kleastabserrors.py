@@ -78,7 +78,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         self.path_weights_sol = None
         self.edge_errors_sol = None
-        self.solution = None
+        self.__solution = None
 
         self.solve_statistics = {}
 
@@ -187,8 +187,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
         """
 
-        if self.solution is not None:
-            return self.solution
+        if self.__solution is not None:
+            return self.__solution
 
         self.check_is_solved()
 
@@ -206,13 +206,13 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         for (u,v) in self.edge_indexes_basic:
             self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
 
-        self.solution = (
+        self.__solution = (
             self.get_solution_paths(),
             self.path_weights_sol,
             self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
         )
 
-        return self.solution
+        return self.__solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -233,12 +233,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
-        if self.solution is None:
+        if self.__solution is None:
             self.get_solution()
 
-        solution_paths = self.solution[0]
-        solution_weights = self.solution[1]
-        solution_errors = self.solution[2]
+        solution_paths = self.__solution[0]
+        solution_weights = self.__solution[1]
+        solution_errors = self.__solution[2]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
