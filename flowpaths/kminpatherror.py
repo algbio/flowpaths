@@ -85,7 +85,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.path_weights_sol = None
         self.path_slacks_sol = None
-        self.solution = None
+        self.__solution = None
 
         self.solve_statistics = {}
 
@@ -207,8 +207,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
         """
 
-        if self.solution is not None:
-            return self.solution
+        if self.__solution is not None:
+            return self.__solution
 
         self.check_is_solved()
 
@@ -231,13 +231,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             for i in range(self.k)
         ]
 
-        self.solution = (
+        self.__solution = (
             self.get_solution_paths(),
             self.path_weights_sol,
             self.path_slacks_sol,
         )
 
-        return self.solution
+        return self.__solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -258,12 +258,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
-        if self.solution is None:
+        if self.__solution is None:
             self.get_solution()
 
-        solution_paths = self.solution[0]
-        solution_weights = self.solution[1]
-        solution_slacks = self.solution[2]
+        solution_paths = self.__solution[0]
+        solution_weights = self.__solution[1]
+        solution_slacks = self.__solution[2]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
@@ -307,4 +307,4 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.check_is_solved()
 
         # sum of slacks
-        return sum(self.solution[2])
+        return sum(self.__solution[2])

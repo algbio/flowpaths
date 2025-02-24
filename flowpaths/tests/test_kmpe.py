@@ -78,11 +78,11 @@ class TestkMinPathError(unittest.TestCase):
                 )
 
                 if first_solution_size == None:
-                    first_solution_size = len(kmpe_model.solution[0])
+                    first_solution_size = len(kmpe_model.__solution[0])
                 else:
                     self.assertEqual(
                         first_solution_size,
-                        len(kmpe_model.solution[0]),
+                        len(kmpe_model.__solution[0]),
                         "The size of the solution should be the same for all settings.",
                     )
 

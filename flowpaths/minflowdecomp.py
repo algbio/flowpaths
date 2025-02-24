@@ -58,7 +58,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.kwargs = kwargs
 
         self.solve_statistics = {}
-        self.solution = None
+        self.__solution = None
         self.is_solved = False
 
     def solve(self) -> bool:
@@ -89,7 +89,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             fd_model.solve()
 
             if fd_model.is_solved:
-                self.solution = fd_model.get_solution()
+                self.__solution = fd_model.get_solution()
                 self.is_solved = True
                 self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.time() - start_time
@@ -102,14 +102,14 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     def get_solution(self):
 
         self.check_is_solved()
-        return self.solution
+        return self.__solution
     
     def get_objective_value(self):
 
         self.check_is_solved()
 
         # Number of paths
-        return len(self.solution[0])
+        return len(self.__solution[0])
 
     def is_valid_solution(self) -> bool:
         return self.fd_model.is_valid_solution()

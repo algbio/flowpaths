@@ -18,8 +18,9 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         # self.k = num_paths will be available from the superclass AbstractPathModelDAG, 
         # after calling super().__init__(...), which happens below.
 
-        # We declare the solution attribute, to be able to cache it.
-        self.solution = None      
+        # We declare the __solution attribute, to be able to cache it.
+        # Note that we make it private to this class, so that we can access it only with get_solution()
+        self.__solution = None      
         
         # To be able to apply the safety optimizations, we get the edges that 
         # must appear in some solution path. For this problem, these are the edges 
@@ -113,16 +114,16 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
 
     def get_solution(self):
 
-        if self.solution is not None:
-            return self.solution
+        if self.__solution is not None:
+            return self.__solution
     
         solution_weights_dict = self.solver.get_variable_values("w", [int])
-        self.solution = (
+        self.__solution = (
             self.get_solution_paths(), 
             [solution_weights_dict[i] for i in range(self.k)]
         )
 
-        return self.solution
+        return self.__solution
     
     def is_valid_solution(self):
         # AbstractPathModelDAG requires implementing a basic check that the solution is valid, 
