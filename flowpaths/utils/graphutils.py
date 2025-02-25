@@ -17,7 +17,14 @@ def read_graph(graph_raw) -> nx.DiGraph:
         return G
 
     for edge in graph_raw[2:]:
-        u, v, w = list(map(lambda x: int(x), edge.split(" ")))
+        elements = edge.split(" ")
+        if len(elements) != 3:
+            raise ValueError("Invalid edge format: %s", edge)
+        # print(elements)
+        u = elements[0].strip()
+        v = elements[1].strip()
+        w = int(elements[2].strip(" \n"))
+        # print(u, v, w)
         G.add_edge(u, v, flow=w)
 
     return G
