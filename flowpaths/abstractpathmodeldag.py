@@ -1,5 +1,5 @@
 import flowpaths.stdigraph as stdigraph
-from flowpaths.utils import safety
+from flowpaths.utils import safetypathcovers
 from flowpaths.utils import solverwrapper as sw
 import time
 from abc import ABC, abstractmethod
@@ -135,7 +135,7 @@ class AbstractPathModelDAG(ABC):
         self.safe_lists = None
         if self.optimize_with_safe_paths and not self.is_solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_paths(
+            self.safe_lists = safetypathcovers.safe_paths(
                 self.G,
                 self.trusted_edges_for_safety,
                 no_duplicates=False,
@@ -145,7 +145,7 @@ class AbstractPathModelDAG(ABC):
 
         if self.optimize_with_safe_sequences and not self.is_solved:
             start_time = time.time()
-            self.safe_lists = safety.safe_sequences(
+            self.safe_lists = safetypathcovers.safe_sequences(
                 self.G,
                 self.trusted_edges_for_safety,
                 no_duplicates=False,
@@ -313,7 +313,7 @@ class AbstractPathModelDAG(ABC):
                 if self.optimize_with_safe_zero_edges:
                     # get the endpoints of the longest safe path in the sequence
                     first_node, last_node = (
-                        safety.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
+                        safetypathcovers.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
                     )
                     # get the reachable nodes from the last node
                     reachable_nodes = self.G.reachable_nodes_from[last_node]
