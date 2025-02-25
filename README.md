@@ -1,4 +1,4 @@
-# <img src="/assets/flowpaths-logo.svg" alt="flowpaths logo" height="50"> The _flowpaths_ Python Package
+#  <img src="/assets/flowpaths-logo.svg" alt="flowpaths logo" height="30"> _flowpaths_ Python Package
 
 
 
