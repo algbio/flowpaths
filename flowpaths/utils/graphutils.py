@@ -65,10 +65,11 @@ def min_cost_flow(G: nx.DiGraph, s, t):
 
     counter = count(1)  # Start an iterator given increasing integers starting from 1
     edgeMap = dict()
+    uid = "z" + str(id(G))
 
     for x, y in G.edges():
-        z1 = str(next(counter))
-        z2 = str(next(counter))
+        z1 = uid + str(next(counter))
+        z2 = uid + str(next(counter))
         edgeMap[(x, y)] = z1
         l = G[x][y]["l"]
         u = G[x][y]["u"]
@@ -81,9 +82,7 @@ def min_cost_flow(G: nx.DiGraph, s, t):
 
     flowCost, flowDictNet = nx.network_simplex(flowNetwork)
 
-    flowDict = dict()
-    for x in G.nodes():
-        flowDict[x] = dict()
+    flowDict = {node: dict() for node in G.nodes()}
 
     for x, y in G.edges():
         flowDict[x][y] = flowDictNet[x][edgeMap[(x, y)]]
