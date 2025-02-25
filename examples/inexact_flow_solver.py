@@ -70,7 +70,7 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         # This means pi_vars[(u,v,i)] equals path_weights_vars[(i)] if path i goes through edge (u,v), otherwise it is 0
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
-            name_prefix="p",
+            name_prefix="pi",
             lb=0,
             ub=maximum_allowed_path_weight,
         )
