@@ -77,12 +77,13 @@ class TestkMinPathError(unittest.TestCase):
                     "The MILP encoded edge positions (inside paths) are not correct.",
                 )
 
+                current_solution = kmpe_model.get_solution()
                 if first_solution_size == None:
-                    first_solution_size = len(kmpe_model.__solution[0])
+                    first_solution_size = len(current_solution[0])
                 else:
                     self.assertEqual(
                         first_solution_size,
-                        len(kmpe_model.__solution[0]),
+                        len(current_solution[0]),
                         "The size of the solution should be the same for all settings.",
                     )
 
