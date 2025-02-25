@@ -1,8 +1,6 @@
 import unittest
 import itertools
-from utils import graphutils as graphutils
-import kminpatherror as kmpe
-import stdigraph as stdigraph
+import flowpaths as fp
 
 # Run as `python -m tests.test_mfd` in the `flowpaths` directory
 
@@ -16,7 +14,7 @@ class TestkMinPathError(unittest.TestCase):
         optimize_with_safe_zero_edges = [True, False]  # 3
         solvers = ["gurobi", "highs"]  # 4
 
-        self.graphs = graphutils.read_graphs("./tests/tests.graph")
+        self.graphs = fp.graphutils.read_graphs("./tests/tests.graph")
         self.params = list(
             itertools.product(
                 weight_type,
@@ -32,7 +30,7 @@ class TestkMinPathError(unittest.TestCase):
         for graph in self.graphs:
 
             print("Testing graph: ", graph.graph["id"])
-            stG = stdigraph.stDiGraph(graph)
+            stG = fp.stDiGraph(graph)
             num_paths = stG.get_width()
 
             first_solution_size = None
@@ -53,7 +51,7 @@ class TestkMinPathError(unittest.TestCase):
                 ):
                     continue
 
-                kmpe_model = kmpe.kMinPathError(
+                kmpe_model = fp.kMinPathError(
                     graph,
                     flow_attr="flow",
                     num_paths=num_paths,

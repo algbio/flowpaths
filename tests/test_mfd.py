@@ -1,10 +1,8 @@
 import unittest
-import networkx as nx
 import itertools
-from utils import graphutils as graphutils
-import minflowdecomp as mfd
+import flowpaths as fp
 
-# Run as `python -m tests.test_mfd` in the `flowpaths` directory
+# Run as `python -m tests.test_mfd` in the top `flowpaths` directory
 
 
 class TestMinFlowDecomp(unittest.TestCase):
@@ -17,7 +15,7 @@ class TestMinFlowDecomp(unittest.TestCase):
         optimize_with_greedy = [True, False]  # 4
         solvers = ["gurobi", "highs"]  # 5
 
-        self.graphs = graphutils.read_graphs("./tests/tests.graph")
+        self.graphs = fp.graphutils.read_graphs("./tests/tests.graph")
         self.params = list(
             itertools.product(
                 weight_type,
@@ -53,7 +51,7 @@ class TestMinFlowDecomp(unittest.TestCase):
                 ):
                     continue
 
-                mfd_model = mfd.MinFlowDecomp(
+                mfd_model = fp.MinFlowDecomp(
                     graph,
                     flow_attr="flow",
                     weight_type=settings[0],
