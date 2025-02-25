@@ -32,6 +32,13 @@ def main():
     mpe_model_2.solve()
     process_solution(mpe_model_2)
 
+    edges_to_ignore = [("a", "c")]
+    # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
+    # when computing the path slacks (i.e. edge errors)
+    mpe_model_3 = fp.kMinPathError(graph, flow_attr="flow", num_paths=3, weight_type=int, edges_to_ignore=edges_to_ignore)
+    mpe_model_3.solve()
+    process_solution(mpe_model_3)
+
 def process_solution(model: fp.kMinPathError):
     if model.is_solved:
         solution = model.get_solution()

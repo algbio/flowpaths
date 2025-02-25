@@ -110,6 +110,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
             edge_length_attr=self.edge_length_attr,
             encode_edge_position=True,
+            encode_path_length=True,
             **kwargs
         )
 
@@ -316,6 +317,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             return False
 
         if not self.verify_edge_position():
+            return False
+        
+        if not self.verify_path_length():
             return False
 
         return True
