@@ -115,7 +115,7 @@ class stDiGraph(nx.DiGraph):
         """
 
         if self.width == None:
-            width, _ = self.compute_max_edge_antichain(self)
+            width = self.compute_max_edge_antichain()
             self.width = width
 
         return self.width
