@@ -61,7 +61,8 @@ class AbstractPathModelDAG(ABC):
             Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
         - subpath_constraints_coverage_length (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of length of the subpath.
             Defaults to None, meaning that this is not imposed. 
-            Setting this constraint overrides subpath_constraints_coverage, and you also need to set edge_length_attr. If an edge has missing edge length, it gets length 1.
+            If you set this constraint, you cannot set subpath_constraints_coverage (and its default value of 1 will be ignored).
+            If you set this constraint, you also need to set edge_length_attr. If an edge has missing edge length, it gets length 1.
         - encode_edge_position (bool, optional): Whether to encode the position of the edges in the paths. Defaults to False.
         - edge_length_attr (str, optional): The attribute name from where to get the edge lengths. Defaults to None.
             If set, then the edge positions (above) are in terms of the edge lengths specified in the edge_length_attr field of each edge
@@ -103,6 +104,8 @@ class AbstractPathModelDAG(ABC):
                     raise ValueError("If set, subpath_constraints_coverage_length must be in the range (0, 1]")
                 if self.edge_length_attr is None:
                     raise ValueError("If subpath_constraints_coverage_length is set, edge_length_attr must be provided.")
+                if self.subpath_constraints_coverage < 1:
+                    raise ValueError("If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
 
         self.solve_statistics = kwargs.get("solve_statistics", {})
         self.edge_vars = {}
