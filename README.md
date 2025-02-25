@@ -27,8 +27,9 @@ mfd_solver = fp.MinFlowDecomp(graph, flow_attr="flow")
 
 mfd_solver.solve() # We solve it
 
-if mfd_solver.is_solved: # We get the solution
-    print(mfd_model.get_solution())
+if mfd_solver.is_solved(): # We get the solution
+    print(mfd_solver.get_solution())
+    # ([['s', 'b', 't'], ['s', 'a', 't']], [5, 2])
 ```
 
 ### Design principles

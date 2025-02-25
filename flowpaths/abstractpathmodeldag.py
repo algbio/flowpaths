@@ -130,9 +130,9 @@ class AbstractPathModelDAG(ABC):
 
         self.external_solution_paths = kwargs.get("external_solution_paths", None)
         if self.external_solution_paths is None:
-            self.is_solved = None
+            self.__is_solved = None
         else:
-            self.is_solved = True
+            self.__is_solved = True
 
         # optimizations
         self.optimize_with_safe_paths = kwargs.get("optimize_with_safe_paths", True)
@@ -141,7 +141,7 @@ class AbstractPathModelDAG(ABC):
         self.optimize_with_safe_zero_edges = kwargs.get("optimize_with_safe_zero_edges", True)
 
         self.safe_lists = None
-        if self.optimize_with_safe_paths and not self.is_solved:
+        if self.optimize_with_safe_paths and not self.is_solved():
             start_time = time.time()
             self.safe_lists = safetypathcovers.safe_paths(
                 self.G,
@@ -151,7 +151,7 @@ class AbstractPathModelDAG(ABC):
             )
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
-        if self.optimize_with_safe_sequences and not self.is_solved:
+        if self.optimize_with_safe_sequences and not self.is_solved():
             start_time = time.time()
             self.safe_lists = safetypathcovers.safe_sequences(
                 self.G,
@@ -429,7 +429,7 @@ class AbstractPathModelDAG(ABC):
         """
         # If we already received an external solution, we don't need to solve the model
         if self.external_solution_paths is not None:
-            self.is_solved = True
+            self.__is_solved = True
             return True
 
         # self.write_model(f"model-{self.id}.lp")
@@ -447,21 +447,24 @@ class AbstractPathModelDAG(ABC):
             self.solver.get_model_status() == "kOptimal"
             or self.solver.get_model_status() == 2
         ):
-            self.is_solved = True
+            self.__is_solved = True
             return True
 
-        self.is_solved = False
+        self.__is_solved = False
         return False
 
     def check_is_solved(self):
-        if not self.is_solved:
+        if not self.is_solved():
             raise Exception(
                 "Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
             )
         
     def is_solved(self):
-        return self.is_solved
+        return self.__is_solved
+    
+    def set_solved(self):
+        self.__is_solved = True
 
     @abstractmethod
     def get_solution(self):

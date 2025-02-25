@@ -95,7 +95,7 @@ def main():
     process_solution(mfd_model6)
 
 def process_solution(model: fp.MinFlowDecomp):
-    if model.is_solved:
+    if model.is_solved():
         solution = model.get_solution()
         print(
             "Solution paths, weights, solve statistics: ",

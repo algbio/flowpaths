@@ -67,7 +67,6 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         self.solve_statistics = {}
         self.__solution = None
-        self.is_solved = False
 
     def solve(self) -> bool:
         """
@@ -99,9 +98,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
             fd_model.solve()
 
-            if fd_model.is_solved:
+            if fd_model.is_solved():
                 self.__solution = fd_model.get_solution()
-                self.is_solved = True
+                self.set_solved()
                 self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.time() - start_time
 

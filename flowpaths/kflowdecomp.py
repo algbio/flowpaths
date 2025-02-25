@@ -113,7 +113,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         )
 
         # If already solved with a previous method, we don't create solver, not add paths
-        if self.is_solved:
+        if self.is_solved():
             return
 
         # This method is called from the super class AbstractPathModelDAG
@@ -139,7 +139,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         """
 
         # If already solved, no need to encode further
-        if self.is_solved:
+        if self.is_solved():
             return
 
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
@@ -213,7 +213,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             
         if len(paths) <= self.k:
             self.__solution = (paths, weights)
-            self.is_solved = True
+            self.set_solved()
             self.solve_statistics = {}
             self.solve_statistics["greedy_solve_time"] = time.time() - start_time
             return True

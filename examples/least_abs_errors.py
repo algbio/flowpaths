@@ -33,7 +33,7 @@ def main():
     process_solution(lae_model_2)
 
 def process_solution(model: fp.kLeastAbsErrors):
-    if model.is_solved:
+    if model.is_solved():
         solution = model.get_solution()
         print(
             "Solution paths, weights, edge errors, solve statistics: ",
