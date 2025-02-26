@@ -40,9 +40,9 @@ def main():
     process_solution(mpe_model_3)
 
     path_length_ranges    = [[0, 15], [16, 18], [19, 20], [21, 30], [31, 100]]
-    error_scale_factors   = [ 1.6   ,  1.0    ,  1.3    ,  1.7    ,  1.0     ]    
-    # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
-    # when computing the path slacks (i.e. edge errors)
+    path_length_factors   = [ 1.6   ,  1.0    ,  1.3    ,  1.7    ,  1.0     ]    
+    # We solve again, by telling the model to consider the path length ranges in `path_length_ranges`
+    # and the slack scale factors in `error_scale_factors` when computing the path slacks (i.e. edge errors)
     mpe_model_4 = fp.kMinPathError(
         graph, 
         flow_attr="flow", 
@@ -50,7 +50,7 @@ def main():
         weight_type=int, 
         edge_length_attr="length", 
         path_length_ranges=path_length_ranges, 
-        path_error_scale_factors=error_scale_factors,
+        path_length_factors=path_length_factors,
         external_solver="gurobi"
         )  
     mpe_model_4.solve()

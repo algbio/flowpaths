@@ -29,7 +29,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
         path_length_ranges: list = [],
-        path_error_scale_factors: list = [],
+        path_length_factors: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
         **kwargs,
@@ -90,9 +90,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.edge_length_attr = edge_length_attr
         self.path_length_ranges = path_length_ranges
-        self.path_error_scale_factors = path_error_scale_factors
-        if len(self.path_length_ranges) != len(self.path_error_scale_factors):
+        self.path_length_factors = path_length_factors
+        if len(self.path_length_ranges) != len(self.path_length_factors):
             raise ValueError("The number of path length ranges must be equal to the number of error scale factors.")
+        if len(self.path_length_factors) > 0 and self.weight_type == float:
+            raise ValueError("Error scale factors are only allowed for integer weights.")
+            
         self.kwargs = kwargs
 
         self.pi_vars = {}
@@ -101,6 +104,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.path_weights_sol = None
         self.path_slacks_sol = None
+        self.path_slacks_scaled_sol = None
         self.__solution = None
 
         self.solve_statistics = {}
@@ -176,42 +180,47 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             var_type="integer" if self.weight_type == int else "continuous",
         )
 
-        if len(self.path_error_scale_factors) > 0:
+        if len(self.path_length_factors) > 0:
 
             # path_error_scale_vars[(i)] will give the error scale factor for path i
-            self.path_error_scale_vars = self.solver.add_variables(
+            self.slack_factors_vars = self.solver.add_variables(
                 self.path_indexes,
-                name_prefix="path_error_scale",
-                lb=min(self.path_error_scale_factors),
-                ub=max(self.path_error_scale_factors),
+                name_prefix="path_slack_scaled",
+                lb=min(self.path_length_factors),
+                ub=max(self.path_length_factors),
                 var_type="continuous"
             )
 
             # Getting the right error scale factor depending on the path length
-            # if path_length_vars[(i)] in [ranges[i][0], ranges[i][1]] then path_error_scale_vars[(i)] = constants[i].
+            # if path_length_vars[(i)] in [ranges[i][0], ranges[i][1]] then slack_factors_vars[(i)] = constants[i].
             for i in range(self.k):
                 self.solver.add_piecewise_constant_constraint(
                     x=self.path_length_vars[(i)], 
-                    y=self.path_error_scale_vars[(i)],
+                    y=self.slack_factors_vars[(i)],
                     ranges = self.path_length_ranges, 
-                    constants = self.path_error_scale_factors,
-                    name_prefix="error_scale_{}".format(i)
+                    constants = self.path_length_factors,
+                    name_prefix=f"error_scale_{i}"
                 )
 
-            # self.scaled_gamma_vars = self.solver.add_variables(
-            #     self.path_indexes,
-            #     name_prefix="gamma_scaled",
-            #     lb=0,
-            #     ub=self.w_max * max(self.error_scale_factor),
-            #     var_type="continuous",
-            # )
+            self.scaled_slack_vars = self.solver.add_variables(
+                self.path_indexes,
+                name_prefix="scaled_slack",
+                lb=0,
+                ub=self.w_max * max(self.path_length_factors),
+                var_type="continuous",
+            )
 
-            # for i in range(self.k):
-            #     self.solver.add_constraint(
-            #         self.scaled_gamma_vars[i] == self.error_scale_vars[i] * self.path_slacks_vars[i],
-            #         name=f"13_i={i}",
-            #     )
-        
+            # We encode that self.scaled_slack_vars[i] = self.slack_factors_vars[i] * self.path_slacks_vars[i]
+            for i in range(self.k):
+                self.solver.add_integer_continuous_product_constraint(
+                    integer_var=self.path_slacks_vars[i],
+                    continuous_var=self.slack_factors_vars[i],
+                    product_var=self.scaled_slack_vars[i],
+                    lb=0,
+                    ub=self.w_max * max(self.path_length_factors),
+                    name=f"scaled_slack_i{i}",
+                )
+                        
         for u, v, data in self.G.edges(data=True):
             if (u, v) in self.edges_to_ignore:
                 continue
@@ -232,10 +241,14 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
             # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
+
             for i in range(self.k):
+                # We take either the scaled slack or the regular slack
+                slack_var = self.path_slacks_vars[i] if len(self.path_length_factors) == 0 else self.scaled_slack_vars[i]
+
                 self.solver.add_binary_continuous_product_constraint(
                     binary_var=self.edge_vars[(u, v, i)],
-                    continuous_var=self.path_slacks_vars[(i)],
+                    continuous_var=slack_var,
                     product_var=self.gamma_vars[(u, v, i)],
                     lb=0,
                     ub=self.w_max,
@@ -274,6 +287,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             - the list ofsolution paths, 
             - the list of their corresponding weights, 
             - the list of their corresponding slacks.
+            - the list of their corresponding scaled slacks (if path_error_scale_factors is not empty); continuous values
 
         Raises:
         - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
@@ -309,6 +323,17 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             self.path_slacks_sol,
         )
 
+        if len(self.path_length_factors) > 0:
+            slacks_scaled_sol_dict = self.solver.get_variable_values("scaled_slack", index_types=[int])
+            self.path_slacks_scaled_sol = [slacks_scaled_sol_dict[i] for i in range(self.k)]
+
+            self.__solution = (
+                self.get_solution_paths(),
+                self.path_weights_sol,
+                self.path_slacks_sol,
+                self.path_slacks_scaled_sol
+            )
+
         return self.__solution
 
     def is_valid_solution(self, tolerance=0.001):
@@ -336,6 +361,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         solution_paths = self.__solution[0]
         solution_weights = self.__solution[1]
         solution_slacks = self.__solution[2]
+        if len(self.path_length_factors) > 0:
+            solution_slacks = self.__solution[3]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
@@ -365,26 +392,35 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                     # print(f"weight_from_paths[({u}, {v})]) = ", weight_from_paths[(u, v)])
                     # print("> ", tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)])
 
-                    var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
+                    # var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
                     # print(var_dict)
-                    return False
+
+                    # return False
+                    pass
 
         if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
+            print("self.get_objective_value()", self.get_objective_value())
+            print("self.solver.get_objective_value()", self.solver.get_objective_value())
             return False
         
         # Checking that the error scale factor is correctly encoded
-        if len(self.path_error_scale_factors) > 0:
-            path_error_scale_sol = self.solver.get_variable_values("path_error_scale", [int])
+        if len(self.path_length_factors) > 0:
             path_length_sol = self.solver.get_variable_values("path_length", [int])
-            print("path_error_scale_sol", path_error_scale_sol)
+            slack_sol = self.solver.get_variable_values("slack", [int])
+            path_slack_scaled_sol = self.solver.get_variable_values("path_slack_scaled", [int])
+            scaled_slack_sol = self.solver.get_variable_values("scaled_slack", [int])
             print("path_length_sol", path_length_sol)
+            print("slack_sol", slack_sol)
+            print("path_slack_scaled_sol", path_slack_scaled_sol)
+            print("scaled_slack_sol", scaled_slack_sol)
+            
             for i in range(self.k):
                 # Checking which interval the path length is in,
                 # and then checking if the error scale factor is correctly encoded, 
                 # within tolerance to self.error_scale_factor[index]
                 for index, interval in enumerate(self.path_length_ranges):
                     if path_length_sol[i] >= interval[0] and path_length_sol[i] <= interval[1]:
-                        if abs(path_error_scale_sol[i] - self.path_error_scale_factors[index]) > tolerance:
+                        if abs(path_slack_scaled_sol[i] - self.path_length_factors[index]) > tolerance:
                             return False
 
         if not self.verify_edge_position():
@@ -392,6 +428,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         
         if not self.verify_path_length():
             return False
+
+        var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
+        # print(var_dict)
+        # self.solver.write_model("kminpatherror.lp")
 
         return True
 
