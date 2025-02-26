@@ -39,8 +39,8 @@ def main():
     mpe_model_3.solve()
     process_solution(mpe_model_3)
 
-    path_length_ranges    = [[0, 15], [16, 18], [19, 20], [21, 30], [31, 100]]
-    path_length_factors   = [ 1.6   ,  1.0    ,  1.3    ,  1.7    ,  1.0     ]    
+    path_length_ranges    = [[0, 15], [16, 18], [19, 20], [21, 30], [31, 100000]]
+    path_length_factors   = [ 1.6   ,  1.0    ,  1.3    ,  1.7    ,  1.0        ]    
     # We solve again, by telling the model to consider the path length ranges in `path_length_ranges`
     # and the slack scale factors in `error_scale_factors` when computing the path slacks (i.e. edge errors).
     # For example, if a path has length in the range [0, 15], its slack will be multiplied by 1.6 when comparing the 
