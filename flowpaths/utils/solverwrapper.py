@@ -1,3 +1,5 @@
+from math import log2
+from math import ceil
 import highspy
 
 class SolverWrapper:
@@ -140,18 +142,22 @@ class SolverWrapper:
         Assumptions
         -----------
         - binary_var in [0,1]
-        - 0 <= product_var <= bound
+        - lb <= continuous_var <= ub
+
+        Note
+        ----
+        This works correctly also if continuous_var is an integer variable.
 
         Parameters
         ----------
         binary_var : Variable
             The binary variable.
         continuous_var : Variable
-            The product variable.
+            The continuous variable (can also be integer).
         product_var : Variable
-            The variable that should be equal to the product of the binary and product variables.
-        bound : float
-            The upper bound of the product variable.
+            The variable that should be equal to the product of the binary and continous variables.
+        lb, ub : float
+            The lower and upper bounds of the continuous variable.
         name : str
             The name of the constraint
         """
@@ -159,6 +165,77 @@ class SolverWrapper:
         self.add_constraint(product_var >= lb * binary_var, name=name + "_b")
         self.add_constraint(product_var <= continuous_var - lb * (1 - binary_var), name=name + "_c")
         self.add_constraint(product_var >= continuous_var - ub * (1 - binary_var), name=name + "_d")
+
+    def add_integer_continuous_product_constraint(self, integer_var, continuous_var, product_var, lb, ub, name: str):
+        """
+        This function adds constraints to model the equality:
+            integer_var * continuous_var = product_var
+
+        Assumptions
+        -----------
+        lb <= product_var <= ub
+
+        Note
+        ----
+        This works correctly also if continuous_var is an integer variable.
+
+        Parameters
+        ----------
+        binary_var : Variable
+            The binary variable.
+        continuous_var : Variable
+            The continuous variable (can also be integer).
+        product_var : Variable
+            The variable that should be equal to the product of the binary and continous variables.
+        lb, ub : float
+            The lower and upper bounds of the continuous variable.
+        name : str
+            The name of the constraint
+        """
+
+        num_bits = ceil(log2(ub + 1))
+        bits = list(range(num_bits))
+
+        binary_vars = self.add_variables(
+            indexes=bits,
+            name_prefix=f"binary_{name}",
+            lb=0,
+            ub=1,
+            var_type="integer"
+        )
+
+        # We encode integer_var == sum(binary_vars[i] * 2^i)
+        self.add_constraint(
+            sum(binary_vars[i] * 2**i for i in bits) 
+            == integer_var, 
+            name=f"{name}_int_eq"
+        )
+
+        comp_vars = self.add_variables(
+            indexes=bits,
+            name_prefix=f"comp_{name}",
+            lb=lb,
+            ub=ub,
+            var_type="continuous"
+        )
+
+        # We encode comp_vars[i] == binary_vars[i] * continuous_var
+        for i in bits:
+            self.add_binary_continuous_product_constraint(
+                binary_var=binary_vars[i],
+                continuous_var=continuous_var,
+                product_var=comp_vars[i],
+                lb=lb,
+                ub=ub,
+                name=f"product_{i}_{name}"
+            )
+
+        # We encode product_var == sum_{i in bits} comp_vars[i] * 2^i
+        self.add_constraint(
+            sum(comp_vars[i] * 2**i for i in bits) 
+            == product_var, 
+            name=f"{name}_prod_eq"
+        )
 
     def set_objective(self, expr, sense="minimize"):
 
@@ -347,7 +424,6 @@ class SolverWrapper:
         ranges: List of tuples [(L0, U0), (L1, U1), ...]
         constants: List of constants [c0, c1, ...] for each segment.
         name_prefix: A prefix for naming the added variables and constraints.
-        M: Optional big-M value. If not provided, it is computed as (max(U_i)-min(L_i))*2.
         
         Returns
         -------
