@@ -85,13 +85,21 @@ class SolverWrapper:
                 "integer": highspy.HighsVarType.kInteger,
                 "continuous": highspy.HighsVarType.kContinuous,
             }
-            return self.solver.addVariables(
-                indexes,
-                lb=lb,
-                ub=ub,
-                type=var_type_map[var_type],
-                name_prefix=name_prefix,
-            )
+            if len(indexes) == 1: # if a single variable
+                return self.solver.addVariable(
+                    lb=lb,
+                    ub=ub,
+                    type=var_type_map[var_type],
+                    name=name_prefix,
+                )
+            else:
+                return self.solver.addVariables(
+                    indexes,
+                    lb=lb,
+                    ub=ub,
+                    type=var_type_map[var_type],
+                    name_prefix=name_prefix,
+                )
         elif self.external_solver == "gurobi":
             import gurobipy
 
@@ -100,13 +108,21 @@ class SolverWrapper:
                 "continuous": gurobipy.GRB.CONTINUOUS,
             }
             vars = {}
-            for index in indexes:
-                vars[index] = self.solver.addVar(
+            if len(indexes) == 1: # if a single variable
+                vars[0] = self.solver.addVar(
                     lb=lb,
                     ub=ub,
                     vtype=var_type_map[var_type],
-                    name=f"{name_prefix}{index}",
+                    name=name_prefix,
                 )
+            else:
+                for index in indexes:
+                    vars[index] = self.solver.addVar(
+                        lb=lb,
+                        ub=ub,
+                        vtype=var_type_map[var_type],
+                        name=f"{name_prefix}{index}",
+                    )
             self.solver.update()
             return vars
 
@@ -213,12 +229,14 @@ class SolverWrapper:
             index_types (list): A list of types corresponding to the indices of the variables.
                                 Each type in the list is used to cast the string indices to 
                                 the appropriate type.
+                                If empty, then it is assumed that the variable has no index, and does exact matching with the variable name.
             binary_values (bool, optional): If True, ensures that the variable values (rounded) are 
                                             binary (0 or 1). Defaults to False.
 
         Returns:
             dict: A dictionary where the keys are the indices of the variables (as tuples or 
                   single values) and the values are the corresponding variable values.
+                  If index_types is empty, then the unique key is 0 and the value is the variable value.
 
         Raises:
             Exception: If the length of `index_types` does not match the number of indices 
@@ -231,6 +249,19 @@ class SolverWrapper:
         values = dict()
 
         for index, var in enumerate(varNames):
+            # print(f"Checking variable {var} against prefix {name_prefix}")
+            if var == name_prefix:
+                if len(index_types) > 0:
+                    raise Exception(
+                        f"We are getting the value of variable {var}, but the provided list of var_types is not empty ({index_types})."
+                    )
+                values[0] = varValues[index]
+                if binary_values and round(values[0]) not in [0,1]:
+                    raise Exception(f"Variable {var} has value {values[0]}, which is not binary.")
+                # We return already, because we are supposed to match only one variable name
+                # print("Returning values", values)
+                return values
+
             if var.startswith(name_prefix):
                 if var.count("(") == 1:
                     elements = [
@@ -259,7 +290,7 @@ class SolverWrapper:
                         )
                 else:
                     element = var.replace(name_prefix, "", 1)
-                    if len(index_types) != 1:
+                    if len(index_types) > 1:
                         raise Exception(
                             f"We are getting the value of variable {var}, with only one index ({element}), but the provided list of var_types is not of length one ({index_types})."
                         )
@@ -285,3 +316,79 @@ class SolverWrapper:
             return self.solver.getObjectiveValue()
         elif self.external_solver == "gurobi":
             return self.solver.objVal
+        
+
+    def add_variable_and_piecewise_constant_constraint(
+        self, x, ranges: list, constants: list, name_prefix: str
+    ):
+        """
+        Enforces that variable y equals a constant from `constants` depending on the range that x falls into.
+        
+        For each piece i:
+            if x in [ranges[i][0], ranges[i][1]] then y = constants[i].
+
+        Assumptions:
+            - The ranges must be non-overlapping. Otherwise, if x belongs to more ranges, the solver will choose one arbitrarily.
+            - The value of x must be within the union of the ranges. Otherwise the solver will not find a feasible solution.
+        
+        This is modeled by:
+        - introducing binary variables z[i] with sum(z) = 1,
+        - for each piece i:
+                x >= L_i - M*(1 - z[i])
+                x <= U_i + M*(1 - z[i])
+                y <= constant[i] + M*(1 - z[i])
+                y >= constant[i] - M*(1 - z[i])
+        
+        Parameters
+        ----------
+        x: The continuous variable (created earlier) whose value determines the segment.
+            ranges: List of tuples [(L0, U0), (L1, U1), ...]
+            constants: List of constants [c0, c1, ...] for each segment.
+        name_prefix: A prefix for naming the added variables and constraints.
+        M: Optional big-M value. If not provided, it is computed as (max(U_i)-min(L_i))*2.
+        
+        Returns
+        -------
+        y: The created piecewise output variable.
+        """
+        if len(ranges) != len(constants):
+            raise ValueError("`ranges` and `constants` must have the same length.")
+
+        pieces = len(ranges)
+        Ls = [r[0] for r in ranges]
+        Us = [r[1] for r in ranges]
+        M = (max(Us) - min(Ls)) * 2
+
+        # Create binary variables z[i] for each piece.
+        z = self.add_variables(
+            [(i) for i in range(pieces)],
+            name_prefix=f"z_{name_prefix}",
+            lb=0,
+            ub=1,
+            var_type="integer"
+        )
+
+        # Create the output variable y.
+        y = self.add_variables(
+            [0],
+            name_prefix=f"{name_prefix}",
+            lb=min(constants),
+            ub=max(constants),
+            var_type="continuous"
+        )
+
+        # Enforce that exactly one piece is active: sum_i z[i] == 1.
+        self.add_constraint(sum(z[i] for i in range(pieces)) == 1, name=f"sum_z_{name_prefix}")
+
+        # For each piece i, add the constraints:
+        for i in range(pieces):
+            L = Ls[i]
+            U = Us[i]
+            c = constants[i]
+            # Link x with the range [L, U] if piece i is active.
+            self.add_constraint(x >= L - M * ((-1)*z[(i)] + 1), name=f"{name_prefix}_L_{i}")
+            self.add_constraint(x <= U + M * ((-1)*z[(i)] + 1), name=f"{name_prefix}_U_{i}")
+            self.add_constraint(y[0] <= c + M * ((-1)*z[i] + 1), name=f"{name_prefix}_yU_{i}")
+            self.add_constraint(y[0] >= c - M * ((-1)*z[(i)] + 1), name=f"{name_prefix}_yL_{i}")
+
+        return y
