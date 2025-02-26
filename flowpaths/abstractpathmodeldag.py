@@ -207,15 +207,18 @@ class AbstractPathModelDAG(ABC):
                 (i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))
             ]
 
+
+        ################################
+        #                              #
+        #       Encoding paths         #
+        #                              #
+        ################################
+
+        # The identifiers of the constraints come from https://arxiv.org/pdf/2201.10923 page 14-15
+
         self.edge_vars = self.solver.add_variables(
             self.edge_indexes, name_prefix="edge", lb=0, ub=1, var_type="integer"
         )
-        if self.subpath_constraints:
-            self.subpaths_vars = self.solver.add_variables(
-                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer"
-            )
-
-        # The identifiers of the constraints come from https://arxiv.org/pdf/2201.10923 page 14-15
 
         for i in range(self.k):
             self.solver.add_constraint(
@@ -246,8 +249,19 @@ class AbstractPathModelDAG(ABC):
                     "10c_v={}_i={}".format(v, i),
                 )
 
+        ################################
+        #                              #
+        # Encoding subpath constraints #
+        #                              #
+        ################################
+
         # Example of a subpath constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 paths to cover, the first one is 1-3-5. the second path is just a single edge 0-1
+
         if self.subpath_constraints:
+            self.subpaths_vars = self.solver.add_variables(
+                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer"
+            )
+        
             for i in range(self.k):
                 for j in range(len(self.subpath_constraints)):
 
@@ -273,15 +287,19 @@ class AbstractPathModelDAG(ABC):
                             sum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1) for e in self.subpath_constraints[j])
                             >= constraint_length * coverage_fraction
                             * self.subpaths_vars[(i, j)],
-                            name="7a_i={}_j={}".format(i, j),
+                            name=f"7a_i={i}_j={j}",
                         )
             for j in range(len(self.subpath_constraints)):
                 self.solver.add_constraint(
                     sum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
-                    name="7b_j={}".format(j),
+                    name=f"7b_j={j}",
                 )
 
-        # Encoding position variables
+        ###############################
+        #                             #
+        # Encoding position variables #
+        #                             #
+        ###############################
 
         # edge_position_vars[(u, v, i)] = position (i.e., index) 
         # of the edge (u, v) in the path i, starting from position 0. 
@@ -304,7 +322,7 @@ class AbstractPathModelDAG(ABC):
                         name=f"position_u={u}_v={v}_i={i}"
                     )
 
-        # path_length_vars[(u, v, i)] = length of path i
+        # path_length_vars[(i)] = length of path i
         if self.encode_edge_position:
             max_length = self.G.number_of_nodes()
             if self.edge_length_attr is not None:
@@ -323,7 +341,12 @@ class AbstractPathModelDAG(ABC):
                     name=f"path_length_constr_i={i}"
                 )
 
-        # Fixing variables based on safe lists
+        ########################################
+        #                                      #
+        # Fixing variables based on safe lists #
+        #                                      #
+        ########################################
+
         if self.safe_lists is not None:
             paths_to_fix = self.__get_paths_to_fix_from_safe_lists()
 
@@ -334,7 +357,7 @@ class AbstractPathModelDAG(ABC):
                 for u, v in paths_to_fix[i]:
                     self.solver.add_constraint(
                         self.edge_vars[(u, v, i)] == 1,
-                        name="safe_list_u={}_v={}_i={}".format(u, v, i),
+                        name=f"safe_list_u={u}_v={v}_i={i}",
                     )
 
                 if self.optimize_with_safe_zero_edges:
