@@ -132,10 +132,10 @@ class SolverWrapper:
         elif self.external_solver == "gurobi":
             self.solver.addConstr(expr, name=name)
 
-    def add_product_constraint(self, binary_var, product_var, equal_var, bound, name: str):
+    def add_binary_continuous_product_constraint(self, binary_var, continuous_var, product_var, lb, ub, name: str):
         """
         This function adds constraints to model the equality:
-            binary_var * product_var = equal_var
+            binary_var * continuous_var = product_var
 
         Assumptions
         -----------
@@ -146,18 +146,19 @@ class SolverWrapper:
         ----------
         binary_var : Variable
             The binary variable.
-        product_var : Variable
+        continuous_var : Variable
             The product variable.
-        equal_var : Variable
+        product_var : Variable
             The variable that should be equal to the product of the binary and product variables.
         bound : float
             The upper bound of the product variable.
         name : str
             The name of the constraint
         """
-        self.add_constraint(equal_var <= binary_var * bound, name=name + "_a")
-        self.add_constraint(equal_var <= product_var, name=name + "_b")
-        self.add_constraint(equal_var >= product_var - (1 - binary_var) * bound, name=name + "_c")
+        self.add_constraint(product_var <= ub * binary_var, name=name + "_a")
+        self.add_constraint(product_var >= lb * binary_var, name=name + "_b")
+        self.add_constraint(product_var <= continuous_var - lb * (1 - binary_var), name=name + "_c")
+        self.add_constraint(product_var >= continuous_var - ub * (1 - binary_var), name=name + "_d")
 
     def set_objective(self, expr, sense="minimize"):
 
@@ -318,8 +319,8 @@ class SolverWrapper:
             return self.solver.objVal
         
 
-    def add_variable_and_piecewise_constant_constraint(
-        self, x, ranges: list, constants: list, name_prefix: str
+    def add_piecewise_constant_constraint(
+        self, x, y, ranges: list, constants: list, name_prefix: str
     ):
         """
         Enforces that variable y equals a constant from `constants` depending on the range that x falls into.
@@ -342,8 +343,9 @@ class SolverWrapper:
         Parameters
         ----------
         x: The continuous variable (created earlier) whose value determines the segment.
-            ranges: List of tuples [(L0, U0), (L1, U1), ...]
-            constants: List of constants [c0, c1, ...] for each segment.
+        y: The continuous variable whose value equals the corresponding constant.
+        ranges: List of tuples [(L0, U0), (L1, U1), ...]
+        constants: List of constants [c0, c1, ...] for each segment.
         name_prefix: A prefix for naming the added variables and constraints.
         M: Optional big-M value. If not provided, it is computed as (max(U_i)-min(L_i))*2.
         
@@ -368,15 +370,6 @@ class SolverWrapper:
             var_type="integer"
         )
 
-        # Create the output variable y.
-        y = self.add_variables(
-            [0],
-            name_prefix=f"{name_prefix}",
-            lb=min(constants),
-            ub=max(constants),
-            var_type="continuous"
-        )
-
         # Enforce that exactly one piece is active: sum_i z[i] == 1.
         self.add_constraint(sum(z[i] for i in range(pieces)) == 1, name=f"sum_z_{name_prefix}")
 
@@ -386,9 +379,7 @@ class SolverWrapper:
             U = Us[i]
             c = constants[i]
             # Link x with the range [L, U] if piece i is active.
-            self.add_constraint(x >= L - M * ((-1)*z[(i)] + 1), name=f"{name_prefix}_L_{i}")
-            self.add_constraint(x <= U + M * ((-1)*z[(i)] + 1), name=f"{name_prefix}_U_{i}")
-            self.add_constraint(y[0] <= c + M * ((-1)*z[i] + 1), name=f"{name_prefix}_yU_{i}")
-            self.add_constraint(y[0] >= c - M * ((-1)*z[(i)] + 1), name=f"{name_prefix}_yL_{i}")
-
-        return y
+            self.add_constraint(x >= L - M * (1 - z[i]), name=f"{name_prefix}_L_{i}")
+            self.add_constraint(x <= U + M * (1 - z[i]), name=f"{name_prefix}_U_{i}")
+            self.add_constraint(y <= c + M * (1 - z[i]), name=f"{name_prefix}_yU_{i}")
+            self.add_constraint(y >= c - M * (1 - z[i]), name=f"{name_prefix}_yL_{i}")

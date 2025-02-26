@@ -29,7 +29,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
         path_length_ranges: list = [],
-        error_scale_factor: list = [],
+        path_error_scale_factors: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
         **kwargs,
@@ -90,8 +90,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.edge_length_attr = edge_length_attr
         self.path_length_ranges = path_length_ranges
-        self.error_scale_factor = error_scale_factor
-        if len(self.path_length_ranges) != len(self.error_scale_factor):
+        self.path_error_scale_factors = path_error_scale_factors
+        if len(self.path_length_ranges) != len(self.path_error_scale_factors):
             raise ValueError("The number of path length ranges must be equal to the number of error scale factors.")
         self.kwargs = kwargs
 
@@ -176,16 +176,25 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             var_type="integer" if self.weight_type == int else "continuous",
         )
 
-        if len(self.error_scale_factor) > 0:
-            self.error_scale_vars = dict()
+        if len(self.path_error_scale_factors) > 0:
+
+            # path_error_scale_vars[(i)] will give the error scale factor for path i
+            self.path_error_scale_vars = self.solver.add_variables(
+                self.path_indexes,
+                name_prefix="path_error_scale",
+                lb=min(self.path_error_scale_factors),
+                ub=max(self.path_error_scale_factors),
+                var_type="continuous"
+            )
 
             # Getting the right error scale factor depending on the path length
-            # if path_length_vars[(i)] in [ranges[i][0], ranges[i][1]] then error_scale_vars[(i)] = constants[i].
+            # if path_length_vars[(i)] in [ranges[i][0], ranges[i][1]] then path_error_scale_vars[(i)] = constants[i].
             for i in range(self.k):
-                self.error_scale_vars[(i)] = self.solver.add_variable_and_piecewise_constant_constraint(
-                    self.path_length_vars[(i)], 
+                self.solver.add_piecewise_constant_constraint(
+                    x=self.path_length_vars[(i)], 
+                    y=self.path_error_scale_vars[(i)],
                     ranges = self.path_length_ranges, 
-                    constants = self.error_scale_factor,
+                    constants = self.path_error_scale_factors,
                     name_prefix="error_scale_{}".format(i)
                 )
 
@@ -212,22 +221,24 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
             for i in range(self.k):
-                self.solver.add_product_constraint(
+                self.solver.add_binary_continuous_product_constraint(
                     binary_var=self.edge_vars[(u, v, i)],
-                    product_var=self.path_weights_vars[(i)],
-                    equal_var=self.pi_vars[(u, v, i)],
-                    bound=self.w_max,
+                    continuous_var=self.path_weights_vars[(i)],
+                    product_var=self.pi_vars[(u, v, i)],
+                    lb=0,
+                    ub=self.w_max,
                     name=f"10_u={u}_v={v}_i={i}",
                 )
 
             # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
             for i in range(self.k):
-                self.solver.add_product_constraint(
+                self.solver.add_binary_continuous_product_constraint(
                     binary_var=self.edge_vars[(u, v, i)],
-                    product_var=self.path_slacks_vars[(i)],
-                    equal_var=self.gamma_vars[(u, v, i)],
-                    bound=self.w_max,
+                    continuous_var=self.path_slacks_vars[(i)],
+                    product_var=self.gamma_vars[(u, v, i)],
+                    lb=0,
+                    ub=self.w_max,
                     name=f"12_u={u}_v={v}_i={i}",
                 )
 
@@ -362,18 +373,18 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             return False
         
         # Checking that the error scale factor is correctly encoded
-        if len(self.error_scale_factor) > 0:
-            error_scale_sol = dict()
+        if len(self.path_error_scale_factors) > 0:
+            path_error_scale_sol = self.solver.get_variable_values("path_error_scale", [int])
             path_length_sol = self.solver.get_variable_values("path_length", [int])
+            print("path_error_scale_sol", path_error_scale_sol)
+            print("path_length_sol", path_length_sol)
             for i in range(self.k):
-                error_scale_sol[i] = self.solver.get_variable_values(f"error_scale_{i}", index_types=[])[0]
-
                 # Checking which interval the path length is in,
                 # and then checking if the error scale factor is correctly encoded, 
                 # within tolerance to self.error_scale_factor[index]
                 for index, interval in enumerate(self.path_length_ranges):
                     if path_length_sol[i] >= interval[0] and path_length_sol[i] <= interval[1]:
-                        if abs(error_scale_sol[i] - self.error_scale_factor[index]) > tolerance:
+                        if abs(path_error_scale_sol[i] - self.path_error_scale_factors[index]) > tolerance:
                             return False
 
         if not self.verify_edge_position():

@@ -167,11 +167,12 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
             for i in range(self.k):
-                self.solver.add_product_constraint(
+                self.solver.add_binary_continuous_product_constraint(
                     binary_var=self.edge_vars[(u, v, i)],
-                    product_var=self.path_weights_vars[(i)],
-                    equal_var=self.pi_vars[(u, v, i)],
-                    bound=self.w_max,
+                    continuous_var=self.path_weights_vars[(i)],
+                    product_var=self.pi_vars[(u, v, i)],
+                    lb=0,
+                    ub=self.w_max,
                     name=f"10_u={u}_v={v}_i={i}",
                 )
 

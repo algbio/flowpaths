@@ -87,11 +87,12 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
             # will introduce additional constraints to linearize it for us, assuming that
             # 0 <= path_weights_vars[(i)] <= maximum_allowed_path_weight, which is the case
             for i in range(self.k):
-                self.solver.add_product_constraint(
+                self.solver.add_binary_continuous_product_constraint(
                     binary_var=self.edge_vars[(u, v, i)],
-                    product_var=self.path_weights_vars[(i)],
-                    equal_var=self.pi_vars[(u, v, i)],
-                    bound=maximum_allowed_path_weight,
+                    continuous_var=self.path_weights_vars[(i)],
+                    product_var=self.pi_vars[(u, v, i)],
+                    lb=0,
+                    ub=maximum_allowed_path_weight,
                     name=f"product_u={u}_v={v}_i={i}",
                 )
 
