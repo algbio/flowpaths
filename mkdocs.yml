@@ -16,6 +16,9 @@ theme:
     - content.code.copy
   logo: flowpaths-logo.svg
 
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-MML-AM_CHTML
+
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -28,6 +31,11 @@ markdown_extensions:
   - pymdownx.superfences
   - attr_list
   - md_in_html
+  - smarty
+  - mdx_math:
+      add_preview: true
+      enable_dollar_delimiter: true  # In order to activate math with $...$. Otherwise, math is rendered with \(...\)
+  - pymdownx.details
 
 plugins:
   - search 
@@ -35,3 +43,4 @@ plugins:
       module_name: docs/getversion
   - mkdocstrings:
       default_handler: python
+      
