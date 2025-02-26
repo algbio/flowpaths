@@ -177,7 +177,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             name_prefix="gamma",
             lb=0,
             ub=self.w_max,
-            var_type="integer" if self.weight_type == int else "continuous",
+            var_type="continuous",
         )
 
         if len(self.path_length_factors) > 0:
@@ -409,10 +409,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             slack_sol = self.solver.get_variable_values("slack", [int])
             path_slack_scaled_sol = self.solver.get_variable_values("path_slack_scaled", [int])
             scaled_slack_sol = self.solver.get_variable_values("scaled_slack", [int])
-            print("path_length_sol", path_length_sol)
-            print("slack_sol", slack_sol)
-            print("path_slack_scaled_sol", path_slack_scaled_sol)
-            print("scaled_slack_sol", scaled_slack_sol)
             
             for i in range(self.k):
                 # Checking which interval the path length is in,
@@ -421,6 +417,11 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 for index, interval in enumerate(self.path_length_ranges):
                     if path_length_sol[i] >= interval[0] and path_length_sol[i] <= interval[1]:
                         if abs(path_slack_scaled_sol[i] - self.path_length_factors[index]) > tolerance:
+                            print("path_length_sol", path_length_sol)
+                            print("slack_sol", slack_sol)
+                            print("path_slack_scaled_sol", path_slack_scaled_sol)
+                            print("scaled_slack_sol", scaled_slack_sol)
+
                             return False
 
         if not self.verify_edge_position():
@@ -429,9 +430,15 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         if not self.verify_path_length():
             return False
 
-        var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
+        # var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
         # print(var_dict)
         # self.solver.write_model("kminpatherror.lp")
+
+        # gamma_sol = self.solver.get_variable_values("gamma", [str, str, int])
+        # pi_sol = self.solver.get_variable_values("pi", [str, str, int])
+
+        # print("pi_sol", pi_sol)
+        # print("gamma_sol", gamma_sol)
 
         return True
 
