@@ -22,27 +22,26 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         """
         Initialize the Minimum Flow Decompostion model, minimizing the number of paths.
 
-        Parameters
-        ----------
-        - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-        - flow_attr (str): The attribute name from where to get the flow values on the edges.
-        - weight_type (type, optional): The type of weights (int or float). Default is int.
-        - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
-        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
-            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
-        - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
-        - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
-        - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
-        - optimize_with_greedy (bool, optional): Whether to optimize with a greedy algorithm. Default is True.
-            If set to True, the model will first try to solve the problem with a greedy algorithm based on
-            always removing the path of maximum bottleneck. If the size of such greedy decomposition matches the width of the graph,
-            the greedy decomposition is optimal, and the model will return the greedy decomposition as the solution.
-            If the greedy decomposition does not match the width, then the model will proceed to solve the problem with the MILP model.
-        - threads (int, optional): Number of threads to use. Default is 4.
-        - time_limit (int, optional): Time limit for the solver in seconds. Default is 300.
-        - presolve (str, optional): Presolve option for the solver. Default is "on".
-        - log_to_console (str, optional): Whether to log solver output to console. Default is "false".
-        - external_solver (str, optional): External solver to use. Default is "highs".
+        Args:
+            G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
+            flow_attr (str): The attribute name from where to get the flow values on the edges.
+            weight_type (type, optional): The type of weights (int or float). Default is int.
+            subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
+            subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+                Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
+            optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
+            optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
+            optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
+            optimize_with_greedy (bool, optional): Whether to optimize with a greedy algorithm. Default is True.
+                - If set to True, the model will first try to solve the problem with a greedy algorithm based on
+                always removing the path of maximum bottleneck. If the size of such greedy decomposition matches the width of the graph,
+                the greedy decomposition is optimal, and the model will return the greedy decomposition as the solution.
+                - If the greedy decomposition does not match the width, then the model will proceed to solve the problem with the MILP model.
+            threads (int, optional): Number of threads to use. Default is 4.
+            time_limit (int, optional): Time limit for the solver in seconds. Default is 300.
+            presolve (str, optional): Presolve option for the solver. Default is "on".
+            log_to_console (str, optional): Whether to log solver output to console. Default is "false".
+            external_solver (str, optional): External solver to use. Default is "highs".
 
         Raises
         ----------

@@ -7,6 +7,7 @@ class SolverWrapper:
     A wrapper class for the both the HiGHS (highspy) and Gurobi (gurobipy) solvers.
 
     This supports the following functionalities:
+    
     - Adding:
         - Variables
         - Constraints
