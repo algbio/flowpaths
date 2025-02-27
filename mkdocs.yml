@@ -9,6 +9,7 @@ nav:
       - k-Least Absolute Errors: k-least-absolute-errors.md
       - k-Minimum Path Error: k-min-path-error.md
     - Additional options:
+      - Solver options and optimizations: solver-options-optimizations.md
       - Subpath constraints: subpath-constraints.md
       - Ignoring edges: ignoring-edges.md
       - Additional start/end nodes: additional-start-end-nodes.md

@@ -45,11 +45,14 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             
             Coverage fraction of the subpath constraints that must be covered by some solution paths. 
             
-            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path).
+            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
         - `subpath_constraints_coverage_length : float`, optional
             
-            Coverage length of the subpath constraints. Default is `None`.
+            Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
+            and the coverage constraint is expressed in terms of the subpath constraint length. 
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
         - `edge_length_attr : str`, optional
             

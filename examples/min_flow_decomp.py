@@ -26,11 +26,12 @@ def main():
 
     # We solve again, by deactivating all optimizations, and 
     # setting the weights of the solution paths to int
-    optimization_options = dict()
-    optimization_options["optimize_with_safe_paths"] = False
-    optimization_options["optimize_with_safe_sequences"] = False
-    optimization_options["optimize_with_safe_zero_edges"] = False
-    optimization_options["optimize_with_greedy"] = False
+    optimization_options = {
+        "optimize_with_safe_paths": False,
+        "optimize_with_safe_sequences": False,
+        "optimize_with_safe_zero_edges": False,
+        "optimize_with_greedy": False,
+    }
     mfd_model_slow = fp.MinFlowDecomp(
         graph,
         flow_attr="flow",

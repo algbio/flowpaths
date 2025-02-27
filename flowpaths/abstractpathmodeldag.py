@@ -21,18 +21,22 @@ class AbstractPathModelDAG(ABC):
 
     - **edge_vars**: `edge_vars[(u, v, i)]` = 1 if path `i` goes through edge `(u, v)`, `0` otherwise
     - **edge_position_vars**: `edge_position_vars[(u, v, i)]` = position of edge `(u, v)` in path `i`, starting from position 0
+
         - These variables are created only if encode_edge_position is set to True
         - Note that positions are relative to the globals source s of the stDiGraph, thus the first edge in a path is 
         the edge from s to the first vertex in the original graph, and this first edge has position 0
         - If you set `edge_length_attr`, then the positions are relative to the edge lengths, and not the number of edges
         The first edge still gets position 0, and other edges get positions equal to the sum of the lengths of the edges before them in the path
         - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
+
     - **path_length_vars**: `path_length_vars[(i)]` = length of path `i`
+
         - These variables are created only if encode_path_length is set to True
         - Note that the length of a path is the sum of the lengths of the edges in the path
         - If you set `edge_length_attr`, then the lengths are the sum of the lengths of the edges in the path
         - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
         - NOTE: the length also includes the edges from gobal source to the first vertex, and from the last vertex to the global sink. By default, these do not have a length attached, so each gets length 1.
+        
     - **solver**: a solver object to solve the (M)ILP
 
     This class uses the "safety information" (see [https://doi.org/10.48550/arXiv.2411.03871](https://doi.org/10.48550/arXiv.2411.03871)) in the graph to fix some 
@@ -66,39 +70,77 @@ class AbstractPathModelDAG(ABC):
         """
         Initializes the class with the given parameters.
 
-        Args:
-            G (stDiGraph.stDiGraph): The directed acyclic graph (DAG) to be used.
-            num_paths (int): The number of paths to be computed.
-            subpath_constraints (list, optional): A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to None.
-                - Each sequence of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
-                then each sequence of edges must appear in at least subpath_constraints_coverage fraction of some solution path, see below.
-            subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of number of edges. 
-                Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
-            subpath_constraints_coverage_length (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of length of the subpath.
-                Defaults to None, meaning that this is not imposed. 
-                If you set this constraint, you cannot set subpath_constraints_coverage (and its default value of 1 will be ignored).
-                If you set this constraint, you also need to set edge_length_attr. If an edge has missing edge length, it gets length 1.
-            encode_edge_position (bool, optional): Whether to encode the position of the edges in the paths. Defaults to False.
-            encode_path_length (bool, optional): Whether to encode the length of the paths (in terms of number of edges, or sum of lengths of edges, if set via edge_length_attr). Defaults to False.
-            edge_length_attr (str, optional): The attribute name from where to get the edge lengths. Defaults to None.
-                If set, then the edge positions, or path lengths (above) are in terms of the edge lengths specified in the edge_length_attr field of each edge
-                If set, and an edge has a missing edge length, then it gets length 1.
-            optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Defaults to False.
-            optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Defaults to False.
-            optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Defaults to False.
-            trusted_edges_for_safety (set, optional): Set of trusted edges for safety. Defaults to None.
-            external_solution_paths (list, optional): External solution paths. Defaults to None.
-            solve_statistics (dict, optional): Dictionary to store solve statistics. Defaults to {}.
-            threads (int, optional): Number of threads to use. Defaults to 4.
-            time_limit (int, optional): Time limit for solving. Defaults to 300.
-            presolve (str, optional): Presolve option. Defaults to "on".
-            log_to_console (str, optional): Log to console option. Defaults to "false".
-            external_solver (str, optional): External solver to use. Defaults to "highs".
+        Args
+        ----
+        - `G: stDiGraph.stDiGraph`  
+            
+            The directed acyclic graph (DAG) to be used.
+
+        - `num_paths: int`
+            
+            The number of paths to be computed.
+        - `subpath_constraints: list`, optional
+            
+            A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to None.
+            
+            Each sequence of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
+            then each sequence of edges must appear in at least subpath_constraints_coverage fraction of some solution path, see below.
+        
+        - `subpath_constraints_coverage: float`, optional
+            
+            Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of number of edges. 
+                - Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
+        
+        - `subpath_constraints_coverage_length: float`, optional 
+            
+            Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of length of the subpath. Defaults to `None`, meaning that this is not imposed. 
+            - If you set this constraint, you cannot set `subpath_constraints_coverage` (and its default value of 1 will be ignored).
+            - If you set this constraint, you also need to set `edge_length_attr`. If an edge has missing edge length, it gets length 1.
+
+        - `encode_edge_position: bool`, optional
+        
+            Whether to encode the position of the edges in the paths. Defaults to `False`.
+
+        - `encode_path_length: bool`, optional
+            
+            Whether to encode the length of the paths (in terms of number of edges, or sum of lengths of edges, if set via `edge_length_attr`). Defaults to `False`.
+
+        - `edge_length_attr: str`, optional
+            
+            The attribute name from where to get the edge lengths. Defaults to `None`.
+            
+            - If set, then the edge positions, or path lengths (above) are in terms of the edge lengths specified in the `edge_length_attr` field of each edge
+            - If set, and an edge has a missing edge length, then it gets length 1.
+        
+        - `optimization_options: dict`, optional 
+            
+            Dictionary of optimization options. Defaults to `None`, in which case the default values are used. See the [available optimizations](solver-options-optimizations.md). If you pass any safety optimizations, you must also pass `trusted_edges_for_safety` (see below). If a child class has already solved the problem and has the solution paths, it can pass them via `external_solution_paths` to skip the solver creation and encoding of paths (see below).
+            
+            - `"trusted_edges_for_safety"` (set): Set of trusted edges for safety. Defaults to `None`. If you use any safety optimization, this cannot be `None`.
+
+            !!! warning "Global optimality"
+                In order for the optimizations to still guarantee a global optimium, you must guarantee that:
+
+                1. The solution is made up of source-to-sink paths, and
+                2. Every edge in `trusted_edges_for_safety` appears in some solution path, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decompositon](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
+
+            - `"external_solution_paths"` (list): External solution paths, as a list of paths, where every path is a list of nodes. Defaults to `None`. If you provide this, this class skip the solver creation and encoding of paths, and just return these paths. This is useful when the child class managed to solver the problem in a different way, and needs to let this class know them to have a consistent API.
+
+
+
+        - `solver_options: dict`, optional
+            
+            Dictionary of solver options. Defaults to `None`, in which case the default values are used. See the [available solver options](solver-options-optimizations.md).
+
+        - `solve_statistics: dict`, optional
+            
+            Dictionary to store solve statistics. Defaults to `{}`.
+
 
         Raises
         ----------
-        - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with safe lists.
-        - ValueError: If both `optimize_with_safe_paths` and `optimize_with_safe_sequences` are set to True.
+        - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with `optimize_with_safe_paths` or `optimize_with_safe_sequences`.
+        - ValueError: If both `optimize_with_safe_paths` and `optimize_with_safe_sequences` are set to `True`.
         """
 
         self.G = G

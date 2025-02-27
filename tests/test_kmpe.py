@@ -51,13 +51,13 @@ class TestkMinPathError(unittest.TestCase):
                 ):
                     continue
 
-                optimization_options = dict()
-                optimization_options["optimize_with_safe_paths"] = settings[1]
-                optimization_options["optimize_with_safe_sequences"] = settings[2]
-                optimization_options["optimize_with_safe_zero_edges"] = settings[3]
+                optimization_options = {
+                    "optimize_with_safe_paths": settings[1],
+                    "optimize_with_safe_sequences": settings[2],
+                    "optimize_with_safe_zero_edges": settings[3],
+                }
 
-                solver_options = dict()
-                solver_options["external_solver"] = settings[4]
+                solver_options = {"external_solver": settings[4]}
 
                 kmpe_model = fp.kMinPathError(
                     graph,

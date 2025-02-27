@@ -51,14 +51,14 @@ class TestMinFlowDecomp(unittest.TestCase):
                 ):
                     continue
 
-                optimization_options = dict()
-                optimization_options["optimize_with_safe_paths"] = settings[1]
-                optimization_options["optimize_with_safe_sequences"] = settings[2]
-                optimization_options["optimize_with_safe_zero_edges"] = settings[3]
-                optimization_options["optimize_with_greedy"] = settings[4]
+                optimization_options = {
+                    "optimize_with_safe_paths": settings[1],
+                    "optimize_with_safe_sequences": settings[2],
+                    "optimize_with_safe_zero_edges": settings[3],
+                    "optimize_with_greedy": settings[4],
+                }
 
-                solver_options = dict()
-                solver_options["external_solver"] = settings[5]
+                solver_options = {"external_solver": settings[5]}
 
                 mfd_model = fp.MinFlowDecomp(
                     graph,
