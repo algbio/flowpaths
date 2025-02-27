@@ -7,7 +7,7 @@ class SolverWrapper:
     A wrapper class for the both the HiGHS (highspy) and Gurobi (gurobipy) solvers.
 
     This supports the following functionalities:
-    
+
     - Adding:
         - Variables
         - Constraints
@@ -26,6 +26,18 @@ class SolverWrapper:
     external_solver = "highs"
     tolerance = 1e-9
     optimization_sense = "minimize"
+
+    # We try to map gurobi status codes to HiGHS status codes when there is a clear correspondence
+    gurobi_status_to_highs = {
+        2: "kOptimal",
+        3: "kInfeasible",
+        4: "kUnboundedOrInfeasible",
+        5: "kUnbounded",
+        7: "kIterationLimit",
+        9: "kTimeLimit",
+        10: "kSolutionLimit",
+        17: "kMemoryLimit",
+    }
 
     def __init__(self, external_solver="highs", **kwargs):
         self.external_solver = external_solver
@@ -137,30 +149,24 @@ class SolverWrapper:
 
     def add_binary_continuous_product_constraint(self, binary_var, continuous_var, product_var, lb, ub, name: str):
         """
-        This function adds constraints to model the equality:
-            binary_var * continuous_var = product_var
-
-        Assumptions
+        Description
         -----------
-        - binary_var in [0,1]
-        - lb <= continuous_var <= ub
+        This function adds constraints to model the equality: `binary_var` * `continuous_var` = `product_var`.
 
-        Note
-        ----
-        This works correctly also if continuous_var is an integer variable.
+        Assumptions:
+            - `binary_var` $\in [0,1]$
+            - lb ≤ `continuous_var` ≤ ub
 
-        Parameters
-        ----------
-        binary_var : Variable
-            The binary variable.
-        continuous_var : Variable
-            The continuous variable (can also be integer).
-        product_var : Variable
-            The variable that should be equal to the product of the binary and continous variables.
-        lb, ub : float
-            The lower and upper bounds of the continuous variable.
-        name : str
-            The name of the constraint
+        Note:
+            This works correctly also if `continuous_var` is an integer variable.
+
+        Args:
+            binary_var (variable): The binary variable.
+            continuous_var (variable): The continuous variable (can also be integer).
+            product_var (variable): The variable that should be equal to the product of the binary and continous variables.
+            lb (float): The lower bound of the continuous variable.
+            ub (float): The upper bound of the continuous variable.
+            name (str): The name of the constraint.
         """
         self.add_constraint(product_var <= ub * binary_var, name=name + "_a")
         self.add_constraint(product_var >= lb * binary_var, name=name + "_b")
@@ -176,9 +182,8 @@ class SolverWrapper:
         -----------
         lb <= product_var <= ub
 
-        Note
-        ----
-        This works correctly also if continuous_var is an integer variable.
+        !!!tip "Note"
+            This works correctly also if `continuous_var` is an integer variable.
 
         Parameters
         ----------
@@ -269,11 +274,11 @@ class SolverWrapper:
         elif self.external_solver == "gurobi":
             self.solver.write(filename)
 
-    def get_model_status(self):
+    def get_model_status(self, raw = False):
         if self.external_solver == "highs":
             return self.solver.getModelStatus().name
         elif self.external_solver == "gurobi":
-            return self.solver.status
+            return SolverWrapper.gurobi_status_to_highs.get(self.solver.status, self.solver.status) if not raw else self.solver.status
 
     def get_all_variable_values(self):
         if self.external_solver == "highs":
@@ -313,7 +318,7 @@ class SolverWrapper:
                                             binary (0 or 1). Defaults to False.
 
         Returns:
-            dict: A dictionary where the keys are the indices of the variables (as tuples or 
+            values: A dictionary where the keys are the indices of the variables (as tuples or 
                   single values) and the values are the corresponding variable values.
                   If index_types is empty, then the unique key is 0 and the value is the variable value.
 
@@ -395,7 +400,6 @@ class SolverWrapper:
             return self.solver.getObjectiveValue()
         elif self.external_solver == "gurobi":
             return self.solver.objVal
-        
 
     def add_piecewise_constant_constraint(
         self, x, y, ranges: list, constants: list, name_prefix: str

@@ -5,14 +5,14 @@ def main():
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"
-    graph.add_edge("s", "a", flow=3)
-    graph.add_edge("a", "c", flow=3)
-    graph.add_edge("s", "b", flow=2)
-    graph.add_edge("b", "c", flow=2)
-    graph.add_edge("c", "d", flow=3)
-    graph.add_edge("d", "t", flow=3)
-    graph.add_edge("c", "e", flow=2)
-    graph.add_edge("e", "t", flow=2)
+    graph.add_edge("s", "a", flow=6)
+    graph.add_edge("s", "b", flow=7)
+    graph.add_edge("a", "b", flow=2)
+    graph.add_edge("a", "c", flow=4)
+    graph.add_edge("b", "c", flow=9)
+    graph.add_edge("c", "d", flow=6)
+    graph.add_edge("c", "t", flow=7)
+    graph.add_edge("d", "t", flow=6)
 
     # We create a Minimum Flow Decomposition solver with default settings,
     # by specifying that the flow value of each edge is in the attribute `flow` of the edges,
@@ -22,7 +22,7 @@ def main():
     mfd_model = fp.MinFlowDecomp(
         graph, 
         flow_attr="flow", 
-        subpath_constraints=[[("a", "c"),("c", "e")]]
+        subpath_constraints=[[("a", "c"),("c", "t")]]
         )
     mfd_model.solve() # We solve it
     process_solution(mfd_model) # We process its solution
@@ -31,7 +31,7 @@ def main():
     mfd_model2 = fp.MinFlowDecomp(
         graph, 
         flow_attr="flow", 
-        subpath_constraints=[[("a", "c"),("c", "e")]], 
+        subpath_constraints=[[("a", "c"),("c", "t")]], 
         subpath_constraints_coverage=0.5, 
         optimize_with_greedy=False
         )
@@ -42,7 +42,7 @@ def main():
     mfd_model3 = fp.MinFlowDecomp(
         graph, 
         flow_attr="flow", 
-        subpath_constraints=[[("a", "c"),("c", "e")]], 
+        subpath_constraints=[[("a", "c"),("c", "t")]], 
         subpath_constraints_coverage=0.5
         )
     mfd_model3.solve()
@@ -52,7 +52,7 @@ def main():
     mfd_model4 = fp.MinFlowDecomp(
         graph, 
         flow_attr="flow", 
-        subpath_constraints=[[("s", "a"), ("e", "t")]]
+        subpath_constraints=[[("s", "a"), ("c", "t")]]
         )
     mfd_model4.solve()
     process_solution(mfd_model4) # We process its solution

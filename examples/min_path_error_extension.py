@@ -45,6 +45,9 @@ def main():
     # and the slack scale factors in `error_scale_factors` when computing the path slacks (i.e. edge errors).
     # For example, if a path has length in the range [0, 15], its slack will be multiplied by 1.6 when comparing the 
     # flow value of the edge to the sum of path slacks, but this multiplier will have no effect on the objective function.
+
+    solver_options = dict()
+    solver_options["external_solver"] = "gurobi"
     mpe_model_4 = fp.kMinPathError(
         graph, 
         flow_attr="flow", 
@@ -53,9 +56,10 @@ def main():
         edge_length_attr="length", 
         path_length_ranges=path_length_ranges, 
         path_length_factors=path_length_factors,
-        external_solver="gurobi"
+        solver_options=solver_options
         )  
     mpe_model_4.solve()
+    print(mpe_model_4.solver.get_model_status())
     process_solution(mpe_model_4)
 
 

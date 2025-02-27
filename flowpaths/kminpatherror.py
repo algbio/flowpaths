@@ -32,7 +32,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         path_length_factors: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
-        **kwargs,
+        optimization_options: dict = None,
+        solver_options: dict = None,
     ):
         """
         Initialize the Min Path Error model for a given number of paths.
@@ -95,8 +96,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             raise ValueError("The number of path length ranges must be equal to the number of error scale factors.")
         if len(self.path_length_factors) > 0 and self.weight_type == float:
             raise ValueError("Error scale factors are only allowed for integer weights.")
-            
-        self.kwargs = kwargs
 
         self.pi_vars = {}
         self.path_weights_vars = {}
@@ -109,11 +108,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.solve_statistics = {}
 
-        # Call the constructor of the parent class AbstractPathModelDAG
-        kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
+        self.optimization_options = optimization_options or {}
+        self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
             flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
         ).difference(self.edges_to_ignore)
-        kwargs["solve_statistics"] = self.solve_statistics
+        
+        # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
             self.G, 
             num_paths, 
@@ -123,7 +123,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             edge_length_attr=self.edge_length_attr,
             encode_edge_position=True,
             encode_path_length=True,
-            **kwargs
+            optimization_options=self.optimization_options,
+            solver_options=solver_options,
+            solve_statistics=self.solve_statistics,
         )
 
         # This method is called from the super class AbstractPathModelDAG

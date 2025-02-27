@@ -9,6 +9,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
     """
     Class to decompose a flow into a given number of weighted paths.
     """
+    # storing some defaults
+    optimize_with_greedy = True
+
     def __init__(
         self,
         G: nx.DiGraph,
@@ -19,7 +22,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
-        **kwargs,
+        optimization_options: dict = None,
+        solver_options: dict = None,
     ):
         """
         Initialize the Flow Decompostion model for a given number of paths `num_paths`.
@@ -89,19 +93,19 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.path_weights_sol = None
         self.__solution = None
 
-        greedy_solution_paths = None
+        
         self.solve_statistics = {}
-        self.optimize_with_greedy = kwargs.get("optimize_with_greedy", True)
+        self.optimization_options = optimization_options or {}
+
+        greedy_solution_paths = None
+        self.optimize_with_greedy = self.optimization_options.get("optimize_with_greedy", kFlowDecomp.optimize_with_greedy)
         if self.optimize_with_greedy:
             if self.get_solution_with_greedy():
                 greedy_solution_paths = self.__solution[0]
+                self.optimization_options["external_solution_paths"] = greedy_solution_paths
+        self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
 
         # Call the constructor of the parent class AbstractPathModelDAG
-        kwargs["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
-            flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
-        )
-        kwargs["solve_statistics"] = self.solve_statistics
-        kwargs["external_solution_paths"] = greedy_solution_paths
         super().__init__(
             self.G, 
             num_paths, 
@@ -109,7 +113,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
             edge_length_attr=self.edge_length_attr, 
-            **kwargs
+            optimization_options=self.optimization_options,
+            solver_options=solver_options,
+            solve_statistics=self.solve_statistics,
         )
 
         # If already solved with a previous method, we don't create solver, not add paths

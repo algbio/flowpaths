@@ -51,18 +51,24 @@ class TestMinFlowDecomp(unittest.TestCase):
                 ):
                     continue
 
+                optimization_options = dict()
+                optimization_options["optimize_with_safe_paths"] = settings[1]
+                optimization_options["optimize_with_safe_sequences"] = settings[2]
+                optimization_options["optimize_with_safe_zero_edges"] = settings[3]
+                optimization_options["optimize_with_greedy"] = settings[4]
+
+                solver_options = dict()
+                solver_options["external_solver"] = settings[5]
+
                 mfd_model = fp.MinFlowDecomp(
                     graph,
                     flow_attr="flow",
                     weight_type=settings[0],
-                    optimize_with_safe_paths=settings[1],
-                    optimize_with_safe_sequences=settings[2],
-                    optimize_with_safe_zero_edges=settings[3],
-                    optimize_with_greedy=settings[4],
-                    external_solver=settings[5],
+                    optimization_options=optimization_options,
+                    solver_options=solver_options,
                 )
                 mfd_model.solve()
-                print(mfd_model.kwargs)
+                # print(optimization_options, solver_options)
                 print(mfd_model.solve_statistics)
                 self.assertTrue(mfd_model.is_solved(), "Model should be solved")
                 self.assertTrue(

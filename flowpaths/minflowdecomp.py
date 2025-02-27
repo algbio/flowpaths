@@ -17,39 +17,57 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
-        **kwargs,
+        optimization_options: dict = None,
+        solver_options: dict = None,
     ):
         """
-        Initialize the Minimum Flow Decompostion model, minimizing the number of paths.
+        Initialize the Minimum Flow Decomposition model, minimizing the number of paths.
 
-        Args:
-            G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-            flow_attr (str): The attribute name from where to get the flow values on the edges.
-            weight_type (type, optional): The type of weights (int or float). Default is int.
-            subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
-            subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
-                Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
-            optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
-            optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
-            optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
-            optimize_with_greedy (bool, optional): Whether to optimize with a greedy algorithm. Default is True.
-                - If set to True, the model will first try to solve the problem with a greedy algorithm based on
-                always removing the path of maximum bottleneck. If the size of such greedy decomposition matches the width of the graph,
-                the greedy decomposition is optimal, and the model will return the greedy decomposition as the solution.
-                - If the greedy decomposition does not match the width, then the model will proceed to solve the problem with the MILP model.
-            threads (int, optional): Number of threads to use. Default is 4.
-            time_limit (int, optional): Time limit for the solver in seconds. Default is 300.
-            presolve (str, optional): Presolve option for the solver. Default is "on".
-            log_to_console (str, optional): Whether to log solver output to console. Default is "false".
-            external_solver (str, optional): External solver to use. Default is "highs".
+        Parameters
+        ----------
+        - `G : nx.DiGraph`
+            
+            The input directed acyclic graph, as networkx DiGraph.
+
+        - `flow_attr : str`
+            
+            The attribute name from where to get the flow values on the edges.
+
+        - `weight_type : type`, optional
+            
+            The type of weights (`int` or `float`). Default is `float`.
+
+        - `subpath_constraints : list`, optional
+            
+            List of subpath constraints. Default is an empty list. See [subpath constraints documentation](subpath-constraints.md)
+
+        - `subpath_constraints_coverage : float`, optional
+            
+            Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            
+            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path).
+
+        - `subpath_constraints_coverage_length : float`, optional
+            
+            Coverage length of the subpath constraints. Default is `None`.
+
+        - `edge_length_attr : str`, optional
+            
+            Attribute name for edge lengths. Default is `None`.
+
+        - `**kwargs : dict`
+            
+            Additional keyword arguments.
 
         Raises
-        ----------
-        - ValueError: If weight_type is not int or float.
-        - ValueError: If some edge does not have the flow attribute specified as "flow_attr".
-        - ValueError: If the graph does not satisfy flow conservation on nodes different from source or sink.
-        - ValueError: If the graph contains edges with negative (<0) flow values.
-        - ValueError: If the graph is not acyclic.
+        ------
+        `ValueError`
+
+        - If `weight_type` is not `int` or `float`.
+        - If some edge does not have the flow attribute specified as `flow_attr`.
+        - If the graph does not satisfy flow conservation on nodes different from source or sink.
+        - If the graph contains edges with negative (<0) flow values.
+        - If the graph is not acyclic.
         """
 
         stG = stdigraph.stDiGraph(G)
@@ -62,7 +80,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.edge_length_attr = edge_length_attr
-        self.kwargs = kwargs
+        self.optimization_options = optimization_options
+        self.solver_options = solver_options
 
         self.solve_statistics = {}
         self.__solution = None
@@ -79,7 +98,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             bool: True if a solution is found, False otherwise.
 
         Note:
-            This overloads the solve() method from the AbstractPathModelDAG class.
+            This overloads the `solve()` method from `AbstractPathModelDAG` class.
         """
         start_time = time.time()
         for i in range(self.lowerbound, self.G.number_of_edges()):
@@ -92,7 +111,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 subpath_constraints_coverage=self.subpath_constraints_coverage,
                 subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
                 edge_length_attr=self.edge_length_attr,
-                **self.kwargs,
+                optimization_options=self.optimization_options,
+                solver_options=self.solver_options,
             )
 
             fd_model.solve()
