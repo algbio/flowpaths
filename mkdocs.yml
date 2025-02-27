@@ -2,9 +2,20 @@ site_name: flowpaths
 
 nav:
   - Home: index.md
-  - Minimum Flow Decomposition: minimumflowdecomposition.md
-  - Abstract Path Model: abstractpathmodel.md
-  - Solver Wrapper: solverwrapper.md
+  - Decomposition models:
+    - Models:
+      - Minimum Flow Decomposition: minimum-flow-decomposition.md
+      - k-Flow Decomposition: k-flow-decomposition.md
+      - k-Least Absolute Errors: k-least-absolute-errors.md
+      - k-Minimum Path Error: k-min-path-error.md
+    - Additional options:
+      - Subpath constraints: subpath-constraints.md
+      - Ignoring edges: ignoring-edges.md
+      - Additional start/end nodes: additional-start-end-nodes.md
+  - Developing new models:
+    - Abstract Path Model: abstract-path-model.md
+    - Solver Wrapper: solver-wrapper.md
+    - stDiGraph: stdigraph.md
 
 use_directory_urls: false
 
@@ -14,11 +25,15 @@ theme:
     primary: white
   features:
     - content.code.copy
-  logo: flowpaths-logo.svg
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.expand
+    - navigation.path
+  logo: flowpaths-logo.svg  
+  
 
 extra_javascript:
   - https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-MML-AM_CHTML
-
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -28,10 +43,15 @@ markdown_extensions:
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - attr_list
   - md_in_html
   - smarty
+  - admonition
   - mdx_math:
       add_preview: true
       enable_dollar_delimiter: true  # In order to activate math with $...$. Otherwise, math is rendered with \(...\)
@@ -43,4 +63,9 @@ plugins:
       module_name: docs/getversion
   - mkdocstrings:
       default_handler: python
+      handlers:
+        python:
+          options:
+            show_root_toc_entry: false
+
       

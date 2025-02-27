@@ -1,3 +1,3 @@
-# A wrapper for (M)ILP solvers
+This class
 
 ::: flowpaths.utils.solverwrapper
