@@ -3,9 +3,13 @@ name = "flowpaths"
 version = "0.1.0"
 description = "A Python package to quickly decompose weighted graphs into weights paths, under various models."
 readme = "README.md"
-
+author = "Graph Algorithms and Bioinformatics Group @ University of Helsinki, and external collaborators"
 requires-python = ">=3.8"
-
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "networkx",
     "highspy"
@@ -14,3 +18,7 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/algbio/flowpaths"
+Issues = "https://github.com/algbio/flowpaths/issues"
