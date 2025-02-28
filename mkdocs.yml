@@ -16,7 +16,7 @@ nav:
   - Developing new models:
     - Abstract Path Model: abstract-path-model.md
     - Solver Wrapper: solver-wrapper.md
-    - stDiGraph: stdigraph.md 
+    - stDiGraph: stdigraph.md  
 
 use_directory_urls: false
 
@@ -34,7 +34,8 @@ theme:
   
 
 extra_javascript:
-  - https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-MML-AM_CHTML
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -53,10 +54,10 @@ markdown_extensions:
   - md_in_html
   - smarty
   - admonition
-  - mdx_math:
-      add_preview: true
-      enable_dollar_delimiter: true  # In order to activate math with $...$. Otherwise, math is rendered with \(...\)
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.details
+
 
 plugins:
   - search 
