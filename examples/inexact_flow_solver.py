@@ -33,15 +33,12 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         # that have a non-zero flow lowerbound, since they appear in at least one source-to-sink path.
         trusted_edges_for_safety = self.G.get_non_zero_flow_edges(flow_attr=self.lb)
 
-        solver_options = {"threads": threads}
-        optimization_options = {"trusted_edges_for_safety": trusted_edges_for_safety}
-
         # We initialize the super class with the graph, the number of paths, and the trusted edges.
         super().__init__(
             self.G, 
             num_paths, 
-            optimization_options=optimization_options, 
-            solver_options=solver_options
+            optimization_options={"trusted_edges_for_safety": trusted_edges_for_safety},
+            solver_options={"threads": threads}
             )
 
         # This method is called from the super class AbstractPathModelDAG
