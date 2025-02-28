@@ -118,9 +118,8 @@ mfd_model = fp.MinFlowDecomp(
         
 mfd_model.solve() # We solve it
 if mfd_model.is_solved():
-    solution = mfd_model.get_solution()
-    print("Paths, weights", solution["paths"], solution["weights"])
-    # [['s', 'a', 'b', 'c', 't'], ['s', 'a', 'c', 't'], ['s', 'b', 'c', 't'], ['s', 'b', 'c', 'd', 't']] [2.0, 4.0, 1.0, 6.0]
+    print(mfd_model.get_solution())
+    # {'paths': [['s', 'a', 'b', 'c', 't'], ['s', 'a', 'c', 't'], ['s', 'b', 'c', 't'], ['s', 'b', 'c', 'd', 't']], 'weights': [2.0, 4.0, 1.0, 6.0]}
 ```
 
 ## 3. Relaxing the constraint coverage

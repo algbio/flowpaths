@@ -33,7 +33,7 @@ mfd_solver.solve() # We solve it
 
 if mfd_solver.is_solved(): # We get the solution
     print(mfd_solver.get_solution())
-    # ([['s', 'b', 't'], ['s', 'a', 't']], [5, 2])
+    # {'paths': [['s', 'b', 't'], ['s', 'a', 't']], 'weights': [5, 2]}
 ```
 
 ### Design principles
@@ -53,5 +53,3 @@ if mfd_solver.is_solved(): # We get the solution
 - **$k$-Minimum Path Error**: Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths, with associated *slack* values, such that:
     - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths going through the edge, and
     - The sum of path slacks is minimized.
-
-<!-- \[\sum_{i=1}^{k}P_i\] -->

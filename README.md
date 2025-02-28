@@ -34,7 +34,7 @@ mfd_solver.solve() # We solve it
 
 if mfd_solver.is_solved(): # We get the solution
     print(mfd_solver.get_solution())
-    # ([['s', 'b', 't'], ['s', 'a', 't']], [5, 2])
+    # {'paths': [['s', 'b', 't'], ['s', 'a', 't']], 'weights': [5, 2]}
 ```
 
 ### Design principles
