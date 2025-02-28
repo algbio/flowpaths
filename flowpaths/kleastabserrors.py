@@ -195,15 +195,16 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         Otherwise, it checks if the problem has been solved, computes the solution paths, weights, slacks
         and caches the solution.
 
+
         Returns
         -------
-        - tuple: A tuple containing 
-            - the list of solution paths, 
-            - the list of their corresponding weights,
-            - a dictionary with keys (u,v) and values the error on the edge (u,v).
+        - `solution: dict`
+        
+            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`), and the edge errors (key `"edge_errors"`).
 
-        Raises:
-        - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
+        Raises
+        -------
+        - `exception` If model is not solved.
         """
 
         if self.__solution is not None:

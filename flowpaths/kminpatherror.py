@@ -285,14 +285,14 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         Returns
         -------
-        - tuple: A tuple containing
-            - the list ofsolution paths, 
-            - the list of their corresponding weights, 
-            - the list of their corresponding slacks.
-            - the list of their corresponding scaled slacks (if path_error_scale_factors is not empty); continuous values
+        - `solution: dict`
+        
+            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`) and slacks (key `"slacks"`). 
+            If `path_error_scale_factors` is not empty, it also contains the scaled slacks (key `"scaled_slacks"`).
 
-        Raises:
-        - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
+        Raises
+        -------
+        - `exception` If model is not solved.
         """
 
         if self.__solution is not None:

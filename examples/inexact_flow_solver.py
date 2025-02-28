@@ -133,10 +133,10 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
             return self.__solution
     
         solution_weights_dict = self.solver.get_variable_values("w", [int])
-        self.__solution = (
-            self.get_solution_paths(), 
-            [solution_weights_dict[i] for i in range(self.k)]
-        )
+        self.__solution = {
+            "paths": self.get_solution_paths(),
+            "weights": [solution_weights_dict[i] for i in range(self.k)],
+        }
 
         return self.__solution
     
@@ -181,13 +181,8 @@ if __name__ == "__main__":
 
     # We process its solution
     if kifd_model.is_solved():
-        solution = kifd_model.get_solution()
-        print(
-            "Solution paths, weights, solve statistics: ",
-            solution["paths"],
-            solution["weights"],
-            kifd_model.solve_statistics,
-        )
+        print(kifd_model.get_solution())
+        print(kifd_model.solve_statistics)
         print("model.is_valid_solution()", kifd_model.is_valid_solution())
     else:
         print("Model could not be solved.")

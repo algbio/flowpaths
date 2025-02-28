@@ -39,14 +39,15 @@ class AbstractPathModelDAG(ABC):
         
     - **solver**: a solver object to solve the (M)ILP
 
-    This class uses the "safety information" (see [https://doi.org/10.48550/arXiv.2411.03871](https://doi.org/10.48550/arXiv.2411.03871)) in the graph to fix some 
-    `edge_vars` to 1 or 0. The safety information consists of safe paths, or safe sequences, that are guaranteed to appear in at least 
-    one cover (made up of any number of s-t paths) of the edges in `trusted_edges_for_safety`. That is, when implementing a new
-    path-finding (M)ILP, you can guarantee that 
+    !!! node "Safety optimizations"
+        This class uses the "safety information" (see [https://doi.org/10.48550/arXiv.2411.03871](https://doi.org/10.48550/arXiv.2411.03871)) in the graph to fix some 
+        `edge_vars` to 1 or 0. The safety information consists of safe paths, or safe sequences, that are guaranteed to appear in at least 
+        one cover (made up of any number of s-t paths) of the edges in `trusted_edges_for_safety`. That is, when implementing a new
+        path-finding (M)ILP, you can guarantee that 
 
-    1. The solution is made up of s-t paths
-    2. Any solution covers all edges in `trusted_edges_for_safety`, then safety optimizations can be used to fix some edge_vars to 1, 
-    which can speed up the solving process, while guaranteeing global optimality.
+        1. The solution is made up of s-t paths
+        2. Any solution covers all edges in `trusted_edges_for_safety`, then safety optimizations can be used to fix some edge_vars to 1, 
+        which can speed up the solving process, while guaranteeing global optimality.
     """
     # storing some defaults
     optimize_with_safe_paths = True

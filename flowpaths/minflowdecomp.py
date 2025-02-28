@@ -132,7 +132,19 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         return False
 
     def get_solution(self):
+        """
+        Retrieves the solution for the flow decomposition problem.
 
+        Returns
+        -------
+        - `solution: dict`
+        
+            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`).
+
+        Raises
+        -------
+        - `exception` If model is not solved.
+        """
         self.check_is_solved()
         return self.__solution
     

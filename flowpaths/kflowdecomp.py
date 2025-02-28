@@ -240,10 +240,13 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         Returns
         -------
-        - tuple: A tuple containing the solution paths and their corresponding weights.
+        - `solution: dict`
+        
+            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`).
 
-        Raises:
-        - AssertionError: If the solution returned by the MILP solver is not a valid flow decomposition.
+        Raises
+        ------
+        - `exception` If model is not solved.
         """
 
         if self.__solution is not None:
