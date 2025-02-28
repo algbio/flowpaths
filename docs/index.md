@@ -10,7 +10,7 @@ pip install flowpaths
 
 ### Source code
 
-[github.com/algbio/flowpaths](https://github.com/algbio/flowpaths)
+[github.com/algbio/flowpaths](https://github.com/algbio/flowpaths) 
 
 ### Basic usage example
 
