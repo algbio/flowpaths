@@ -8,6 +8,10 @@ This package implements various solvers for decomposing a weighted directed acyc
 pip install flowpaths
 ```
 
+### Source code
+
+[github.com/algbio/flowpaths](https://github.com/algbio/flowpaths)
+
 ### Basic usage example
 
 ```python
