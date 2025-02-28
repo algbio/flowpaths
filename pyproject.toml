@@ -3,7 +3,7 @@ name = "flowpaths"
 version = "0.1.0"
 description = "A Python package to quickly decompose weighted graphs into weights paths, under various models."
 readme = "README.md"
-author = "Graph Algorithms and Bioinformatics Group @ University of Helsinki, and external collaborators"
+authors = [{name="Graph Algorithms and Bioinformatics Group @ University of Helsinki, and external collaborators"}]
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
