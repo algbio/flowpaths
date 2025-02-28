@@ -3,8 +3,7 @@ name: User manual
 on:
   workflow_dispatch:
   push:
-    branches:
-      - master
+    branches: [ "main" ]
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
