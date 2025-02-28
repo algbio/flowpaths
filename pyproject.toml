@@ -9,9 +9,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "License :: OSI Approved :: MIT License",
-    "Scientific/Engineering :: Bio-Informatics",
-    "Scientific/Engineering :: Information Analysis",
-    "Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Mathematics",
 ]
 dependencies = [
     "networkx",
