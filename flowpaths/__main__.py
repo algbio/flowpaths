@@ -98,8 +98,8 @@ def process_solution(model: mfd.MinFlowDecomp):
         solution = model.get_solution()
         print(
             "Solution weights, paths, solve statistics: ",
-            solution[1],
-            solution[0],
+            solution["weights"],
+            solution["paths"],
             model.solve_statistics,
         )
     else:
@@ -111,9 +111,9 @@ def process_solution_kmpe(model: kmpe.kMinPathError):
         solution = model.get_solution()
         print(
             "Solution weights, slacks, paths, weights, solve statistics: ",
-            solution[1],
-            solution[2],
-            solution[0],
+            solution["weights"],
+            solution[],
+            solution["paths"],
             model.solve_statistics,
         )
     else:

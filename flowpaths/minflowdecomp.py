@@ -141,7 +141,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.check_is_solved()
 
         # Number of paths
-        return len(self.__solution[0])
+        return len(self.__solution["paths"])
 
     def is_valid_solution(self) -> bool:
         return self.fd_model.is_valid_solution()

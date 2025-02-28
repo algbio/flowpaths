@@ -65,10 +65,10 @@ def main():
 def process_solution(model: fp.kMinPathError):
     if model.is_solved():
         solution = model.get_solution()
-        print("Solution paths", solution[0])
-        print("weights, slacks", solution[1], solution[2])
-        if len(solution) > 3:
-            print("Scaled slacks", solution[3])
+        print("Solution paths", solution["paths"])
+        print("weights, slacks", solution["weights"], solution["slacks"])
+        if "scaled_slacks" in solution:
+            print("Scaled slacks", solution["scaled_slacks"])
 
         print("Solve statistics", model.solve_statistics)
         print("model.is_valid_solution()", model.is_valid_solution())

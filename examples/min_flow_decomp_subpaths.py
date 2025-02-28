@@ -33,7 +33,7 @@ def main():
         flow_attr="flow", 
         subpath_constraints=[[("a", "c"),("c", "t")]], 
         subpath_constraints_coverage=0.5, 
-        optimize_with_greedy=False
+        optimization_options={"optimize_with_greedy": False}
         )
     mfd_model2.solve()
     process_solution(mfd_model2) # We process its solution
@@ -87,7 +87,7 @@ def main():
         edge_length_attr="length", 
         subpath_constraints=[[("a", "c"),("c", "e")]], 
         subpath_constraints_coverage_length=0.7, 
-        optimize_with_greedy=False
+        optimization_options={"optimize_with_greedy": False}
         )
     # Note that edge ("c", "e") has length 16, which is 0.8 * subpath length (4 + 16). 
     # Thus already covering the edge ("c", "e") with a coverage_length = 0.7 is enough to satisfy the constraint.
@@ -99,8 +99,8 @@ def process_solution(model: fp.MinFlowDecomp):
         solution = model.get_solution()
         print(
             "Solution paths, weights, solve statistics: ",
-            solution[0],
-            solution[1],
+            solution["paths"],
+            solution["weights"],
             model.solve_statistics,
         )
     else:

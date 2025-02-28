@@ -101,7 +101,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.optimize_with_greedy = self.optimization_options.get("optimize_with_greedy", kFlowDecomp.optimize_with_greedy)
         if self.optimize_with_greedy:
             if self.get_solution_with_greedy():
-                greedy_solution_paths = self.__solution[0]
+                greedy_solution_paths = self.__solution["paths"]
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
 
@@ -219,7 +219,10 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                     return False
             
         if len(paths) <= self.k:
-            self.__solution = (paths, weights)
+            self.__solution = {
+                "paths": paths,
+                "weights": weights,
+            }
             self.set_solved()
             self.solve_statistics = {}
             self.solve_statistics["greedy_solve_time"] = time.time() - start_time
@@ -257,7 +260,10 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             for i in range(self.k)
         ]
 
-        self.__solution = (self.get_solution_paths(), self.path_weights_sol)
+        self.__solution = {
+            "paths": self.get_solution_paths(),
+            "weights": self.path_weights_sol,
+        }
 
         return self.__solution
 
@@ -283,8 +289,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         if self.__solution is None:
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_paths = self.__solution[0]
-        solution_weights = self.__solution[1]
+        solution_paths = self.__solution["paths"]
+        solution_weights = self.__solution["weights"]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths

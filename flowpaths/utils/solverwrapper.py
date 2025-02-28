@@ -405,7 +405,7 @@ class SolverWrapper:
         self, x, y, ranges: list, constants: list, name_prefix: str
     ):
         """
-        Enforces that variable y equals a constant from `constants` depending on the range that x falls into.
+        Enforces that variable `y` equals a constant from `constants` depending on the range that `x` falls into.
         
         For each piece i:
             if x in [ranges[i][0], ranges[i][1]] then y = constants[i].

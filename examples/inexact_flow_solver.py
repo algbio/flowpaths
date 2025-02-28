@@ -184,8 +184,8 @@ if __name__ == "__main__":
         solution = kifd_model.get_solution()
         print(
             "Solution paths, weights, solve statistics: ",
-            solution[0],
-            solution[1],
+            solution["paths"],
+            solution["weights"],
             kifd_model.solve_statistics,
         )
         print("model.is_valid_solution()", kifd_model.is_valid_solution())

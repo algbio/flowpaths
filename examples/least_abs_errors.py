@@ -37,9 +37,9 @@ def process_solution(model: fp.kLeastAbsErrors):
         solution = model.get_solution()
         print(
             "Solution paths, weights, edge errors, solve statistics: ",
-            solution[0],
-            solution[1],
-            solution[2],
+            solution["paths"],
+            solution["weights"],
+            solution["edge_errors"],
             model.solve_statistics,
         )
         print("model.is_valid_solution()", model.is_valid_solution())

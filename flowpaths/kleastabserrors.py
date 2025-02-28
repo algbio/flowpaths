@@ -225,11 +225,11 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         for (u,v) in self.edge_indexes_basic:
             self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
 
-        self.__solution = (
-            self.get_solution_paths(),
-            self.path_weights_sol,
-            self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
-        )
+        self.__solution = {
+            "paths": self.get_solution_paths(),
+            "weights": self.path_weights_sol,
+            "edge_errors": self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
+        }
 
         return self.__solution
 
@@ -255,9 +255,9 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         if self.__solution is None:
             self.get_solution()
 
-        solution_paths = self.__solution[0]
-        solution_weights = self.__solution[1]
-        solution_errors = self.__solution[2]
+        solution_paths = self.__solution["paths"]
+        solution_weights = self.__solution["weights"]
+        solution_errors = self.__solution["edge_errors"]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths

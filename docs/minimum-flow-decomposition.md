@@ -89,7 +89,7 @@ The model might not be solved because the MILP solver couldn't do it in the time
 ``` python
 if mfd_model.is_solved():
     solution = mfd_model.get_solution()
-    print("Paths, weights", solution[0], solution[1])
+    print("Paths, weights", solution["paths"], solution["weights"])
     # [['s', 'b', 'c', 't'], ['s', 'a', 'c', 'd', 't'], ['s', 'a', 'b', 'c', 'd', 't']] [7, 4, 2]
 ```
 

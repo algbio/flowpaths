@@ -119,7 +119,7 @@ mfd_model = fp.MinFlowDecomp(
 mfd_model.solve() # We solve it
 if mfd_model.is_solved():
     solution = mfd_model.get_solution()
-    print("Paths, weights", solution[0], solution[1])
+    print("Paths, weights", solution["paths"], solution["weights"])
     # [['s', 'a', 'b', 'c', 't'], ['s', 'a', 'c', 't'], ['s', 'b', 'c', 't'], ['s', 'b', 'c', 'd', 't']] [2.0, 4.0, 1.0, 6.0]
 ```
 

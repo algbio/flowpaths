@@ -319,22 +319,17 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             for i in range(self.k)
         ]
 
-        self.__solution = (
-            self.get_solution_paths(),
-            self.path_weights_sol,
-            self.path_slacks_sol,
-        )
+        self.__solution = {
+            "paths": self.get_solution_paths(),
+            "weights": self.path_weights_sol,
+            "slacks": self.path_slacks_sol
+        }
 
         if len(self.path_length_factors) > 0:
             slacks_scaled_sol_dict = self.solver.get_variable_values("scaled_slack", index_types=[int])
             self.path_slacks_scaled_sol = [slacks_scaled_sol_dict[i] for i in range(self.k)]
 
-            self.__solution = (
-                self.get_solution_paths(),
-                self.path_weights_sol,
-                self.path_slacks_sol,
-                self.path_slacks_scaled_sol
-            )
+            self.__solution["scaled_slacks"] = self.path_slacks_scaled_sol
 
         return self.__solution
 
@@ -360,11 +355,11 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         if self.__solution is None:
             self.get_solution()
 
-        solution_paths = self.__solution[0]
-        solution_weights = self.__solution[1]
-        solution_slacks = self.__solution[2]
+        solution_paths = self.__solution["paths"]
+        solution_weights = self.__solution["weights"]
+        solution_slacks = self.__solution["slacks"]
         if len(self.path_length_factors) > 0:
-            solution_slacks = self.__solution[3]
+            solution_slacks = self.__solution["scaled_slacks"]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
@@ -449,4 +444,4 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.check_is_solved()
 
         # sum of slacks
-        return sum(self.__solution[2])
+        return sum(self.__solution["slacks"])

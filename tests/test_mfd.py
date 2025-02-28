@@ -78,11 +78,11 @@ class TestMinFlowDecomp(unittest.TestCase):
 
                 current_solution = mfd_model.get_solution()
                 if first_solution_size == None:
-                    first_solution_size = len(current_solution[0])
+                    first_solution_size = len(current_solution["paths"])
                 else:
                     self.assertEqual(
                         first_solution_size,
-                        len(current_solution[0]),
+                        len(current_solution["paths"]),
                         "The size of the solution should be the same for all settings.",
                     )
 
