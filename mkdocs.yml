@@ -16,7 +16,7 @@ nav:
   - Developing new models:
     - Abstract Path Model: abstract-path-model.md
     - Solver Wrapper: solver-wrapper.md
-    - stDiGraph: stdigraph.md
+    - stDiGraph: stdigraph.md 
 
 use_directory_urls: false
 
