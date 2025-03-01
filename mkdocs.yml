@@ -1,7 +1,9 @@
 site_name: flowpaths
 
 nav:
-  - Home: index.md
+  - Home: 
+    - About: index.md
+    - References: references.md
   - Decomposition models:
     - Models:
       - Minimum Flow Decomposition: minimum-flow-decomposition.md

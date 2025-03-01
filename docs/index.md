@@ -2,17 +2,15 @@
 
 This package implements various solvers for decomposing a weighted directed acyclic graph (DAG) into weighted paths, based on (Mixed) Integer Linear Programming ((M)ILP) formulations. It also supports the easy creation of solvers for new decomposition models. Current version **{{flowpaths_version()}}**.
 
-### Installation
+## 1. Installation
 
 ```bash
 pip install flowpaths
 ```
 
-### Source code
+The source code is available at [github.com/algbio/flowpaths](https://github.com/algbio/flowpaths) under an MIT license.
 
-[github.com/algbio/flowpaths](https://github.com/algbio/flowpaths)
-
-### Basic usage example
+## 2. Basic usage example
 
 ```python
 import flowpaths as fp
@@ -36,7 +34,7 @@ if mfd_solver.is_solved(): # We get the solution
     # {'paths': [['s', 'b', 't'], ['s', 'a', 't']], 'weights': [5, 2]}
 ```
 
-### Design principles
+## 3. Design principles
 
 1. **Easy to use**: You just pass a directed graph to the solvers (as a [networkx](https://networkx.org) [DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html)), and they return optimal weighted paths. See the [examples](https://github.com/algbio/flowpaths/tree/main/examples) folder for some usage examples. 
 
@@ -47,10 +45,10 @@ if mfd_solver.is_solved(): # We get the solution
 
 4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` means that any optimization to the path-finding mechanisms benefits **all** solvers that inherit from this class. We implement some "safety optimizations" described in [this paper](https://doi.org/10.48550/arXiv.2411.03871), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
 
-### Models implemented
-- **Minimum Flow Decomposition**: Given a DAG with flow values on its edges (i.e. at every node different from source or sink the flow enetering the node is equal to the flow exiting the node), find the minimum number of weighted paths such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
-- **$k$-Least Absolute Errors**: Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths such that the sum of the absolute errors of each edge is minimized. 
+## 4. Models implemented
+- [**Minimum Flow Decomposition**](minimum-flow-decomposition.md): Given a DAG with flow values on its edges (i.e. at every node different from source or sink the flow enetering the node is equal to the flow exiting the node), find the minimum number of weighted paths such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
+- [**$k$-Least Absolute Errors**](k-least-absolute-errors.md): Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths such that the sum of the absolute errors of each edge is minimized. 
     - The *error of an edge* is defined as the weight of the edge minus the sum of the weights of the paths going through it.
-- **$k$-Minimum Path Error**: Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths, with associated *slack* values, such that:
+- [**$k$-Minimum Path Error**](k-min-path-error.md): Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths, with associated *slack* values, such that:
     - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths going through the edge, and
     - The sum of path slacks is minimized.

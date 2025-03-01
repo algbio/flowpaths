@@ -36,4 +36,10 @@ This class implements a more general version, as follows:
     \lambda_{u,v} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right| \leq \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }\rho_i \cdot \alpha(|P_i|), ~\forall (u,v) \in E'.
     $$
 
+## 3. References
+
+1. Fernando H. C. Dias, Alexandru I. Tomescu
+[**Accurate Flow Decomposition via Robust Integer Linear Programming**](https://doi.org/10.1109/TCBB.2024.3433523)
+IEEE/ACM Transactions on Computational Biology and Bioinformatics 21(6), 1955-1964, 2024 [(preprint)](https://researchportal.helsinki.fi/files/325850154/TCBB3433523.pdf)
+
 ::: flowpaths.kminpatherror

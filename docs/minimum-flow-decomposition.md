@@ -97,4 +97,16 @@ if mfd_model.is_solved():
     # [['s', 'b', 'c', 't'], ['s', 'a', 'c', 'd', 't'], ['s', 'a', 'b', 'c', 'd', 't']] [7, 4, 2]
 ```
 
+## 3. References
+
+There are several works on this problem, for example.
+
+1. Vatinlen, Benedicte, et al. [**Simple bounds and greedy algorithms for decomposing a flow into a minimal set of paths**](https://fc.isima.fr/~mahey/ejor_2008.pdf). European Journal of Operational Research 185.3 (2008): 1390-1401.
+
+2. Shao, Mingfu, and Carl Kingsford. [**Theory and a heuristic for the minimum path flow decomposition problem**](https://ieeexplore.ieee.org/iel7/8857/4359833/08126870.pdf). IEEE/ACM Transactions on Computational Biology and Bioinformatics 16.2 (2017): 658-670.
+
+3. Kloster, Kyle, et al. [**A practical fpt algorithm for flow decomposition and transcript assembly**](https://epubs.siam.org/doi/pdf/10.1137/1.9781611975055.7) 2018 Proceedings of the Twentieth Workshop on Algorithm Engineering and Experiments (ALENEX). Society for Industrial and Applied Mathematics, 2018.
+
+4. See also flowpaths [References](references.md), and the other papers cited by these works.
+
 ::: flowpaths.minflowdecomp
