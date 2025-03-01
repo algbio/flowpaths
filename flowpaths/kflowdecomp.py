@@ -161,11 +161,11 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.__encode_flow_decomposition()
 
     def __encode_flow_decomposition(self):
-        """
-        Encodes the flow decomposition constraints for the given graph.
-        This method sets up the path weight variables and the edge variables encoding
-        the sum of the weights of the paths going through the edge.
-        """
+        
+        # Encodes the flow decomposition constraints for the given graph.
+        # This method sets up the path weight variables and the edge variables encoding
+        # the sum of the weights of the paths going through the edge.
+        
 
         # If already solved, no need to encode further
         if self.is_solved():
@@ -211,17 +211,17 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             )
 
     def __get_solution_with_greedy(self):
-        """
-        Attempts to find a solution using a greedy algorithm.
-        This method first decomposes the problem using the maximum bottleneck approach.
-        If the number of paths obtained is less than or equal to the specified limit `k`,
-        it sets the solution and marks the problem as solved. It also records the time
-        taken to solve the problem using the greedy approach.
+        
+        # Attempts to find a solution using a greedy algorithm.
+        # This method first decomposes the problem using the maximum bottleneck approach.
+        # If the number of paths obtained is less than or equal to the specified limit `k`,
+        # it sets the solution and marks the problem as solved. It also records the time
+        # taken to solve the problem using the greedy approach.
 
-        Returns
-        -------
-        - bool: True if a solution is found using the greedy algorithm, False otherwise.
-        """
+        # Returns
+        # -------
+        # - bool: True if a solution is found using the greedy algorithm, False otherwise.
+        
 
         start_time = time.time()
         (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)

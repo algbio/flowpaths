@@ -171,9 +171,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.__encode_objective()
 
     def __encode_leastabserrors_decomposition(self):
-        """
-        Encodes the least absolute errors decomposition variables and constraints for the optimization problem.
-        """
+
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
@@ -303,7 +301,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         Notes
         -------
-        - get_solution() must be called before this method.
+        - `get_solution()` must be called before this method.
         - The solution is considered valid if the flow from paths is equal
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """

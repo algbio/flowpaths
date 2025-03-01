@@ -249,12 +249,12 @@ class AbstractPathModelDAG(ABC):
         self.__encode_paths()
 
     def __encode_paths(self):
-        """
-        Encodes the paths in the graph by creating variables for edges and subpaths.
+        
+        # Encodes the paths in the graph by creating variables for edges and subpaths.
 
-        This method initializes the edge and subpath variables for the solver and adds constraints
-        to ensure the paths are valid according to the given subpath constraints and safe lists.
-        """
+        # This method initializes the edge and subpath variables for the solver and adds constraints
+        # to ensure the paths are valid according to the given subpath constraints and safe lists.
+        
         self.edge_indexes = [
             (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
         ]

@@ -211,9 +211,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.__encode_objective()
 
     def __encode_minpatherror_decomposition(self):
-        """
-        Encodes the minimum path error decomposition variables and constraints for the optimization problem.
-        """
 
         # path weights 
         self.path_weights_vars = self.solver.add_variables(
@@ -301,7 +298,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 continue
 
             f_u_v = data[self.flow_attr]
-            edge_error_scale_u_v = self.edge_error_scaling.get((u, v), 1)
+            edge_error_scaling_u_v = self.edge_error_scaling.get((u, v), 1)
 
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
@@ -337,13 +334,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             #   <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k))
             self.solver.add_constraint(
                 (f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
-                * edge_error_scale_u_v
+                * edge_error_scaling_u_v
                 <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
                 name=f"9aa_u={u}_v={v}_i={i}",
             )
             self.solver.add_constraint(
                 (f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
-                * edge_error_scale_u_v
+                * edge_error_scaling_u_v
                 >= -sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
