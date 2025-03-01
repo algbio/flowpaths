@@ -6,13 +6,17 @@ The Minimum Flow Decomposition problem on a directed **acyclic** graph (*DAG*) i
 
 - **INPUT**: A directed graph $G = (V,E)$, and a *flow* on $G$, namely weights $f(u,v)$ for every edge $(u,v)$ of $G$, such that for every node $v$ that is not a source or sink of $G$, it holds that the sum of the flow values entering $v$ equals the sum of the flow values exiting $v$. This property is called *flow conservation*. 
 
-- **OUTPUT**: A minimum number $k$ of source-to-sink paths, $P_1,\dots,P_k$, with a weight $w_i$ associatd to each $P_i$, such that for every edge it holds that its flow value equals the sum of the weights of the paths going through the edge. Formally, 
+- **OUTPUT**: A minimum number $k$ of source-to-sink paths, $P_1,\dots,P_k$, with a weight $w_i$ associated to each $P_i$, such that for every edge it holds that its flow value equals the sum of the weights of the paths going through the edge. Formally, 
 $$
 f(u,v) = \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i, ~~\forall (u,v) \in E.
 $$
 
 !!! info "Note"
     The graph may have more than one source or sink nodes. The solution paths are required to start in some source node, and end in some sink node.
+
+!!! info "See also"
+
+    [k-Flow Decomposition](k-flow-decomposition.md)
 
 For example, the directed graph below satisfies the flow conservation property:
 ``` mermaid
