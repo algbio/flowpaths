@@ -41,16 +41,18 @@ def main():
     mfd_model_slow.solve()
     process_solution(mfd_model_slow)
 
+    kfd_model_3 = fp.kFlowDecomp(graph, flow_attr="flow", num_paths=3)
+    kfd_model_3.solve()
+    process_solution(kfd_model_3)
+
+    kfd_model_4 = fp.kFlowDecomp(graph, flow_attr="flow", num_paths=4)
+    kfd_model_4.solve()
+    process_solution(kfd_model_4)
+
 def process_solution(model: fp.MinFlowDecomp):
     if model.is_solved():
-        solution = model.get_solution()
-        print(
-            "Solution paths, weights, solve statistics: ",
-            solution["paths"],
-            solution["weights"],
-            model.solve_statistics,
-        )
-        fp.utils.graphutils.draw_solution_basic(model.G, flow_attr="flow", paths = solution["paths"], weights = solution["weights"], id = model.G.graph["id"])
+        print(model.get_solution())
+        # fp.utils.graphutils.draw_solution_basic(model.G, flow_attr="flow", paths = solution["paths"], weights = solution["weights"], id = model.G.graph["id"])
     else:
         print("Model could not be solved.")
 
