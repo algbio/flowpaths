@@ -62,7 +62,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         - `optimization_options : dict`, optional
             
-            Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations).
+            Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
             This class also supports the optimization `"optimize_with_greedy": True` (this is the default value). This
             will use a greedy algorithm to solve the problem, and if the number of paths returned by it equals a lowerbound on the solution size,
             then we know the greedy solution is optimum, and it will use that. The lowerbound used currently is the edge-width of the graph,
@@ -71,7 +71,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         - `solver_options : dict`, optional
             
-            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations).
+            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
 
         Raises
         ------

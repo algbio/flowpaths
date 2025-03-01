@@ -75,7 +75,6 @@ plugins:
           options:
             show_root_toc_entry: false
             docstring_options:
-            ignore_init_summary: false
             merge_init_into_class: true
             # docstring_section_style: spacy
             separate_signature: true
