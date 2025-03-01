@@ -165,15 +165,6 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         Encodes the flow decomposition constraints for the given graph.
         This method sets up the path weight variables and the edge variables encoding
         the sum of the weights of the paths going through the edge.
-
-        The method performs the following steps:
-        1. Checks if the problem is already solved to avoid redundant encoding.
-        2. Initializes the sum of path weights variables (`pi_vars`) and path weight variables (`path_weights_vars`).
-        3. Iterates over each edge in the graph and adds constraints to ensure:
-
-        Returns
-        -------
-        - None
         """
 
         # If already solved, no need to encode further

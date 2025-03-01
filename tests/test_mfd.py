@@ -13,7 +13,7 @@ class TestMinFlowDecomp(unittest.TestCase):
         optimize_with_safe_sequences = [True, False]  # 2
         optimize_with_safe_zero_edges = [True, False]  # 3
         optimize_with_greedy = [True, False]  # 4
-        solvers = ["highs"]  # 5
+        solvers = ["highs", "gurobi"]  # 5
 
         self.graphs = fp.graphutils.read_graphs("./tests/tests.graph")
         self.params = list(

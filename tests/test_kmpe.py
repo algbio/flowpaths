@@ -12,7 +12,7 @@ class TestkMinPathError(unittest.TestCase):
         optimize_with_safe_paths = [True, False]  # 1
         optimize_with_safe_sequences = [True, False]  # 2
         optimize_with_safe_zero_edges = [True, False]  # 3
-        solvers = ["highs"]  # 4
+        solvers = ["highs", "gurobi"]  # 4
 
         self.graphs = fp.graphutils.read_graphs("./tests/tests.graph")
         self.params = list(
