@@ -240,8 +240,12 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 # If the subpath is not covered enough by the greedy decomposition, we return False
                 if gu.max_occurrence(subpath, paths, edge_lengths={(u,v): self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in subpath}) < constraint_length * coverage_fraction:
                     return False
-            
+        
         if len(paths) <= self.k:
+            # If paths contains strictly less than self.k paths, 
+            # then we add arbitrary paths (i.e. we repeat the first path) with 0 weights to reach self.k paths.
+            paths += [paths[0] for _ in range(self.k - len(paths))]
+            weights += [0 for _ in range(self.k - len(weights))]
             self.__solution = {
                 "paths": paths,
                 "weights": weights,
