@@ -39,7 +39,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         - `subpath_constraints : list`, optional
             
-            List of subpath constraints. Default is an empty list. See [subpath constraints documentation](subpath-constraints.md)
+            List of subpath constraints. Default is an empty list. 
+            Each subpath constraint is a list of edges that must be covered by some solution path, according 
+            to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
 
         - `subpath_constraints_coverage : float`, optional
             
@@ -58,9 +60,18 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             
             Attribute name for edge lengths. Default is `None`.
 
-        - `**kwargs : dict`
+        - `optimization_options : dict`, optional
             
-            Additional keyword arguments.
+            Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations).
+            This class also supports the optimization `"optimize_with_greedy": True` (this is the default value). This
+            will use a greedy algorithm to solve the problem, and if the number of paths returned by it equals a lowerbound on the solution size,
+            then we know the greedy solution is optimum, and it will use that. The lowerbound used currently is the edge-width of the graph,
+            meaning the minimum number of paths needed to cover all edges. This is a correct lowerbound because any flow decomposition must cover all edges, 
+            as they have non-zero flow.
+
+        - `solver_options : dict`, optional
+            
+            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations).
 
         Raises
         ------

@@ -41,14 +41,8 @@ def main():
 
 def process_solution(model: fp.kMinPathError):
     if model.is_solved():
-        solution = model.get_solution()
-        print(
-            "Solution paths, weights, slacks, solve statistics: ",
-            solution["paths"],
-            solution["weights"],
-            solution["slacks"],
-            model.solve_statistics,
-        )
+        print(model.get_solution())
+        print(model.solve_statistics)
         print("model.is_valid_solution()", model.is_valid_solution())
     else:
         print("Model could not be solved.")

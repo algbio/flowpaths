@@ -47,7 +47,7 @@ def main():
     # flow value of the edge to the sum of path slacks, but this multiplier will have no effect on the objective function.
 
     solver_options = {"external_solver": "gurobi"}
-    mpe_model_4 = fp.kMinPathError(
+    mpe_model_5 = fp.kMinPathError(
         graph, 
         flow_attr="flow", 
         num_paths=3, 
@@ -57,20 +57,27 @@ def main():
         path_length_factors=path_length_factors,
         solver_options=solver_options
         )  
-    mpe_model_4.solve()
-    print(mpe_model_4.solver.get_model_status())
-    process_solution(mpe_model_4)
+    mpe_model_5.solve()
+    print(mpe_model_5.solver.get_model_status())
+    process_solution(mpe_model_5)
+
+    mpe_model_5 = fp.kMinPathError(
+        graph, 
+        flow_attr="flow", 
+        num_paths=3, 
+        weight_type=float, 
+        edge_length_attr="length", 
+        edge_error_scaling={("a", "c"): 0.5},
+        )  
+    mpe_model_5.solve()
+    print(mpe_model_5.solver.get_model_status())
+    process_solution(mpe_model_5)
 
 
 def process_solution(model: fp.kMinPathError):
     if model.is_solved():
-        solution = model.get_solution()
-        print("Solution paths", solution["paths"])
-        print("weights, slacks", solution["weights"], solution["slacks"])
-        if "scaled_slacks" in solution:
-            print("Scaled slacks", solution["scaled_slacks"])
-
-        print("Solve statistics", model.solve_statistics)
+        print(model.get_solution())
+        print(model.solve_statistics)
         print("model.is_valid_solution()", model.is_valid_solution())
     else:
         print("Model could not be solved.")

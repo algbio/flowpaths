@@ -246,9 +246,9 @@ class AbstractPathModelDAG(ABC):
             log_to_console=self.log_to_console,
         )
 
-        self.encode_paths()
+        self.__encode_paths()
 
-    def encode_paths(self):
+    def __encode_paths(self):
         """
         Encodes the paths in the graph by creating variables for edges and subpaths.
 

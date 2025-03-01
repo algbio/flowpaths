@@ -31,24 +31,61 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         Parameters
         ----------
-        - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-        - flow_attr (str): The attribute name from where to get the flow values on the edges.
-        - num_paths (int): The number of paths to decompose in.
-        - weight_type (type, optional): The type of the weights and slacks (int or float). Default is float.
-        - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
-        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
-            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
-        - edges_to_ignore (list, optional): List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack. Default is an empty list.
-        - additional_starts (list, optional): List of additional start nodes of the paths. Default is an empty list.
-        - additional_ends (list, optional): List of additional end nodes of the paths. Default is an empty list.
-        - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
-        - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
-        - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
-        - threads (int, optional): Number of threads to use. Default is 4.
-        - time_limit (int, optional): Time limit for the solver in seconds. Default is 300.
-        - presolve (str, optional): Presolve option for the solver. Default is "on".
-        - log_to_console (str, optional): Whether to log solver output to console. Default is "false".
-        - external_solver (str, optional): External solver to use. Default is "highs".
+        - `G: nx.DiGraph`
+            
+            The input directed acyclic graph, as networkx DiGraph.
+
+        - `flow_attr: str`
+            
+            The attribute name from where to get the flow values on the edges.
+
+        - `num_paths: int`
+            
+            The number of paths to decompose in.
+
+        - `weight_type: int | float`, optional
+            
+            The type of the weights and slacks (`int` or `float`). Default is `float`.
+
+         - `subpath_constraints : list`, optional
+            
+            List of subpath constraints. Default is an empty list. 
+            Each subpath constraint is a list of edges that must be covered by some solution path, according 
+            to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
+
+        - `subpath_constraints_coverage : float`, optional
+            
+            Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            
+            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+
+        - `subpath_constraints_coverage_length : float`, optional
+            
+            Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
+            and the coverage constraint is expressed in terms of the subpath constraint length. 
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+        
+        - `edges_to_ignore: list`, optional
+            
+            List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack.
+            Default is an empty list.
+        
+        - `additional_starts: list`, optional
+            
+            List of additional start nodes of the paths. Default is an empty list.
+
+        - `additional_ends: list`, optional
+            
+            List of additional end nodes of the paths. Default is an empty list.
+
+        - `optimization_options: dict`, optional
+
+            Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
+
+        - `solver_options: dict`, optional
+
+            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
 
         Raises
         ----------
@@ -113,12 +150,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self.encode_leastabserrors_decomposition()
+        self.__encode_leastabserrors_decomposition()
 
         # This method is called from the current class to add the objective function
-        self.encode_objective()
+        self.__encode_objective()
 
-    def encode_leastabserrors_decomposition(self):
+    def __encode_leastabserrors_decomposition(self):
         """
         Encodes the least absolute errors decomposition variables and constraints for the optimization problem.
         """
@@ -180,7 +217,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 name=f"9aa_u={u}_v={v}_i={i}",
             )
 
-    def encode_objective(self):
+    def __encode_objective(self):
 
         self.solver.set_objective(
             sum(self.edge_errors_vars[(u, v)] for (u,v) in self.edge_indexes_basic), 

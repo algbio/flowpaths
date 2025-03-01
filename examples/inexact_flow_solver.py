@@ -45,12 +45,12 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class
-        self.encode_inexact_flow_decomposition()
+        self.__encode_inexact_flow_decomposition()
 
         # We encode the objective, from the current class
-        self.encode_objective()
+        self.__encode_objective()
             
-    def encode_inexact_flow_decomposition(self):
+    def __encode_inexact_flow_decomposition(self):
 
         # Get the maximum data in an edge indexed under self.lb.
         # This will be used to set the upper bound of the path weights, since a path weight larger than this
@@ -116,7 +116,7 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
                 name=f"upperbound_u={u}_v={v}_i={i}",
             )
 
-    def encode_objective(self):
+    def __encode_objective(self):
 
         # We set the objective to minimize the sum of the path weights
         self.solver.set_objective(

@@ -30,26 +30,58 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         Parameters
         ----------
-        - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-        - flow_attr (str): The attribute name from where to get the flow values on the edges.
-        - num_paths (int): The number of paths to decompose in.
-        - weight_type (type, optional): The type of weights (int or float). Default is float.
-        - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
-        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
-            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
-        - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
-        - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
-        - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
-        - optimize_with_greedy (bool, optional): Whether to optimize with a greedy algorithm. Default is True.
-              If set to True, the model will first try to solve the problem with a greedy algorithm based on
-              always removing the path of maximum bottleneck. If the size of such greedy decomposition matches the width of the graph,
-              the greedy decomposition is optimal, and the model will return the greedy decomposition as the solution.
-              If the greedy decomposition does not match the width, then the model will proceed to solve the problem with the MILP model.
-        - threads (int, optional): Number of threads to use. Default is 4.
-        - time_limit (int, optional): Time limit for the solver in seconds. Default is 300.
-        - presolve (str, optional): Presolve option for the solver. Default is "on".
-        - log_to_console (str, optional): Whether to log solver output to console. Default is "false".
-        - external_solver (str, optional): External solver to use. Default is "highs".
+        - `G : nx.DiGraph`
+            
+            The input directed acyclic graph, as networkx DiGraph.
+
+        - `flow_attr : str`
+            
+            The attribute name from where to get the flow values on the edges.
+
+        - `num_paths: int`
+            
+            The number of paths to decompose in.
+
+        - `weight_type : type`, optional
+            
+            The type of weights (`int` or `float`). Default is `float`.
+
+        - `subpath_constraints : list`, optional
+            
+            List of subpath constraints. Default is an empty list. 
+            Each subpath constraint is a list of edges that must be covered by some solution path, according 
+            to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
+
+        - `subpath_constraints_coverage : float`, optional
+            
+            Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            
+            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+
+        - `subpath_constraints_coverage_length : float`, optional
+            
+            Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
+            and the coverage constraint is expressed in terms of the subpath constraint length. 
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+
+        - `edge_length_attr : str`, optional
+            
+            Attribute name for edge lengths. Default is `None`.
+
+        - `optimization_options : dict`, optional
+            
+            Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
+            This class also supports the optimization `"optimize_with_greedy": True` (this is the default value). This
+            will use a greedy algorithm to solve the problem, and if the number of paths returned by it equals a lowerbound on the solution size,
+            then we know the greedy solution is optimum, and it will use that. The lowerbound used currently is the edge-width of the graph,
+            meaning the minimum number of paths needed to cover all edges. This is a correct lowerbound because any flow decomposition must cover all edges, 
+            as they have non-zero flow.
+
+        - `solver_options : dict`, optional
+            
+            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
+
 
         Raises
         ----------
@@ -100,7 +132,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         greedy_solution_paths = None
         self.optimize_with_greedy = self.optimization_options.get("optimize_with_greedy", kFlowDecomp.optimize_with_greedy)
         if self.optimize_with_greedy:
-            if self.get_solution_with_greedy():
+            if self.__get_solution_with_greedy():
                 greedy_solution_paths = self.__solution["paths"]
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
@@ -126,9 +158,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class to encode the flow decomposition
-        self.encode_flow_decomposition()
+        self.__encode_flow_decomposition()
 
-    def encode_flow_decomposition(self):
+    def __encode_flow_decomposition(self):
         """
         Encodes the flow decomposition constraints for the given graph.
         This method sets up the path weight variables and the edge variables encoding
@@ -187,7 +219,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 name=f"10d_u={u}_v={v}_i={i}",
             )
 
-    def get_solution_with_greedy(self):
+    def __get_solution_with_greedy(self):
         """
         Attempts to find a solution using a greedy algorithm.
         This method first decomposes the problem using the maximum bottleneck approach.

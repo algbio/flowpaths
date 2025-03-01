@@ -8,7 +8,7 @@ The Minimum Flow Decomposition problem on a directed **acyclic** graph (*DAG*) i
 
 - **OUTPUT**: A minimum number $k$ of source-to-sink paths, $P_1,\dots,P_k$, with a weight $w_i$ associatd to each $P_i$, such that for every edge it holds that its flow value equals the sum of the weights of the paths going through the edge. Formally, 
 $$
-\sum_{(u,v) \in E}f(u,v) = \sum_{i \in \{1,\dots,k\} : (u,v) \in P_i }w_i.
+f(u,v) = \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i, ~~\forall (u,v) \in E.
 $$
 
 !!! info "Note"

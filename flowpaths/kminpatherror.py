@@ -28,6 +28,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
+        edge_error_scaling: dict = {},
         path_length_ranges: list = [],
         path_length_factors: list = [],
         additional_starts: list = [],
@@ -40,32 +41,98 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         Parameters
         ----------
-        - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-        - flow_attr (str): The attribute name from where to get the flow values on the edges.
-        - num_paths (int): The number of paths to decompose in.
-        - weight_type (type, optional): The type of the weights and slacks (int or float). Default is float.
-        - subpath_constraints (list, optional): List of subpath constraints. Default is an empty list.
-        - subpath_constraints_coverage (float, optional): Coverage fraction of the subpath constraints that must be covered by some solution paths. 
-            Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
-        - edges_to_ignore (list, optional): List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack. Default is an empty list.
-        - path_length_ranges (list, optional): List of ranges for the path lengths. Default is an empty list.
-        - error_scale_factor (list, optional): List of error scale factors, which scale the allowed difference between edge weight and path weights. Default is an empty list.
-        - additional_starts (list, optional): List of additional start nodes of the paths. Default is an empty list.
-        - additional_ends (list, optional): List of additional end nodes of the paths. Default is an empty list.
-        - optimize_with_safe_paths (bool, optional): Whether to optimize with safe paths. Default is True.
-        - optimize_with_safe_sequences (bool, optional): Whether to optimize with safe sequences. Default is False.
-        - optimize_with_safe_zero_edges (bool, optional): Whether to optimize with safe zero edges. Default is False.
-        - threads (int, optional): Number of threads to use. Default is 4.
-        - time_limit (int, optional): Time limit for the solver in seconds. Default is 300.
-        - presolve (str, optional): Presolve option for the solver. Default is "on".
-        - log_to_console (str, optional): Whether to log solver output to console. Default is "false".
-        - external_solver (str, optional): External solver to use. Default is "highs".
+        - `G: nx.DiGraph`
+            
+            The input directed acyclic graph, as networkx DiGraph.
+
+        - `flow_attr: str`
+            
+            The attribute name from where to get the flow values on the edges.
+
+        - `num_paths: int`
+            
+            The number of paths to decompose in.
+
+        - `weight_type: int | float`, optional
+            
+            The type of the weights and slacks (`int` or `float`). Default is `float`.
+
+         - `subpath_constraints : list`, optional
+            
+            List of subpath constraints. Default is an empty list. 
+            Each subpath constraint is a list of edges that must be covered by some solution path, according 
+            to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
+
+        - `subpath_constraints_coverage : float`, optional
+            
+            Coverage fraction of the subpath constraints that must be covered by some solution paths. 
+            
+            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+
+        - `subpath_constraints_coverage_length : float`, optional
+            
+            Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
+            and the coverage constraint is expressed in terms of the subpath constraint length. 
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+
+        - `edges_to_ignore: list`, optional
+            
+            List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack.
+            Default is an empty list.
+
+        - `error_scale_factor: dict`, optional
+            
+            List of error scale factors (in [0,1]), which scale the allowed difference between edge weight and path weights.
+            Default is an empty list. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
+            difference between the flow value of the edge and the sum of the weights of the paths going through the edge.
+
+        - `path_length_ranges: list`, optional
+            
+            List of ranges for the solution path lengths. Default is an empty list. If this list is not empty, the solution path slacks are scaled by the
+            corresponding factor in `path_length_factors` depending on the length of the solution path.
+
+            !!! example "Example"
+                If you pass
+                ```
+                path_length_ranges    = [[0, 15], [16, 18], [19, 20], [21, 30], [31, 100000]]
+                path_length_factors   = [ 1.6   ,  1.0    ,  1.3    ,  1.7    ,  1.0        ]    
+                ```
+                For example, if a path has length in the range [0, 15], its slack will be multiplied by 1.6 when comparing the 
+                flow value of the edge to the sum of path slacks, but this multiplier will have no effect on the objective function.
+                That is, in the objective function we still minimize the sum of path slacks, not the sum of scaled path slacks.
+        
+        - `path_length_factors: list`, optional
+
+            List of slack scale factors, based on the path lengths. Default is an empty list. If this list is not empty, the path slacks are scaled by the
+            corresponding factor in `path_length_factors` depending on the length of the path. See the above example.
+
+        - `additional_starts: list`, optional
+            
+            List of additional start nodes of the paths. Default is an empty list.
+
+        - `additional_ends: list`, optional
+            
+            List of additional end nodes of the paths. Default is an empty list.
+
+        - `optimization_options: dict`, optional
+
+            Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
+
+        - `solver_options: dict`, optional
+
+            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
 
         Raises
         ----------
-        - ValueError: If `weight_type` is not int or float.
-        - ValueError: If some edge does not have the flow attribute specified as `flow_attr`.
-        - ValueError: If the graph contains edges with negative (<0) flow values.
+        - `ValueError`
+            
+            - If `weight_type` is not int or float.
+            - If some edge does not have the flow attribute specified as `flow_attr`.
+            - If `path_length_factors` is not empty and `weight_type` is float.
+            - If the number of path length ranges is not equal to the number of error scale factors.
+            - If the edge error scaling factor is not between 0 and 1.
+            - If the graph contains edges with negative (<0) flow values.            
         """
 
         self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
@@ -90,6 +157,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.edge_length_attr = edge_length_attr
+        self.edge_error_scaling = edge_error_scaling
+        # Checking that every entry in self.edge_error_scaling is between 0 and 1
+        for key, value in self.edge_error_scaling.items():
+            if value < 0 or value > 1:
+                raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
+            
         self.path_length_ranges = path_length_ranges
         self.path_length_factors = path_length_factors
         if len(self.path_length_ranges) != len(self.path_length_factors):
@@ -132,12 +205,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self.encode_minpatherror_decomposition()
+        self.__encode_minpatherror_decomposition()
 
         # This method is called from the current class to add the objective function
-        self.encode_objective()
+        self.__encode_objective()
 
-    def encode_minpatherror_decomposition(self):
+    def __encode_minpatherror_decomposition(self):
         """
         Encodes the minimum path error decomposition variables and constraints for the optimization problem.
         """
@@ -228,6 +301,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 continue
 
             f_u_v = data[self.flow_attr]
+            edge_error_scale_u_v = self.edge_error_scaling.get((u, v), 1)
 
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
@@ -257,19 +331,24 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                     name=f"12_u={u}_v={v}_i={i}",
                 )
 
-            # We encode that abs(f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k))
+            # We encode that 
+            #   abs(f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+            #   * edge_error_scale_u_v 
+            #   <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k))
             self.solver.add_constraint(
-                f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))
+                (f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+                * edge_error_scale_u_v
                 <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
                 name=f"9aa_u={u}_v={v}_i={i}",
             )
             self.solver.add_constraint(
-                f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))
+                (f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+                * edge_error_scale_u_v
                 >= -sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
 
-    def encode_objective(self):
+    def __encode_objective(self):
 
         self.solver.set_objective(
             sum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
@@ -282,6 +361,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
         Otherwise, it checks if the problem has been solved, computes the solution paths, weights, slacks
         and caches the solution.
+
+        !!! warning "Warning"
+            Make sure you called `.solve()` before calling this method.
 
         Returns
         -------
@@ -335,21 +417,24 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
     def is_valid_solution(self, tolerance=0.001):
         """
-        Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
+        Checks if the solution is valid by checking of the weighted paths and their slacks satisfy the constraints of the problem. 
+
+        !!! warning "Warning"
+            Make sure you called `.solve()` before calling this method.
 
         Raises
         ------
-        - ValueError: If the solution is not available (i.e., self.solution is None).
+        - `ValueError`: If the solution is not available.
 
         Returns
         -------
-        - bool: True if the solution is valid, False otherwise.
+        - `bool`: `True` if the solution is valid, `False` otherwise.
 
         Notes
         -------
-        - get_solution() must be called before this method.
+        - `get_solution()` must be called before this method.
         - The solution is considered valid if the flow from paths is equal
-            (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
+            (up to `tolerance * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
         if self.__solution is None:
@@ -410,7 +495,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             for i in range(self.k):
                 # Checking which interval the path length is in,
                 # and then checking if the error scale factor is correctly encoded, 
-                # within tolerance to self.error_scale_factor[index]
                 for index, interval in enumerate(self.path_length_ranges):
                     if path_length_sol[i] >= interval[0] and path_length_sol[i] <= interval[1]:
                         if abs(path_slack_scaled_sol[i] - self.path_length_factors[index]) > tolerance:
