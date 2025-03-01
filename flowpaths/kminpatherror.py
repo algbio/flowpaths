@@ -81,10 +81,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack.
             Default is an empty list.
 
-        - `error_scale_factor: dict`, optional
+        - `edge_error_scaling: dict`, optional
             
-            List of error scale factors (in [0,1]), which scale the allowed difference between edge weight and path weights.
-            Default is an empty list. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
+            Dictionary `edge: factor` storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge weight and path weights.
+            Default is an empty dict. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
             difference between the flow value of the edge and the sum of the weights of the paths going through the edge.
 
         - `path_length_ranges: list`, optional
@@ -370,7 +370,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         - `solution: dict`
         
             A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`) and slacks (key `"slacks"`). 
-            If `path_error_scale_factors` is not empty, it also contains the scaled slacks (key `"scaled_slacks"`).
+            If `path_length_factors` is not empty, it also contains the scaled slacks (key `"scaled_slacks"`).
 
         Raises
         -------

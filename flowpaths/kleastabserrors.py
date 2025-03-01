@@ -21,6 +21,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
+        edge_error_scaling: dict = {},
         additional_starts: list = [],
         additional_ends: list = [],
         optimization_options: dict = None,
@@ -70,6 +71,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             
             List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack.
             Default is an empty list.
+
+        - `edge_error_scaling: dict`, optional
+            
+            Dictionary `edge: factor` storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge weight and path weights.
+            Default is an empty dict. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
+            difference between the flow value of the edge and the sum of the weights of the paths going through the edge.
         
         - `additional_starts: list`, optional
             
@@ -88,10 +95,13 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
 
         Raises
-        ----------
-        - ValueError: If `weight_type` is not int or float.
-        - ValueError: If some edge does not have the flow attribute specified as `flow_attr`.
-        - ValueError: If the graph contains edges with negative (<0) flow values.
+        ------
+        - `ValueError`
+            
+            - If `weight_type` is not `int` or `float`.
+            - If the edge error scaling factor is not in [0,1].
+            - If the flow attribute `flow_attr` is not specified in some edge.
+            - If the graph contains edges with negative flow values.
         """
 
         self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
@@ -103,6 +113,11 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.weight_type = weight_type
 
         self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
+        # Checking that every entry in self.edge_error_scaling is between 0 and 1
+        self.edge_error_scaling = edge_error_scaling
+        for key, value in self.edge_error_scaling.items():
+            if value < 0 or value > 1:
+                raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
 
         self.flow_attr = flow_attr
         self.w_max = num_paths * self.weight_type(
@@ -220,7 +235,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
     def __encode_objective(self):
 
         self.solver.set_objective(
-            sum(self.edge_errors_vars[(u, v)] for (u,v) in self.edge_indexes_basic), 
+            sum(
+                self.edge_errors_vars[(u, v)] 
+                * self.edge_error_scaling.get((u, v), 1)
+                for (u,v) in self.edge_indexes_basic), 
             sense="minimize"
         )
 
