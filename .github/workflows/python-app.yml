@@ -6,8 +6,14 @@ name: Python application
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'flowpaths/**'
+      - 'tests/**'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'flowpaths/**'
+      - 'tests/**'
 
 permissions:
   contents: read
