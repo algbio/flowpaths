@@ -41,11 +41,11 @@ def main():
     mfd_model_slow.solve()
     process_solution(mfd_model_slow)
 
-    kfd_model_3 = fp.kFlowDecomp(graph, flow_attr="flow", num_paths=3)
+    kfd_model_3 = fp.kFlowDecomp(graph, flow_attr="flow", k=3)
     kfd_model_3.solve()
     process_solution(kfd_model_3)
 
-    kfd_model_4 = fp.kFlowDecomp(graph, flow_attr="flow", num_paths=4)
+    kfd_model_4 = fp.kFlowDecomp(graph, flow_attr="flow", k=4)
     kfd_model_4.solve()
     process_solution(kfd_model_4)
 

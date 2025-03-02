@@ -21,7 +21,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self,
         G: nx.DiGraph,
         flow_attr: str,
-        num_paths: int,
+        k: int,
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
@@ -49,7 +49,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             
             The attribute name from where to get the flow values on the edges.
 
-        - `num_paths: int`
+        - `k: int`
             
             The number of paths to decompose in.
 
@@ -146,13 +146,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
 
         self.flow_attr = flow_attr
-        self.w_max = num_paths * self.weight_type(
+        self.w_max = k * self.weight_type(
             self.G.get_max_flow_value_and_check_positive_flow(
                 flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
             )
         )
 
-        self.k = num_paths
+        self.k = k
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
@@ -180,6 +180,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.path_slacks_sol = None
         self.path_slacks_scaled_sol = None
         self.__solution = None
+        self.__k_lowerbound = None
 
         self.solve_statistics = {}
 
@@ -191,7 +192,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
             self.G, 
-            num_paths, 
+            k, 
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
@@ -526,5 +527,22 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.check_is_solved()
 
+        if self.__solution is None:
+            self.get_solution()
+
         # sum of slacks
         return sum(self.__solution["slacks"])
+    
+    def get_lowerbound_k(self):
+
+        if self.__k_lowerbound != None:
+            return self.__k_lowerbound
+
+        weight_function = dict()
+        for e in self.G.edges():
+            if e not in self.edges_to_ignore:
+                weight_function[e] = 1
+
+        self.__k_lowerbound = self.G.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+
+        return self.__k_lowerbound

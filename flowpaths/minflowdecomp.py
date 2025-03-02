@@ -119,7 +119,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             fd_model = kflowdecomp.kFlowDecomp(
                 G=self.G,
                 flow_attr=self.flow_attr,
-                num_paths=i,
+                k=i,
                 weight_type=self.weight_type,
                 subpath_constraints=self.subpath_constraints,
                 subpath_constraints_coverage=self.subpath_constraints_coverage,

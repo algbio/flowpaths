@@ -16,7 +16,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self,
         G: nx.DiGraph,
         flow_attr: str,
-        num_paths: int,
+        k: int,
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
@@ -38,7 +38,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             
             The attribute name from where to get the flow values on the edges.
 
-        - `num_paths: int`
+        - `k: int`
             
             The number of paths to decompose in.
 
@@ -113,7 +113,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             )
         )
 
-        self.k = num_paths
+        self.k = k
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
@@ -140,7 +140,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
             self.G, 
-            num_paths, 
+            k, 
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
@@ -348,3 +348,17 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.check_is_solved()
 
         return self.num_paths
+    
+    def get_lowerbound_k(self):
+
+        if self.__k_lowerbound != None:
+            return self.__k_lowerbound
+
+        weight_function = dict()
+        for e in self.G.edges():
+            if e not in self.edges_to_ignore:
+                weight_function[e] = 1
+
+        self.__k_lowerbound = self.G.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+
+        return self.__k_lowerbound

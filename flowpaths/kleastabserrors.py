@@ -14,7 +14,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self,
         G: nx.DiGraph,
         flow_attr: str,
-        num_paths: int,
+        k: int,
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
@@ -41,7 +41,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             
             The attribute name from where to get the flow values on the edges.
 
-        - `num_paths: int`
+        - `k: int`
             
             The number of paths to decompose in.
 
@@ -127,13 +127,13 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
 
         self.flow_attr = flow_attr
-        self.w_max = num_paths * self.weight_type(
+        self.w_max = k * self.weight_type(
             self.G.get_max_flow_value_and_check_positive_flow(
                 flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
             )
         )
 
-        self.k = num_paths
+        self.k = k
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
@@ -165,7 +165,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
             self.G, 
-            num_paths, 
+            k, 
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
@@ -357,3 +357,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         # sum of edge errors
         return sum(self.edge_errors_sol[(u, v)] for (u,v) in self.edge_indexes_basic)
+    
+    def get_lowerbound_k(self):
+
+        return 1

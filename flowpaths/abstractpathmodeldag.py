@@ -562,6 +562,14 @@ class AbstractPathModelDAG(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_lowerbound_k(self):
+        """
+        Implement this class in the child class to return a lower bound on the number of solution paths to the model.
+        If you have no lower bound, you should implement this method to return 1.
+        """
+        pass
+
     def get_solution_paths(self) -> list:
         """
         Retrieves the solution paths from the graph.

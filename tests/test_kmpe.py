@@ -62,7 +62,7 @@ class TestkMinPathError(unittest.TestCase):
                 kmpe_model = fp.kMinPathError(
                     graph,
                     flow_attr="flow",
-                    num_paths=num_paths,
+                    k=num_paths,
                     weight_type=settings[0],
                     optimization_options=optimization_options,
                     solver_options=solver_options,

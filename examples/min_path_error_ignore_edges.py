@@ -13,7 +13,7 @@ graph.add_edge("c", "t", flow=70)
 
 graph.add_edge("a", "d", flow=1)
 
-mpe_model = fp.kMinPathError(graph, flow_attr="flow", num_paths=4, weight_type=int)
+mpe_model = fp.kMinPathError(graph, flow_attr="flow", k=4, weight_type=int)
 mpe_model.solve()
 if mpe_model.is_solved():
     print(mpe_model.get_solution())
@@ -21,7 +21,7 @@ if mpe_model.is_solved():
 mpe_model_2 = fp.kMinPathError(
     graph, 
     flow_attr="flow", 
-    num_paths=3, 
+    k=3, 
     weight_type=int,
     edges_to_ignore=[("a", "d")])
 mpe_model_2.solve()

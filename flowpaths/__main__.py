@@ -70,7 +70,7 @@ def main():
         graph,
         flow_attr="flow",
         weight_type=float,
-        num_paths=3,
+        k=3,
         optimization_options={
             "optimize_with_safe_paths": True,
             "optimize_with_safe_sequences": False,
@@ -86,7 +86,7 @@ def main():
         graph,
         flow_attr="flow",
         weight_type=int,
-        num_paths=3,
+        k=3,
         edges_to_ignore=[("a", "c")],
         optimization_options={
             "optimize_with_safe_paths": False,

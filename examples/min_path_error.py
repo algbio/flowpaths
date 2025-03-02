@@ -17,7 +17,7 @@ def main():
     # We create a Minimum Path Error solver with default settings, 
     # by specifying that the flow value of each edge is in the attribute `flow` of the edges,
     # and that the number of paths to consider is 3.
-    mpe_model = fp.kMinPathError(graph, flow_attr="flow", num_paths=3, weight_type=float)
+    mpe_model = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=float)
 
     # We solve it
     mpe_model.solve()
@@ -28,14 +28,14 @@ def main():
     edges_to_ignore = [("a", "c")]
     # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
     # when computing the path slacks (i.e. edge errors)
-    mpe_model_2 = fp.kMinPathError(graph, flow_attr="flow", num_paths=3, weight_type=int, edges_to_ignore=edges_to_ignore, edge_length_attr="length")
+    mpe_model_2 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, edges_to_ignore=edges_to_ignore, edge_length_attr="length")
     mpe_model_2.solve()
     process_solution(mpe_model_2)
 
     edges_to_ignore = [("a", "c")]
     # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
     # when computing the path slacks (i.e. edge errors)
-    mpe_model_3 = fp.kMinPathError(graph, flow_attr="flow", num_paths=3, weight_type=int, edges_to_ignore=edges_to_ignore)
+    mpe_model_3 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, edges_to_ignore=edges_to_ignore)
     mpe_model_3.solve()
     process_solution(mpe_model_3)
 
