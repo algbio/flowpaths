@@ -1,5 +1,9 @@
 # k-Minimum Path Error
 
+!!! info inline end "See also"
+
+    - [An Optimization Routine for the Number k of Paths](numpathsoptimization.md)
+
 In the k-Minimum Path Error problem tries to model problems where the weight along a path is not constant. As such, edges that appear in more solution paths will be allowed to have a higher error (i.e. difference betweehn their input weight/flow value and the sum of the weights of the paths that use them). More formally, path now receive also a *slack*, which intuitively models how much the weight along a path can vary. Ideally, we can decompose the weighted graphs with $k$ paths that overall have small slack values.
 
 ## 1. Definition

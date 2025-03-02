@@ -1,6 +1,11 @@
+!!! info inline end "See also"
+
+    - [An Optimization Routine for the Number k of Paths](numpathsoptimization.md)
+
 # k-Least Absolute Errors
 
 ## 1. Definition
+
 
 The k-Least Absolute Errors problem on a directed **acyclic** graph (*DAG*) is defined as follows:
 
