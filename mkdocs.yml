@@ -15,6 +15,7 @@ nav:
       - Subpath constraints: subpath-constraints.md
       - Ignoring edges: ignoring-edges.md
       - Additional start/end nodes: additional-start-end-nodes.md
+      - Optimization Routine for k: numpathsoptimization.md
   - Developing new models:
     - Abstract Path Model: abstract-path-model.md
     - Solver Wrapper: solver-wrapper.md
