@@ -84,9 +84,6 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         - If the graph is not acyclic.
         """
 
-        stG = stdigraph.stDiGraph(G)
-        self.lowerbound = stG.get_width()
-
         self.G = G
         self.flow_attr = flow_attr
         self.weight_type = weight_type
@@ -99,6 +96,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         self.solve_statistics = {}
         self.__solution = None
+        self.__lowerbound = None
 
     def solve(self) -> bool:
         """
@@ -115,7 +113,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             This overloads the `solve()` method from `AbstractPathModelDAG` class.
         """
         start_time = time.time()
-        for i in range(self.lowerbound, self.G.number_of_edges()):
+        for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
             fd_model = kflowdecomp.kFlowDecomp(
                 G=self.G,
                 flow_attr=self.flow_attr,
@@ -168,6 +166,16 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
     def is_valid_solution(self) -> bool:
         return self.fd_model.is_valid_solution()
+    
+    def get_lowerbound_k(self):
+
+        if self.__lowerbound != None:
+            return self.__lowerbound
+        
+        stG = stdigraph.stDiGraph(self.G)
+        self.__lowerbound = stG.get_width()
+
+        return self.__lowerbound
 
     def draw_solution(self, show_flow_attr=True):
         self.fd_model.draw_solution(show_flow_attr)

@@ -107,13 +107,13 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
             # That is, the sum of the pi_vars for edge (u,v) is at least the lowerbound of the edge,
             self.solver.add_constraint(
                 sum(self.pi_vars[(u, v, i)] for i in range(self.k)) >= data[self.lb],
-                name=f"lowerbound_u={u}_v={v}_i={i}",
+                name=f"lowerbound_u={u}_v={v}",
             )
 
             # and at most the upperbound of the edge.
             self.solver.add_constraint(
                 sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= data[self.ub],
-                name=f"upperbound_u={u}_v={v}_i={i}",
+                name=f"upperbound_u={u}_v={v}",
             )
 
     def __encode_objective(self):
@@ -153,6 +153,15 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         # namely those paths that are guaranteed to appear as subpath in some path of any optimal solution.
         
         return self.solver.get_objective_value()
+    
+    def get_lowerbound_k(self):
+        # AbstractPathModelDAG requires implementing a method to get the lowerbound for the number of paths.
+        # A possible implemenattion is as followed
+        # We know that each edge with lb > 0 must be covered by at least one path.
+        # Therefore, a lowerbound is the minimum number of paths needed to cover all the edges with lb > 0.
+
+        weight_function = {(u,v): 1 for u, v, data in self.G.edges(data=True) if data.get(self.lb, 0 ) > 0}
+        return self.G.compute_max_edge_antichain(weight_function=weight_function)
 
 if __name__ == "__main__":
     # Create a simple graph

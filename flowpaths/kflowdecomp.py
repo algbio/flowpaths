@@ -124,7 +124,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         self.path_weights_sol = None
         self.__solution = None
-
+        self.__lowerbound_k = None
         
         self.solve_statistics = {}
         self.optimization_options = optimization_options or {}
@@ -354,14 +354,14 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
     
     def get_lowerbound_k(self):
 
-        if self.__k_lowerbound != None:
-            return self.__k_lowerbound
+        if self.__lowerbound_k != None:
+            return self.__lowerbound_k
 
         weight_function = dict()
         for e in self.G.edges():
             if e not in self.edges_to_ignore:
                 weight_function[e] = 1
 
-        self.__k_lowerbound = self.G.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+        self.__lowerbound_k = self.G.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
 
-        return self.__k_lowerbound
+        return self.__lowerbound_k
