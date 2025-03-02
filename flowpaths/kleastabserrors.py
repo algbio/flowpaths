@@ -26,6 +26,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         additional_ends: list = [],
         optimization_options: dict = None,
         solver_options: dict = None,
+        trusted_edges_for_safety: list = None,
     ):
         """
         Initialize the Least Absolute Errors model for a given number of paths.
@@ -94,6 +95,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
             Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
 
+        - `trusted_edges_for_safety: list`, optional
+
+            List of edges that are trusted to appear in an optimal solution. Default is `None`. 
+            If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
+            See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
+
         Raises
         ------
         - `ValueError`
@@ -144,9 +151,16 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.solve_statistics = {}
 
         self.optimization_options = optimization_options or {}        
-        self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
-            flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
-        ).difference(self.edges_to_ignore)
+        
+        # If we get subpath constraints, and the coverage fraction is 1
+        # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
+        self.optimization_options["trusted_edges_for_safety"] = trusted_edges_for_safety
+        if self.subpath_constraints is not None:
+            if (self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length is None) or \
+                self.subpath_constraints_coverage_length == 1:
+                for constraint in self.subpath_constraints:
+                    self.optimization_options["trusted_edges_for_safety"].update(constraint)
+
 
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
