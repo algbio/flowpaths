@@ -198,7 +198,7 @@ class AbstractPathModelDAG(ABC):
 
 
         self.safe_lists = None
-        if self.optimize_with_safe_paths and not self.is_solved():
+        if self.optimize_with_safe_paths and not self.is_solved() and self.trusted_edges_for_safety is not None:
             start_time = time.time()
             self.safe_lists = safetypathcovers.safe_paths(
                 self.G,
