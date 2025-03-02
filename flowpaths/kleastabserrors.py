@@ -154,10 +154,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         
         # If we get subpath constraints, and the coverage fraction is 1
         # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
-        self.optimization_options["trusted_edges_for_safety"] = trusted_edges_for_safety
+        self.optimization_options["trusted_edges_for_safety"] = set(trusted_edges_for_safety or [])
         if self.subpath_constraints is not None:
-            if (self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length is None) or \
-                self.subpath_constraints_coverage_length == 1:
+            if (self.subpath_constraints_coverage == 1.0 and self.subpath_constraints_coverage_length is None) \
+                or self.subpath_constraints_coverage_length == 1:
                 for constraint in self.subpath_constraints:
                     self.optimization_options["trusted_edges_for_safety"].update(constraint)
 

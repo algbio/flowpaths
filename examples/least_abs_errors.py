@@ -50,6 +50,19 @@ def main():
     lae_model_3.solve()
     process_solution(lae_model_3)
 
+    # We solve again, by also passing subpath_constraints. Since by default we have coverage 1, their edges 
+    # will be added by the class to trusted_edges_for_safety, so that safety optimizations can apply to them
+    lae_model_4 = fp.kLeastAbsErrors(
+        graph, 
+        flow_attr="flow", 
+        num_paths=3, 
+        weight_type=float, 
+        subpath_constraints=[[("a", "b")]],
+        edges_to_ignore=[("a", "c")],
+        )
+    lae_model_4.solve()
+    process_solution(lae_model_4)
+
 def process_solution(model: fp.kLeastAbsErrors):
     if model.is_solved():
         print(model.get_solution())
