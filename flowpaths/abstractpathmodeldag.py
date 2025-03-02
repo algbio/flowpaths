@@ -441,7 +441,15 @@ class AbstractPathModelDAG(ABC):
                                 name=f"safe_list_zero_edge_u={u}_v={v}_i={i}",
                             )
 
-    def __get_paths_to_fix_from_safe_lists(self):
+    def __get_paths_to_fix_from_safe_lists(self) -> list:
+        
+        # Returns the paths to fix based on the safe lists.
+        # The method finds the longest safe list for each edge and returns the paths to fix based on the longest safe list.
+
+        # IF we have no safe lists, we return an empty list
+        if self.safe_lists is None or len(self.safe_lists) == 0:
+            return []
+
         longest_safe_list = dict()
         for i, safe_list in enumerate(self.safe_lists):
             for edge in safe_list:
