@@ -1,5 +1,8 @@
-#  The _flowpaths_ Python Package
+![PyPI - Version](https://img.shields.io/pypi/v/flowpaths)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/algbio/flowpaths/dx3-tests.yml)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/flowpaths)
 
+#  The _flowpaths_ Python Package
 
 This package implements various solvers for decomposing a weighted directed acyclic graph (DAG) into weighted paths, based on (Mixed) Integer Linear Programming ((M)ILP) formulations. It also supports the easy creation of solvers for new decomposition models.
 
