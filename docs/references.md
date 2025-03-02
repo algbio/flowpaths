@@ -10,7 +10,7 @@ RECOMB 2022 - 26th Annual International Conference on Research in Computational 
 [**Efficient Minimum Flow Decomposition via Integer Linear Programming**](https://doi.org/10.1089/cmb.2022.0257),
 Journal of Computational Biology 29(11), 1--16, 2022
 
-The flow decomposition with subpath constraints appeared in:
+The flow decomposition with subpath constraints problem was formalized in:
 
 1. Lucia Williams, Alexandru I. Tomescu, Brendan Mumey
 [**Flow Decomposition with Subpath Constraints**](https://doi.org/10.1109/tcbb.2022.3147697),
