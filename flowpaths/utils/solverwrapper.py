@@ -100,21 +100,13 @@ class SolverWrapper:
                 "integer": highspy.HighsVarType.kInteger,
                 "continuous": highspy.HighsVarType.kContinuous,
             }
-            if len(indexes) == 1: # if a single variable
-                return self.solver.addVariable(
-                    lb=lb,
-                    ub=ub,
-                    type=var_type_map[var_type],
-                    name=name_prefix,
-                )
-            else:
-                return self.solver.addVariables(
-                    indexes,
-                    lb=lb,
-                    ub=ub,
-                    type=var_type_map[var_type],
-                    name_prefix=name_prefix,
-                )
+            return self.solver.addVariables(
+                indexes,
+                lb=lb,
+                ub=ub,
+                type=var_type_map[var_type],
+                name_prefix=name_prefix,
+            )
         elif self.external_solver == "gurobi":
             import gurobipy
 
@@ -123,21 +115,13 @@ class SolverWrapper:
                 "continuous": gurobipy.GRB.CONTINUOUS,
             }
             vars = {}
-            if len(indexes) == 1: # if a single variable
-                vars[0] = self.solver.addVar(
+            for index in indexes:
+                vars[index] = self.solver.addVar(
                     lb=lb,
                     ub=ub,
                     vtype=var_type_map[var_type],
-                    name=name_prefix,
+                    name=f"{name_prefix}{index}",
                 )
-            else:
-                for index in indexes:
-                    vars[index] = self.solver.addVar(
-                        lb=lb,
-                        ub=ub,
-                        vtype=var_type_map[var_type],
-                        name=f"{name_prefix}{index}",
-                    )
             self.solver.update()
             return vars
 
