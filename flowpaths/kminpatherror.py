@@ -162,6 +162,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         for key, value in self.edge_error_scaling.items():
             if value < 0 or value > 1:
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
+            if value == 0:
+                self.edges_to_ignore.add(key)
             
         self.path_length_ranges = path_length_ranges
         self.path_length_factors = path_length_factors

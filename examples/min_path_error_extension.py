@@ -73,6 +73,18 @@ def main():
     print(mpe_model_5.solver.get_model_status())
     process_solution(mpe_model_5)
 
+    mpe_model_6 = fp.kMinPathError(
+        graph, 
+        flow_attr="flow", 
+        num_paths=3, 
+        weight_type=float, 
+        edge_length_attr="length", 
+        edge_error_scaling={("a", "c"): 0},
+        )  
+    mpe_model_6.solve()
+    print(mpe_model_6.solver.get_model_status())
+    process_solution(mpe_model_6)
+
 
 def process_solution(model: fp.kMinPathError):
     if model.is_solved():
