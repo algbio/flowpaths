@@ -347,7 +347,10 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         
         self.check_is_solved()
 
-        return self.num_paths
+        if self.__solution is None:
+            self.get_solution()
+
+        return self.k
     
     def get_lowerbound_k(self):
 

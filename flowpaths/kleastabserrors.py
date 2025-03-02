@@ -355,6 +355,9 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         self.check_is_solved()
 
+        if self.__solution is None:
+            self.get_solution()
+
         # sum of edge errors
         return sum(self.edge_errors_sol[(u, v)] for (u,v) in self.edge_indexes_basic)
     
