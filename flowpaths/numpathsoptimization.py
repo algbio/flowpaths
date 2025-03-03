@@ -104,19 +104,18 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         """
         Attempts to solve the optimization problem by iterating over a range of path counts, creating and
         solving a model for each count until one of the stopping conditions is met.
-        The method iterates from the maximum between the minimum allowed paths and a computed lower bound (via
-        get_lowerbound_k()) to the maximum allowed paths. For each iteration:
+        The method iterates from the maximum between the minimum allowed paths and a lower bound (via
+        `get_lowerbound_k()` of the model) to the maximum allowed paths. For each iteration:
 
-        - Creates a model instance with the current number of paths (k).
-        - Solves the model.
-        - Checks if the model has been successfully solved.
+        - Creates a model instance with the current number of paths (`k`).
+        - Solves the model, and checks if it has been successfully solved.
         - Applies various stopping criteria including:
 
-            - stop_on_first_feasible: stops at the first feasible solution.
-            - stop_on_delta_abs: stops if the absolute change in the objective value between iterations is
-                less than or equal to a provided threshold.
-            - stop_on_delta_rel: stops if the relative change in the objective value between iterations is
-                less than or equal to a provided threshold.
+            - `stop_on_first_feasible`: stops at the first feasible solution.
+            - `stop_on_delta_abs`: stops if the absolute change in the objective value between iterations is
+                less than or equal to the `stop_on_delta_abs` value.
+            - `stop_on_delta_rel`: stops if the relative change in the objective value between iterations is
+                less than or equal to the `stop_on_delta_rel` value.
 
         - Stops if the elapsed time exceeds the designated time limit.
 
@@ -128,7 +127,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         - If any of the stopping criteria (feasible or delta conditions) were satisfied, the status is set as solved.
 
         If a valid solution is found, it stores the solution, updates solve statistics and the model,
-        marks the problem as solved, and returns True. Otherwise, it returns False.
+        marks the problem as solved, and returns `True`. Otherwise, it returns `False`.
         
         Returns
         -------
@@ -145,10 +144,8 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         found_feasible = False
 
         for k in range(max(self.min_num_paths,self.get_lowerbound_k()), self.max_num_paths+1):
-            print("num_paths", k)
             # Create the model
             model = self.model_type(**self.kwargs, k=k)
-            print("model", model)
             model.solve()
             if model.is_solved():
                 found_feasible = True
@@ -209,6 +206,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
         - `exception` If model is not solved.
         """
+
         self.check_is_solved()
         return self.__solution
     
@@ -219,8 +217,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
         self.check_is_solved()
 
-        # Number of paths
-        return len(self.__solution["paths"])
+        return self.model.get_objective_value()
 
     def is_valid_solution(self) -> bool:
         """
