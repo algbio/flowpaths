@@ -22,6 +22,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
+        edges_to_ignore: list = [],
         optimization_options: dict = None,
         solver_options: dict = None,
     ):
@@ -69,6 +70,11 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             
             Attribute name for edge lengths. Default is `None`.
 
+        - `edges_to_ignore : list`, optional
+
+            List of edges to ignore when adding constrains on flow explanation by the weighted paths.
+            Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
+
         - `optimization_options : dict`, optional
             
             Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
@@ -100,12 +106,13 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.weight_type = weight_type
 
         # Check requirements on input graph:
-        # Check flow conservation
-        if not gu.check_flow_conservation(G, flow_attr):
-            raise ValueError("The graph G does not satisfy flow conservation.")
+        # Check flow conservation only if there are no edges to ignore
+        if len(edges_to_ignore) == 0:
+            if not gu.check_flow_conservation(G, flow_attr):
+                raise ValueError("The graph G does not satisfy flow conservation.")
 
         # Check that the flow is positive and get max flow value
-        self.edges_to_ignore = self.G.source_sink_edges
+        self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore)
         self.flow_attr = flow_attr
         self.w_max = self.weight_type(
             self.G.get_max_flow_value_and_check_positive_flow(
@@ -131,7 +138,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         greedy_solution_paths = None
         self.optimize_with_greedy = self.optimization_options.get("optimize_with_greedy", kFlowDecomp.optimize_with_greedy)
-        if self.optimize_with_greedy:
+        
+        # We can apply the greedy algorithm only if there are no edges to ignore (in the original input graph)
+        if self.optimize_with_greedy and len(edges_to_ignore) == 0:
             if self.__get_solution_with_greedy():
                 greedy_solution_paths = self.__solution["paths"]
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths

@@ -79,7 +79,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         - `edges_to_ignore: list`, optional
             
             List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack.
-            Default is an empty list.
+            Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
         - `edge_error_scaling: dict`, optional
             

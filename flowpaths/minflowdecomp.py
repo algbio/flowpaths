@@ -17,6 +17,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
+        edges_to_ignore: list = [],
         optimization_options: dict = None,
         solver_options: dict = None,
     ):
@@ -60,6 +61,11 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             
             Attribute name for edge lengths. Default is `None`.
 
+        - `edges_to_ignore : list`, optional
+
+            List of edges to ignore when adding constrains on flow explanation by the weighted paths and their slack.
+            Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
+
         - `optimization_options : dict`, optional
             
             Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
@@ -91,6 +97,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.edge_length_attr = edge_length_attr
+        self.edges_to_ignore = edges_to_ignore
         self.optimization_options = optimization_options
         self.solver_options = solver_options
 
@@ -123,6 +130,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 subpath_constraints_coverage=self.subpath_constraints_coverage,
                 subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
                 edge_length_attr=self.edge_length_attr,
+                edges_to_ignore=self.edges_to_ignore,
                 optimization_options=self.optimization_options,
                 solver_options=self.solver_options,
             )
