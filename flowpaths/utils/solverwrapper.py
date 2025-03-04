@@ -205,7 +205,7 @@ class SolverWrapper:
 
         # We encode integer_var == sum(binary_vars[i] * 2^i)
         self.add_constraint(
-            sum(binary_vars[i] * 2**i for i in bits) 
+            self.quicksum(binary_vars[i] * 2**i for i in bits) 
             == integer_var, 
             name=f"{name}_int_eq"
         )
@@ -231,10 +231,18 @@ class SolverWrapper:
 
         # We encode product_var == sum_{i in bits} comp_vars[i] * 2^i
         self.add_constraint(
-            sum(comp_vars[i] * 2**i for i in bits) 
+            self.quicksum(comp_vars[i] * 2**i for i in bits) 
             == product_var, 
             name=f"{name}_prod_eq"
         )
+
+    def quicksum(self, expr):
+        if self.external_solver == "highs":
+            return self.solver.qsum(expr)
+        elif self.external_solver == "gurobi":
+            import gurobipy
+
+            return gurobipy.quicksum(expr)
 
     def set_objective(self, expr, sense="minimize"):
 
@@ -445,7 +453,7 @@ class SolverWrapper:
         )
 
         # Enforce that exactly one piece is active: sum_i z[i] == 1.
-        self.add_constraint(sum(z[i] for i in range(pieces)) == 1, name=f"sum_z_{name_prefix}")
+        self.add_constraint(self.quicksum(z[i] for i in range(pieces)) == 1, name=f"sum_z_{name_prefix}")
 
         # For each piece i, add the constraints:
         for i in range(pieces):

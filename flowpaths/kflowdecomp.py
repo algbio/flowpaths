@@ -206,7 +206,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 )
 
             self.solver.add_constraint(
-                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
                 name=f"10d_u={u}_v={v}_i={i}",
             )
 

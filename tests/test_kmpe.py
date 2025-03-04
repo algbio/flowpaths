@@ -2,7 +2,7 @@ import unittest
 import itertools
 import flowpaths as fp
 
-# Run as `python -m tests.test_mfd` in the `flowpaths` directory
+# Run as `python -m tests.test_kmpe` in the `flowpaths` directory
 
 
 class TestkMinPathError(unittest.TestCase):

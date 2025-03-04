@@ -336,22 +336,22 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             #   * edge_error_scale_u_v 
             #   <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k))
             self.solver.add_constraint(
-                (f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+                (f_u_v - self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
                 * edge_error_scaling_u_v
-                <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                <= self.solver.quicksum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
                 name=f"9aa_u={u}_v={v}_i={i}",
             )
             self.solver.add_constraint(
-                (f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+                (f_u_v - self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
                 * edge_error_scaling_u_v
-                >= -sum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                >= -self.solver.quicksum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
 
     def __encode_objective(self):
 
         self.solver.set_objective(
-            sum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
+            self.solver.quicksum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
         )
 
     def get_solution(self):

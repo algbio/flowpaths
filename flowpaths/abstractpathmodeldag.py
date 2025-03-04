@@ -291,20 +291,20 @@ class AbstractPathModelDAG(ABC):
 
         for i in range(self.k):
             self.solver.add_constraint(
-                sum(
+                self.solver.quicksum(
                     self.edge_vars[(self.G.source, v, i)]
                     for v in self.G.successors(self.G.source)
                 )
                 == 1,
-                name="10a_i={}".format(i),
+                name=f"10a_i={i}",
             )
             self.solver.add_constraint(
-                sum(
+                self.solver.quicksum(
                     self.edge_vars[(u, self.G.sink, i)]
                     for u in self.G.predecessors(self.G.sink)
                 )
                 == 1,
-                name="10b_i={}".format(i),
+                name=f"10b_i={i}",
             )
 
         for i in range(self.k):
@@ -312,10 +312,10 @@ class AbstractPathModelDAG(ABC):
                 if v == self.G.source or v == self.G.sink:
                     continue
                 self.solver.add_constraint(
-                    sum(self.edge_vars[(u, v, i)] for u in self.G.predecessors(v))
-                    - sum(self.edge_vars[(v, w, i)] for w in self.G.successors(v))
+                    self.solver.quicksum(self.edge_vars[(u, v, i)] for u in self.G.predecessors(v))
+                    - self.solver.quicksum(self.edge_vars[(v, w, i)] for w in self.G.successors(v))
                     == 0,
-                    "10c_v={}_i={}".format(v, i),
+                    f"10c_v={v}_i={i}",
                 )
 
         ################################
@@ -340,10 +340,10 @@ class AbstractPathModelDAG(ABC):
                         # And the fraction of edges that we need to cover is self.subpath_constraints_coverage
                         coverage_fraction = self.subpath_constraints_coverage
                         self.solver.add_constraint(
-                            sum(self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j])
+                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j])
                             >= constraint_length * coverage_fraction
                             * self.subpaths_vars[(i, j)],
-                            name="7a_i={}_j={}".format(i, j),
+                            name=f"7a_i={i}_j={j}",
                         )
                     else:
                         # If however we specified that the coverage fraction is in terms of edge lengths
@@ -353,14 +353,14 @@ class AbstractPathModelDAG(ABC):
                         # And the fraction of edges that we need to cover is self.subpath_constraints_coverage_length
                         coverage_fraction = self.subpath_constraints_coverage_length
                         self.solver.add_constraint(
-                            sum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1) for e in self.subpath_constraints[j])
+                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1) for e in self.subpath_constraints[j])
                             >= constraint_length * coverage_fraction
                             * self.subpaths_vars[(i, j)],
                             name=f"7a_i={i}_j={j}",
                         )
             for j in range(len(self.subpath_constraints)):
                 self.solver.add_constraint(
-                    sum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
+                    self.solver.quicksum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
                     name=f"7b_j={j}",
                 )
 
@@ -383,7 +383,7 @@ class AbstractPathModelDAG(ABC):
                 for (u,v) in self.G.edges():
                     self.solver.add_constraint(
                         self.edge_position_vars[(u, v, i)] 
-                            == sum(
+                            == self.solver.quicksum(
                                 self.edge_vars[(edge[0], edge[1], i)] 
                                 * self.G[edge[0]][edge[1]].get(self.edge_length_attr, 1) 
                                 for edge in self.G.reachable_edges_rev_from[u]
@@ -402,7 +402,7 @@ class AbstractPathModelDAG(ABC):
             for i in range(self.k):
                 self.solver.add_constraint(
                     self.path_length_vars[(i)] 
-                        == sum(
+                        == self.solver.quicksum(
                             self.edge_vars[(edge[0], edge[1], i)] 
                             * self.G[edge[0]][edge[1]].get(self.edge_length_attr, 1) 
                             for edge in self.G.edges()

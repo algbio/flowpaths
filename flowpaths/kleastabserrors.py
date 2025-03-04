@@ -241,14 +241,14 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             )
 
             self.solver.add_constraint(
-                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) - f_u_v <= self.edge_errors_vars[(u, v)],
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) - f_u_v <= self.edge_errors_vars[(u, v)],
                 name=f"9aa_u={u}_v={v}_i={i}",
             )
 
     def __encode_objective(self):
 
         self.solver.set_objective(
-            sum(
+            self.solver.quicksum(
                 self.edge_errors_vars[(u, v)] 
                 * self.edge_error_scaling.get((u, v), 1)
                 for (u,v) in self.edge_indexes_basic), 

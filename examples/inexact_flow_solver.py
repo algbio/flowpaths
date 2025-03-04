@@ -106,13 +106,13 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
             
             # That is, the sum of the pi_vars for edge (u,v) is at least the lowerbound of the edge,
             self.solver.add_constraint(
-                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) >= data[self.lb],
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) >= data[self.lb],
                 name=f"lowerbound_u={u}_v={v}",
             )
 
             # and at most the upperbound of the edge.
             self.solver.add_constraint(
-                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= data[self.ub],
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= data[self.ub],
                 name=f"upperbound_u={u}_v={v}",
             )
 
@@ -120,7 +120,7 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
 
         # We set the objective to minimize the sum of the path weights
         self.solver.set_objective(
-            sum(self.path_weights_vars[(i)] for i in range(self.k)), 
+            self.solver.quicksum(self.path_weights_vars[(i)] for i in range(self.k)), 
             sense="minimize",
         )
 
