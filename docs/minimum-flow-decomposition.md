@@ -1,7 +1,7 @@
 !!! info inline end "See also"
 
     - [k-Flow Decomposition](k-flow-decomposition.md)
-    - [An Optimization Routine for the Number k of Paths](numpathsoptimization.md)
+    - [Handling graphs with flows / weights on nodes](node-expanded-digraph.md)
 
 # Minimum Flow Decomposition
 
