@@ -4,14 +4,17 @@ import highspy
 
 class SolverWrapper:
     """
-    A wrapper class for the both the HiGHS (highspy) and Gurobi (gurobipy) solvers.
+    A wrapper class for the both the [HiGHS (highspy)](https://highs.dev) and 
+    [Gurobi](https://www.gurobi.com/solutions/gurobi-optimizer/) 
+    ([gurobipy](https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python)) solvers.
 
     This supports the following functionalities:
 
     - Adding:
         - Variables
         - Constraints
-        - Product Constraints, encoding the product of a binary variable and a positive continuous / integer variable
+        - Product Constraints, encoding the product of a binary / integer variable and a positive continuous / integer variable
+        - Piecewise constant constraints
     - Setting the objective
     - Optimizing, and getting the model status
     - Writing the model to a file
@@ -39,7 +42,12 @@ class SolverWrapper:
         17: "kMemoryLimit",
     }
 
-    def __init__(self, external_solver="highs", **kwargs):
+    def __init__(
+            self, 
+        external_solver="highs", 
+        **kwargs
+        ):
+
         self.external_solver = external_solver
         self.tolerance = kwargs.get("tolerance", SolverWrapper.tolerance)  # Default tolerance value
         if self.tolerance < 1e-9:

@@ -2,10 +2,13 @@ import time
 import flowpaths.abstractpathmodeldag as pathmodel
 
 class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
+    
+    # Storing some status names
     solved_status_name = "solved"
     timeout_status_name = "timeout"
     unbounded_status_name = "unbounded"
     infeasible_status_name = "infeasible"
+
     def __init__(
         self,
         model_type: pathmodel.AbstractPathModelDAG,
@@ -20,7 +23,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         """
         This is a generic class to find the "best" number of paths optimization problems implemented using `AbstractPathModelDAG`,
         and which are parameterized by the number of paths to be considered.
-        The class iterates over a range of path numbers, creating and  
+        The class iterates over a range of path numbers `k`, creating and  
         solving a model for each path number until one of the stopping conditions is met.
         
         Parameters
@@ -95,6 +98,9 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             raise ValueError(
                 "At least one of the stopping criteria must be set: stop_on_first_feasible, stop_on_delta_abs, stop_on_delta_rel"
             )
+        
+        if 'k' in self.kwargs:
+            raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths accoring to the stopping criteria.")
         
         self.lowerbound_k = None
         self.__solution = None

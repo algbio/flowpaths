@@ -1,6 +1,6 @@
-![PyPI - Version](https://img.shields.io/pypi/v/flowpaths)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/algbio/flowpaths/dx3-tests.yml)
-![PyPI - Downloads](https://img.shields.io/pypi/dm/flowpaths)
+[![PyPI - Version](https://img.shields.io/pypi/v/flowpaths)](https://pypi.org/project/flowpaths/)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/algbio/flowpaths/dx3-tests.yml)](https://github.com/algbio/flowpaths/actions/workflows/dx3-tests.yml)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/flowpaths)](https://pypistats.org/packages/flowpaths)
 
 #  The _flowpaths_ Python Package
 

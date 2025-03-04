@@ -22,22 +22,22 @@ class AbstractPathModelDAG(ABC):
     - **edge_vars**: `edge_vars[(u, v, i)]` = 1 if path `i` goes through edge `(u, v)`, `0` otherwise
     - **edge_position_vars**: `edge_position_vars[(u, v, i)]` = position of edge `(u, v)` in path `i`, starting from position 0
 
-        - These variables are created only if encode_edge_position is set to True
-        - Note that positions are relative to the globals source s of the stDiGraph, thus the first edge in a path is 
-        the edge from s to the first vertex in the original graph, and this first edge has position 0
+        - These variables are created only if `encode_edge_position` is set to `True`
+        - Note that positions are relative to the globals source `s` of the stDiGraph, thus the first edge in a path is 
+        the edge from `s` to the first vertex in the original graph, and this first edge has position 0
         - If you set `edge_length_attr`, then the positions are relative to the edge lengths, and not the number of edges
         The first edge still gets position 0, and other edges get positions equal to the sum of the lengths of the edges before them in the path
         - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
 
     - **path_length_vars**: `path_length_vars[(i)]` = length of path `i`
 
-        - These variables are created only if encode_path_length is set to True
+        - These variables are created only if `encode_path_length` is set to `True`
         - Note that the length of a path is the sum of the lengths of the edges in the path
         - If you set `edge_length_attr`, then the lengths are the sum of the lengths of the edges in the path
         - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
-        - NOTE: the length also includes the edges from gobal source to the first vertex, and from the last vertex to the global sink. By default, these do not have a length attached, so each gets length 1.
+        - **NOTE**: the length also includes the edges from gobal source to the first vertex, and from the last vertex to the global sink. By default, these do not have a length attached, so each gets length 1.
         
-    - **solver**: a solver object to solve the (M)ILP
+    - **solver**: a solver object to solve the (M)ILP, implemented using our [SolverWrapper](solver-wrapper.md) class.
 
     !!! node "Safety optimizations"
         This class uses the "safety information" (see [https://doi.org/10.48550/arXiv.2411.03871](https://doi.org/10.48550/arXiv.2411.03871)) in the graph to fix some 
@@ -46,7 +46,7 @@ class AbstractPathModelDAG(ABC):
         path-finding (M)ILP, you can guarantee that 
 
         1. The solution is made up of s-t paths
-        2. Any solution covers all edges in `trusted_edges_for_safety`, then safety optimizations can be used to fix some edge_vars to 1, 
+        2. Any solution covers all edges in `trusted_edges_for_safety`, then safety optimizations can be used to fix some `edge_vars` to 1, 
         which can speed up the solving process, while guaranteeing global optimality.
     """
     # storing some defaults
@@ -57,7 +57,7 @@ class AbstractPathModelDAG(ABC):
     def __init__(
         self,
         G: stdigraph.stDiGraph,
-        num_paths: int,
+        k: int,
         subpath_constraints: list = None,
         subpath_constraints_coverage: float = 1,
         subpath_constraints_coverage_length: float = None,
@@ -69,17 +69,16 @@ class AbstractPathModelDAG(ABC):
         solve_statistics: dict = {},
     ):
         """
-        Initializes the class with the given parameters.
-
         Args
         ----
         - `G: stDiGraph.stDiGraph`  
             
             The directed acyclic graph (DAG) to be used.
 
-        - `num_paths: int`
+        - `k: int`
             
-            The number of paths to be computed.
+            The number of paths to be modeled.
+
         - `subpath_constraints: list`, optional
             
             A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to None.
@@ -115,23 +114,31 @@ class AbstractPathModelDAG(ABC):
         
         - `optimization_options: dict`, optional 
             
-            Dictionary of optimization options. Defaults to `None`, in which case the default values are used. See the [available optimizations](solver-options-optimizations.md). If you pass any safety optimizations, you must also pass `trusted_edges_for_safety` (see below). If a child class has already solved the problem and has the solution paths, it can pass them via `external_solution_paths` to skip the solver creation and encoding of paths (see below).
+            Dictionary of optimization options. Defaults to `None`, in which case the default values are used. See the [available optimizations](solver-options-optimizations.md). 
+            If you pass any safety optimizations, you must also pass the dict entry `"trusted_edges_for_safety"` (see below). 
+            If a child class has already solved the problem and has the solution paths, it can pass them via the dict entry `"external_solution_paths"` to skip the solver creation and encoding of paths (see below).
             
-            - `"trusted_edges_for_safety"` (set): Set of trusted edges for safety. Defaults to `None`. If you use any safety optimization, this cannot be `None`.
+            - `"trusted_edges_for_safety": set`
+        
+                Set of trusted edges for safety. Defaults to `None`.
 
-            !!! warning "Global optimality"
-                In order for the optimizations to still guarantee a global optimium, you must guarantee that:
+                !!! warning "Global optimality"
+                    In order for the optimizations to still guarantee a global optimium, you must guarantee that:
 
-                1. The solution is made up of source-to-sink paths, and
-                2. Every edge in `trusted_edges_for_safety` appears in some solution path, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decompositon](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
+                    1. The solution is made up of source-to-sink paths, and
+                    2. Every edge in `trusted_edges_for_safety` appears in some solution path, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decompositon](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
 
-            - `"external_solution_paths"` (list): External solution paths, as a list of paths, where every path is a list of nodes. Defaults to `None`. If you provide this, this class skip the solver creation and encoding of paths, and just return these paths. This is useful when the child class managed to solver the problem in a different way, and needs to let this class know them to have a consistent API.
-
-
+            - `"external_solution_paths" : list`
+            
+                External solution paths, as a list of paths, where every path is a list of nodes. Defaults to `None`.
+                If you provide this, this class skip the solver creation and encoding of paths, and just return these paths. 
+                This is useful when the child class managed to solver the problem in a different way, 
+                and needs to let this class know them, in order to have a consistent API.
 
         - `solver_options: dict`, optional
             
-            Dictionary of solver options. Defaults to `None`, in which case the default values are used. See the [available solver options](solver-options-optimizations.md).
+            Dictionary of solver options. Defaults to `None`, in which case the default values are used. 
+            See the [available solver options](solver-options-optimizations.md).
 
         - `solve_statistics: dict`, optional
             
@@ -146,7 +153,7 @@ class AbstractPathModelDAG(ABC):
 
         self.G = G
         self.id = self.G.id
-        self.k = num_paths
+        self.k = k
         self.edge_length_attr = edge_length_attr
         
         self.subpath_constraints = subpath_constraints
@@ -234,6 +241,11 @@ class AbstractPathModelDAG(ABC):
         by creating variables for edges and subpaths.
 
         If external solution paths are provided, it skips the solver creation.
+
+        !!! warning "Call this method before encoding other variables and constraints."
+        
+            Always call this method before encoding other variables and constraints on the paths.
+
         """
         if self.external_solution_paths is not None:
             return
