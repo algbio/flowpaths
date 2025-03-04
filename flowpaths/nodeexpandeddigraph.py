@@ -71,7 +71,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 # Getting the solution in the expanded graph
                 solution = mfd_model.get_solution()
                 # Condensing the paths in the expanded graph to paths in the the original graph
-                original_paths = ne_graph.condense_paths(solution["paths"])
+                original_paths = ne_graph.get_condensed_paths(solution["paths"])
                 print("Original paths:", original_paths)
                 print("Weights:", solution["weights"])
             ```
@@ -124,7 +124,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         """
         return self.__edges_to_ignore
     
-    def expanded_subpath_constraints_nodes(self, subpath_constraints):
+    def get_expanded_subpath_constraints_nodes(self, subpath_constraints):
         """
         Expand a list of subpath constraints from the original graph (where every constraint is a list **nodes**
         in the original graph) to a list of subpath constraints in the expanded graph (where every constraint 
@@ -155,7 +155,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
 
         return expanded_constraints
     
-    def expanded_subpath_constraints_edges(self, subpath_constraints):
+    def get_expanded_subpath_constraints_edges(self, subpath_constraints):
         """
         Expand a list of subpath constraints from the original graph (where every constraint is a list **edges** 
         in the original graph) to a list of subpath constraints in the expanded graph where every constraint 
@@ -196,7 +196,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
 
         return (node + '.0', node + '.1')
 
-    def condense_paths(self, paths):
+    def get_condensed_paths(self, paths):
         """
         Condense a list of paths from the expanded graph to the original graph. 
         

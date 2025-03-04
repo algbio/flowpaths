@@ -19,9 +19,9 @@ def main():
 
     subpath_constraints_edges=[[('a', 'c'), ('c', 't')]]
 
-    ne_subpath_constraints_nodes = neGraph.expanded_subpath_constraints_nodes(subpath_constraints_nodes)
+    ne_subpath_constraints_nodes = neGraph.get_expanded_subpath_constraints_nodes(subpath_constraints_nodes)
 
-    ne_subpath_constraints_edges = neGraph.expanded_subpath_constraints_edges(subpath_constraints_edges)
+    ne_subpath_constraints_edges = neGraph.get_expanded_subpath_constraints_edges(subpath_constraints_edges)
 
     ne_mfd_model_nodes = fp.MinFlowDecomp(
         neGraph, 
@@ -53,7 +53,7 @@ def process_expanded_solution(neGraph: fp.NodeExpandedDiGraph, model: fp.MinFlow
     if model.is_solved():
         solution = model.get_solution()
         expanded_paths = solution["paths"]
-        original_paths = neGraph.condense_paths(expanded_paths)
+        original_paths = neGraph.get_condensed_paths(expanded_paths)
         print("Expanded paths:", expanded_paths)
         print("Original paths:", original_paths)
         print("Weights:", solution["weights"])
