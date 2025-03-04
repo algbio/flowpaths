@@ -6,6 +6,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self,
             G: nx.DiGraph,
             node_flow_attr: str,
+            node_length_attr: str = None,
             ):
         """
         This class is a subclass of the networkx DiGraph class. It is used to represent a directed graph
@@ -33,6 +34,10 @@ class NodeExpandedDiGraph(nx.DiGraph):
             This attribute must be present in all nodes of the graph. This atrribute for each `v` is then 
             set to the edge `(v.0, v.1)` connecting the new expanded nodes.
 
+        - `node_length_attr : str`, optional
+
+            The attribute name from where to get the length values on the nodes. Default is `None`. 
+            If you specify this attribute, it must be present in all nodes of the graph.
 
         !!! example "Example"
 
@@ -89,6 +94,10 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self.add_node(node1, **G.nodes[node])
             self.add_edge(node0, node1, **G.nodes[node])
             self[node0][node1][node_flow_attr] = G.nodes[node][node_flow_attr]
+            if node_length_attr:
+                if node_length_attr not in G.nodes[node]:
+                    raise ValueError(f"Every node must have the length attribute specified as `node_length_attr` ({node_length_attr}).")
+                self[node0][node1][node_length_attr] = G.nodes[node][node_length_attr]
 
             # Adding in-coming edges
             for pred in G.predecessors(node):
@@ -115,6 +124,78 @@ class NodeExpandedDiGraph(nx.DiGraph):
         """
         return self.__edges_to_ignore
     
+    def expanded_subpath_constraints_nodes(self, subpath_constraints):
+        """
+        Expand a list of subpath constraints from the original graph (where every constraint is a list **nodes**
+        in the original graph) to a list of subpath constraints in the expanded graph (where every constraint 
+        is a list of edges (of type `('node.0', 'node.1`)` in the expanded graph).
+
+        Parameters
+        ----------
+        - `subpath_constraints : list`
+            
+            List of subpath constraints in the original graph (as lists of **nodes**).
+
+        Returns
+        -------
+        - `expanded_constraints : list`
+            
+            List of subpath constraints in the expanded graph (as lists of edges of type `('node.0', 'node.1`)`).
+        """
+
+        expanded_constraints = []
+
+        for constraint in subpath_constraints:
+            expanded_constraint = []
+            for node in constraint:
+                if node not in self.original_G.nodes:
+                    raise ValueError(f"Node {node} not in the original graph.")
+                expanded_constraint.append((node + '.0', node + '.1'))
+            expanded_constraints.append(expanded_constraint)
+
+        return expanded_constraints
+    
+    def expanded_subpath_constraints_edges(self, subpath_constraints):
+        """
+        Expand a list of subpath constraints from the original graph (where every constraint is a list **edges** 
+        in the original graph) to a list of subpath constraints in the expanded graph where every constraint 
+        is a list of the corresponding edges in the expanded graph).
+
+        Parameters
+        ----------
+        - `subpath_constraints : list`
+            
+            List of subpath constraints in the original graph (as lists of **edges**).
+
+        Returns
+        -------
+        - `expanded_constraints : list`
+            
+            List of subpath constraints in the expanded graph (as lists of corresponding edges).
+        """
+
+        expanded_constraints = []
+
+        for constraint in subpath_constraints:
+            expanded_constraint = []
+            for edge in constraint:
+                if edge not in self.original_G.edges:
+                    raise ValueError(f"Edge {edge} not in the original graph.")
+                expanded_constraint.append((edge[0] + '.1', edge[1] + '.0'))
+            expanded_constraints.append(expanded_constraint)
+
+        return expanded_constraints
+
+    def get_expanded_edge(self, node):
+        """
+        Get the the expanded edge `('node.0', 'node.1')` for a given node `node` in the original graph.
+        """
+
+        if node not in self.original_G.nodes:
+            raise ValueError(f"Node {node} not in the original graph.")
+
+        return (node + '.0', node + '.1')
+
     def condense_paths(self, paths):
         """
         Condense a list of paths from the expanded graph to the original graph. 

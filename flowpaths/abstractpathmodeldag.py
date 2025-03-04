@@ -198,11 +198,10 @@ class AbstractPathModelDAG(ABC):
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
-        if self.external_solution_paths is None:
-            self.__is_solved = None
-        else:
+        
+        self.__is_solved = None
+        if self.external_solution_paths is not None:
             self.__is_solved = True
-
 
         self.safe_lists = None
         if self.optimize_with_safe_paths and not self.is_solved() and self.trusted_edges_for_safety is not None:
