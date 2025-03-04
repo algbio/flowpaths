@@ -43,7 +43,7 @@ class SolverWrapper:
     }
 
     def __init__(
-            self, 
+        self, 
         external_solver="highs", 
         **kwargs
         ):
@@ -61,6 +61,7 @@ class SolverWrapper:
 
         if external_solver == "highs":
             self.solver = highspy.Highs()
+            self.solver.setOptionValue("solver", "choose")
             self.solver.setOptionValue("threads", kwargs.get("threads", SolverWrapper.threads))
             self.solver.setOptionValue("time_limit", kwargs.get("time_limit", SolverWrapper.time_limit))
             self.solver.setOptionValue("presolve", kwargs.get("presolve", SolverWrapper.presolve))

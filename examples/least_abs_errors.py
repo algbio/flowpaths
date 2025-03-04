@@ -17,7 +17,13 @@ def main():
     # We create a Least Absolute Errors solver with default settings, 
     # by specifying that the flow value of each edge is in the attribute `flow` of the edges,
     # and that the number of paths to consider is 3.
-    lae_model = fp.kLeastAbsErrors(graph, flow_attr="flow", k=3, weight_type=float)
+    lae_model = fp.kLeastAbsErrors(
+        graph, 
+        flow_attr="flow", 
+        k=3, 
+        weight_type=float,
+        solver_options={"external_solver": "highs"}
+        )
 
     # We solve it
     lae_model.solve()
@@ -32,7 +38,8 @@ def main():
         flow_attr="flow", 
         k=3, 
         weight_type=float, 
-        edges_to_ignore=[("a", "c")]
+        edges_to_ignore=[("a", "c")],
+        solver_options={"external_solver": "gurobi"}
         )
     lae_model_2.solve()
     process_solution(lae_model_2)
@@ -45,7 +52,8 @@ def main():
         k=3, 
         weight_type=float, 
         edges_to_ignore=[("a", "c")],
-        trusted_edges_for_safety=[("a", "b")]
+        trusted_edges_for_safety=[("a", "b")],
+        solver_options={"external_solver": "gurobi"}
         )
     lae_model_3.solve()
     process_solution(lae_model_3)
@@ -59,6 +67,7 @@ def main():
         weight_type=float, 
         subpath_constraints=[[("a", "b")]],
         edges_to_ignore=[("a", "c")],
+        solver_options={"external_solver": "gurobi"}
         )
     lae_model_4.solve()
     process_solution(lae_model_4)
