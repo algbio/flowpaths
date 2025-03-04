@@ -53,10 +53,10 @@ if mfd_solver.is_solved(): # We get the solution
 
 4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` means that any optimization to the path-finding mechanisms benefits **all** solvers that inherit from this class. We implement some "safety optimizations" described in [this paper](https://doi.org/10.48550/arXiv.2411.03871), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
 
-### Models implemented:
-- **Minimum Flow Decomposition**: Given a DAG with flow values on its edges (i.e. at every node different from source or sink the flow enetering the node is equal to the flow exiting the node), find the minimum number of weighted paths such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
-- **$k$-Least Absolute Errors**: Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths such that the sum of the absolute errors of each edge is minimized. 
+### Models currently implemented:
+- [**Minimum Flow Decomposition**](https://algbio.github.io/flowpaths/minimum-flow-decomposition.html): Given a DAG with flow values on its edges (i.e. at every node different from source or sink the flow enetering the node is equal to the flow exiting the node), find the minimum number of weighted paths such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
+- [**$k$-Least Absolute Errors**](https://algbio.github.io/flowpaths/k-least-absolute-errors.html): Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths such that the sum of the absolute errors of each edge is minimized. 
     - The *error of an edge* is defined as the weight of the edge minus the sum of the weights of the paths going through it.
-- **$k$-Minimum Path Error**: Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths, with associated *slack* values, such that:
+- [**$k$-Minimum Path Error**](https://algbio.github.io/flowpaths/k-min-path-error.html): Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths, with associated *slack* values, such that:
     - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths going through the edge, and
     - The sum of path slacks is minimized.
