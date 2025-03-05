@@ -1,4 +1,5 @@
 import networkx as nx
+from flowpaths.utils import graphutils as gu
 
 class NodeExpandedDiGraph(nx.DiGraph):
     
@@ -6,6 +7,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self,
             G: nx.DiGraph,
             node_flow_attr: str,
+            fill_in_missing_flow_attr: bool = True,
             node_length_attr: str = None,
             ):
         """
@@ -33,6 +35,12 @@ class NodeExpandedDiGraph(nx.DiGraph):
             The attribute name from where to get the flow values / weights on the nodes. 
             This attribute must be present in all nodes of the graph. This atrribute for each `v` is then 
             set to the edge `(v.0, v.1)` connecting the new expanded nodes.
+
+        - `fill_in_missing_flow_attr : bool`, optional
+
+            If `True`, fill in missing flow values in the expanded graph (i.e., if some original edge does not have the attribute specified by `node_flow_attr`), 
+            by setting them to the flow values of a maximum flow between the sources and the sinks of the original graph, with capacity equal to the flow values of the nodes. 
+            Default is `True`.
 
         - `node_length_attr : str`, optional
 
@@ -85,6 +93,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             raise ValueError(f"Every node must have the flow attribute specified as `node_flow_attr` ({node_flow_attr}).")
 
         self.original_G = nx.DiGraph(G)
+        self.node_flow_attr = node_flow_attr
         self.__edges_to_ignore = []
 
         for node in G.nodes:
@@ -94,7 +103,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self.add_node(node1, **G.nodes[node])
             self.add_edge(node0, node1, **G.nodes[node])
             self[node0][node1][node_flow_attr] = G.nodes[node][node_flow_attr]
-            if node_length_attr:
+            if node_length_attr is not None:
                 if node_length_attr not in G.nodes[node]:
                     raise ValueError(f"Every node must have the length attribute specified as `node_length_attr` ({node_length_attr}).")
                 self[node0][node1][node_length_attr] = G.nodes[node][node_length_attr]
@@ -106,8 +115,9 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 self.__edges_to_ignore.append((pred1, node0))
                 
                 # If the edge (pred,node) does not have the length attribute, set it to 0
-                if node_length_attr not in G.edges[pred, node]:
-                    self[pred1][node0][node_length_attr] = 0
+                if node_length_attr is not None:
+                    if node_length_attr not in G.edges[pred, node]:
+                        self[pred1][node0][node_length_attr] = 0
 
             # Adding out-going edges
             for succ in G.successors(node):
@@ -116,7 +126,59 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 # This is not necessary, as the edge (node1, succ0) has already been added above, for succ
                 # self.__edges_to_ignore.append((node1, succ0))
 
+        if fill_in_missing_flow_attr:
+            self.__fill_in_missing_flow_values()
+
         nx.freeze(self)    
+
+    def __fill_in_missing_flow_values(self):
+        
+        # Fills in missing flow values in the expanded graph, by setting them to the flow values of a maximum flow
+        # between the source and the sink of the original graph, with capacity equal to the flow values of the nodes.
+        
+        # Create a max flow instance where the edges with missing flow have infinite capacity
+        # and the edges with flow have capacity equal to the flow value
+        # The source are the sources of the original graph, and the sink are the sinks of the original graph
+        # We solve this with the networkx package
+        
+        max_flow_network = nx.DiGraph(self)
+
+        source_node = f'source{id(max_flow_network)}'
+        sink_node = f'sink{id(max_flow_network)}'
+        demands_attr = f'demand{id(max_flow_network)}'
+        capacities_attr = f'capacities{id(max_flow_network)}'
+        costs_attr = f'costs{id(max_flow_network)}'
+        
+        max_flow_network.add_node(source_node)
+        max_flow_network.add_node(sink_node)
+
+        # For every node in the graph, add an edge from the source to the node.0 with infinite capacity
+        for node in self.original_G.nodes:
+            if self.original_G.in_degree(node) == 0:
+                max_flow_network.add_edge(source_node, node + '.0')
+                max_flow_network[source_node][node + '.0'].update({demands_attr: 0, capacities_attr: float('inf'), costs_attr: 0})
+            if self.original_G.out_degree(node) == 0:
+                max_flow_network.add_edge(node + '.1', sink_node)
+                max_flow_network[node + '.1'][sink_node].update({demands_attr: 0, capacities_attr: float('inf'), costs_attr: 0})
+
+        for u, v, data in self.edges(data=True):
+            if self.node_flow_attr not in data:
+                max_flow_network[u][v].update({demands_attr: 0, capacities_attr: float('inf'), costs_attr: 0})
+            else:
+                max_flow_network[u][v].update({demands_attr: data[self.node_flow_attr], capacities_attr: data[self.node_flow_attr], costs_attr: 0})
+        
+        flow_value, flow_dict = gu.min_cost_flow(
+            G = max_flow_network, 
+            s = source_node, 
+            t = sink_node, 
+            demands_attr = demands_attr,
+            capacities_attr = capacities_attr,
+            costs_attr = costs_attr,
+            )
+
+        for edge in self.edges:
+            if self.node_flow_attr not in self.edges[edge]:
+                self.edges[edge][self.node_flow_attr] = flow_dict[edge[0]][edge[1]]
 
     @property
     def edges_to_ignore(self):

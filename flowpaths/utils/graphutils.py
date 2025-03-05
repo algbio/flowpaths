@@ -50,7 +50,7 @@ def read_graphs(filename):
     return graphs
 
 
-def min_cost_flow(G: nx.DiGraph, s, t):
+def min_cost_flow(G: nx.DiGraph, s, t, demands_attr = 'l', capacities_attr = 'u', costs_attr = 'c') -> tuple:
 
     flowNetwork = nx.DiGraph()
 
@@ -71,9 +71,9 @@ def min_cost_flow(G: nx.DiGraph, s, t):
         z1 = uid + str(next(counter))
         z2 = uid + str(next(counter))
         edgeMap[(x, y)] = z1
-        l = G[x][y]["l"]
-        u = G[x][y]["u"]
-        c = G[x][y]["c"]
+        l = G[x][y][demands_attr]
+        u = G[x][y][capacities_attr]
+        c = G[x][y][costs_attr]
         flowNetwork.add_node(z1, demand=l)
         flowNetwork.add_node(z2, demand=-l)
         flowNetwork.add_edge(x, z1, weight=c, capacity=u)
@@ -154,8 +154,18 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
     for v in G.nodes():
         if G.out_degree(v) == 0 or G.in_degree(v) == 0:
             continue
-        out_flow = sum(flow for _, _, flow in G.out_edges(v, data=flow_attr))
-        in_flow = sum(flow for _, _, flow in G.in_edges(v, data=flow_attr))
+
+        out_flow = 0
+        for x, y, data in G.out_edges(v, data=True):
+            if data.get(flow_attr) is None:
+                return False
+            out_flow += data[flow_attr]
+
+        in_flow = 0
+        for x, y, data in G.in_edges(v, data=True):
+            if data.get(flow_attr) is None:
+                return False
+            in_flow += data[flow_attr]
 
         if out_flow != in_flow:
             return False
