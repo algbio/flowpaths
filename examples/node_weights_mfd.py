@@ -18,7 +18,7 @@ def main():
     subpath_constraints_nodes=[['s', 'b', 'c', 'd']]
     ne_subpath_constraints_nodes = neGraph.get_expanded_subpath_constraints_nodes(subpath_constraints_nodes)
     
-    
+
     ne_mfd_model_nodes = fp.MinFlowDecomp(
         neGraph, 
         flow_attr="flow",
