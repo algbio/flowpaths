@@ -104,6 +104,10 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 pred1 = pred + '.1'
                 self.add_edge(pred1, node0, **G.edges[pred, node])
                 self.__edges_to_ignore.append((pred1, node0))
+                
+                # If the edge (pred,node) does not have the length attribute, set it to 0
+                if node_length_attr not in G.edges[pred, node]:
+                    self[pred1][node0][node_length_attr] = 0
 
             # Adding out-going edges
             for succ in G.successors(node):
