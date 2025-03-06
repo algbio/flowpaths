@@ -366,11 +366,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         if self.__lowerbound_k != None:
             return self.__lowerbound_k
 
-        weight_function = dict()
-        for e in self.G.edges():
-            if e not in self.edges_to_ignore:
-                weight_function[e] = 1
+        self.__lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
-        self.__lowerbound_k = self.G.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+        self.__lowerbound_k = max(self.__lowerbound_k, self.G.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
 
         return self.__lowerbound_k

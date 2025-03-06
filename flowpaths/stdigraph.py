@@ -66,6 +66,7 @@ class stDiGraph(nx.DiGraph):
         self.source_sink_edges = set(self.source_edges + self.sink_edges)
 
         self.width = None
+        self.flow_width = None
 
         self.topological_order = list(nx.topological_sort(self))
         self.topological_order_rev = list(reversed(self.topological_order))
@@ -100,7 +101,7 @@ class stDiGraph(nx.DiGraph):
         # print("self.reachable_edges_rev_from", self.reachable_edges_rev_from)
 
 
-    def get_width(self) -> int:
+    def get_width(self, edges_to_ignore: list = None) -> int:
         """
         Calculate and return the width of the graph.
         The width is computed as the maximum edge antichain if it has not been
@@ -112,11 +113,55 @@ class stDiGraph(nx.DiGraph):
         - int: The width of the graph.
         """
 
-        if self.width == None:
-            width = self.compute_max_edge_antichain()
-            self.width = width
+        if self.width != None:
+            return self.width
+        
+        edges_to_ignore_set = set(edges_to_ignore or [])
+
+        weight_function = {e: 1 for e in self.edges() if e not in edges_to_ignore_set}
+        self.width = self.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
 
         return self.width
+
+    def get_flow_width(self, flow_attr: str, edges_to_ignore: list = None) -> int:
+        """
+        Calculate, store, and return the [flow-width](https://arxiv.org/abs/2409.20278) of the graph.
+        The flow width is computed as the minimum number to cover all the edges, with the constraint 
+        that an edge cannot be covered more time than the flow value given as `flow_attr` in the edge data.
+        
+        If the flow-width has already been computed, the stored value is returned.
+
+        Returns
+        ----------
+        - int: The flow-width of the graph.
+        """
+
+        if self.flow_width != None:
+            return self.flow_width
+        
+        G_nx = nx.DiGraph()
+
+        edges_to_ignore_set = set(edges_to_ignore or [])
+
+        G_nx.add_nodes_from(self.nodes())
+
+        for u, v in self.edges():
+            # the cost of each path is 1
+            cost = 1 if u == self.source else 0
+
+            edge_demand = int(u != self.source and v != self.sink)
+            if (u, v) in edges_to_ignore_set:
+                edge_demand = 0
+            edge_capacity = self[u][v].get(flow_attr, float('inf'))
+
+            # adding the edge
+            G_nx.add_edge(u, v, l=edge_demand, u=edge_capacity, c=cost)
+
+        minFlowCost, _ = graphutils.min_cost_flow(G_nx, self.source, self.sink)
+
+        self.flow_width = minFlowCost
+
+        return self.flow_width
 
     def compute_max_edge_antichain(self, get_antichain=False, weight_function=None):
         """

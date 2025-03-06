@@ -103,7 +103,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         self.solve_statistics = {}
         self.__solution = None
-        self.__lowerbound = None
+        self.__lowerbound_k = None
 
     def solve(self) -> bool:
         """
@@ -121,6 +121,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         """
         start_time = time.time()
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
+            print("MinFlowDecomp: Trying with k =", i)
             fd_model = kflowdecomp.kFlowDecomp(
                 G=self.G,
                 flow_attr=self.flow_attr,
@@ -177,13 +178,13 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     
     def get_lowerbound_k(self):
 
-        if self.__lowerbound != None:
-            return self.__lowerbound
+        if self.__lowerbound_k != None:
+            return self.__lowerbound_k
         
         stG = stdigraph.stDiGraph(self.G)
-        self.__lowerbound = stG.get_width()
 
-        return self.__lowerbound
+        self.__lowerbound_k = stG.get_width(edges_to_ignore=self.edges_to_ignore)
 
-    def draw_solution(self, show_flow_attr=True):
-        self.fd_model.draw_solution(show_flow_attr)
+        self.__lowerbound_k = max(self.__lowerbound_k, stG.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
+
+        return self.__lowerbound_k
