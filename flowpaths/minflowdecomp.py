@@ -121,7 +121,6 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         """
         start_time = time.time()
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
-            print("MinFlowDecomp: Trying with k =", i)
             fd_model = kflowdecomp.kFlowDecomp(
                 G=self.G,
                 flow_attr=self.flow_attr,
