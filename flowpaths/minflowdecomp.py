@@ -8,6 +8,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     """
     Class to decompose a flow into a minimum number of weighted paths.
     """
+    optimize_with_lookahead_flow = False
+    optimize_with_k_plus_one = False
+
     def __init__(
         self,
         G: nx.DiGraph,
@@ -99,6 +102,12 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.edge_length_attr = edge_length_attr
         self.edges_to_ignore = edges_to_ignore
         self.optimization_options = optimization_options
+
+        if "optimize_with_lookahead" not in self.optimization_options:
+            self.optimization_options["optimize_with_lookahead"] = MinFlowDecomp.optimize_with_lookahead_flow
+        
+        self.optimize_with_k_plus_one = optimization_options.get("optimize_with_k_plus_one", MinFlowDecomp.optimize_with_k_plus_one)
+
         self.solver_options = solver_options
 
         self.solve_statistics = {}
@@ -120,33 +129,84 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             This overloads the `solve()` method from `AbstractPathModelDAG` class.
         """
         start_time = time.time()
-        for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
-            print("MinFlowDecomp: Trying with k =", i)
-            fd_model = kflowdecomp.kFlowDecomp(
-                G=self.G,
-                flow_attr=self.flow_attr,
-                k=i,
-                weight_type=self.weight_type,
-                subpath_constraints=self.subpath_constraints,
-                subpath_constraints_coverage=self.subpath_constraints_coverage,
-                subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-                edge_length_attr=self.edge_length_attr,
-                edges_to_ignore=self.edges_to_ignore,
-                optimization_options=self.optimization_options,
-                solver_options=self.solver_options,
-            )
 
-            fd_model.solve()
+        if self.optimize_with_k_plus_one:
+            for i in range(self.get_lowerbound_k() + 1, self.G.number_of_edges(), 2):
+                print("MinFlowDecomp: Trying with k =", i)
+                fd_model = kflowdecomp.kFlowDecomp(
+                    G=self.G,
+                    flow_attr=self.flow_attr,
+                    k=i,
+                    weight_type=self.weight_type,
+                    subpath_constraints=self.subpath_constraints,
+                    subpath_constraints_coverage=self.subpath_constraints_coverage,
+                    subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                    edge_length_attr=self.edge_length_attr,
+                    edges_to_ignore=self.edges_to_ignore,
+                    optimization_options=self.optimization_options,
+                    solver_options=self.solver_options,
+                )
 
-            if fd_model.is_solved():
-                self.__solution = fd_model.get_solution()
-                self.set_solved()
-                self.solve_statistics = fd_model.solve_statistics
-                self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+                fd_model.solve()
 
-                # storing the fd_model object for further analysis
-                self.fd_model = fd_model
-                return True
+                if fd_model.is_solved():
+                    print("MinFlowDecomp: Trying with k =", i - 1)
+                    fd_model_minus_one = kflowdecomp.kFlowDecomp(
+                        G=self.G,
+                        flow_attr=self.flow_attr,
+                        k=i - 1,
+                        weight_type=self.weight_type,
+                        subpath_constraints=self.subpath_constraints,
+                        subpath_constraints_coverage=self.subpath_constraints_coverage,
+                        subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                        edge_length_attr=self.edge_length_attr,
+                        edges_to_ignore=self.edges_to_ignore,
+                        optimization_options=self.optimization_options,
+                        solver_options=self.solver_options,
+                    )
+                    fd_model_minus_one.solve()
+
+                    solved_model = fd_model
+                    if fd_model_minus_one.is_solved():
+                        solved_model = fd_model_minus_one
+
+                    self.__solution = solved_model.get_solution()
+                    self.set_solved()
+                    self.solve_statistics = solved_model.solve_statistics
+                    self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+
+                    # storing the fd_model object for further analysis
+                    self.fd_model = solved_model
+                    return True
+                 
+        else:    
+            for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
+                print("MinFlowDecomp: Trying with k =", i)
+                fd_model = kflowdecomp.kFlowDecomp(
+                    G=self.G,
+                    flow_attr=self.flow_attr,
+                    k=i,
+                    weight_type=self.weight_type,
+                    subpath_constraints=self.subpath_constraints,
+                    subpath_constraints_coverage=self.subpath_constraints_coverage,
+                    subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                    edge_length_attr=self.edge_length_attr,
+                    edges_to_ignore=self.edges_to_ignore,
+                    optimization_options=self.optimization_options,
+                    solver_options=self.solver_options,
+                )
+
+                fd_model.solve()
+
+                if fd_model.is_solved():
+                    self.__solution = fd_model.get_solution()
+                    self.set_solved()
+                    self.solve_statistics = fd_model.solve_statistics
+                    self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+
+                    # storing the fd_model object for further analysis
+                    self.fd_model = fd_model
+                    return True
         return False
 
     def get_solution(self):

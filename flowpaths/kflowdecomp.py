@@ -169,6 +169,12 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # This method is called from the current class to encode the flow decomposition
         self.__encode_flow_decomposition()
 
+        # If we use the lookahead flow, we also encode the objective
+        if self.optimize_with_lookahead_flow:
+            self.__encode_objective()
+
+        self.__encode_symmetry_breaking_weights()
+
     def __encode_flow_decomposition(self):
         
         # Encodes the flow decomposition constraints for the given graph.
@@ -214,10 +220,65 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                     name=f"10_u={u}_v={v}_i={i}",
                 )
 
-            self.solver.add_constraint(
-                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
-                name=f"10d_u={u}_v={v}_i={i}",
+            if True or not self.optimize_with_lookahead_flow:
+                self.solver.add_constraint(
+                    self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
+                    name=f"10d_u={u}_v={v}_i={i}",
+                )
+            else:
+                self.solver.add_constraint(
+                    self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) >= f_u_v - f_u_v * self.lookahead_flow_vars[(u, v)],
+                    name=f"10d_lookahead_u={u}_v={v}_i={i}",
+                )
+                self.solver.add_constraint(
+                    self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= f_u_v + f_u_v * self.lookahead_flow_vars[(u, v)],
+                    name=f"10d_lookahead_u={u}_v={v}_i={i}",
+                )
+
+    def __encode_symmetry_breaking_weights(self):
+        
+        # Encodes symmetry breaking constraints for the path weights.
+        # This method sets up the symmetry breaking constraints for the path weights.
+        
+        # We encode that the weight of the first path is less than the weight of the second path, and so on.
+        if self.safe_lists is not None:
+            for i in range(len(self.safe_lists) + 1, self.k - 1):
+                self.solver.add_constraint(
+                    self.path_weights_vars[(i)] <= self.path_weights_vars[(i + 1)],
+                    name=f"symmetry_breaking_{i}",
+                )
+
+    def __encode_objective(self):
+
+        if self.optimize_with_lookahead_flow:
+            self.solver.set_objective(
+                self.solver.quicksum(
+                    self.lookahead_flow_vars[(self.G.source, v)] 
+                    for v in self.G.successors(self.G.source)),
+                sense="minimize"
             )
+
+    def solve(self):
+
+        super_solved = super().solve()    
+        
+        if self.optimize_with_lookahead_flow:
+
+            print("Entering self.optimize_with_lookahead_flow")
+
+            self.lookahead_flow_vars_sol = self.solver.get_variable_values("lookahead_flow", [str, str])
+            
+            for v in self.G.successors(self.G.source):
+                print(f"lookahead_flow_vars_sol[{self.G.source}, {v}]: {self.lookahead_flow_vars_sol[(self.G.source, v)]}")
+
+            obj_value = self.solver.get_objective_value()
+
+            print(f"k: {self.k}, obj_value: {obj_value}")
+
+            return False
+        
+        if super_solved:
+            return True
 
     def __get_solution_with_greedy(self):
         

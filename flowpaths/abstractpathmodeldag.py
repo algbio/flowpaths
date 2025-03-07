@@ -53,6 +53,7 @@ class AbstractPathModelDAG(ABC):
     optimize_with_safe_paths = True
     optimize_with_safe_sequences = False
     optimize_with_safe_zero_edges = True
+    optimize_with_lookahead_flow = False
 
     def __init__(
         self,
@@ -177,6 +178,8 @@ class AbstractPathModelDAG(ABC):
         self.edge_vars = {}
         self.edge_vars_sol = {}
         self.subpaths_vars = {}
+        self.lookahead_flow_vars = {}
+        self.lookahead_flow_vars_sol = {}
         self.encode_edge_position = encode_edge_position
         self.encode_path_length = encode_path_length
         self.edge_position_vars = {}
@@ -198,6 +201,10 @@ class AbstractPathModelDAG(ABC):
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
+        self.optimize_with_lookahead_flow = optimization_options.get("optimize_with_lookahead_flow", AbstractPathModelDAG.optimize_with_lookahead_flow)
+
+        if self.optimize_with_lookahead_flow:
+            raise NotImplementedError("optimize_with_lookahead_flow is not yet implemented")
         
         self.__is_solved = None
         if self.external_solution_paths is not None:
@@ -212,6 +219,7 @@ class AbstractPathModelDAG(ABC):
                 no_duplicates=False,
                 threads=self.threads,
             )
+            print(f"max safe path length: {max(len(safe_list) for safe_list in self.safe_lists)}, k {self.k}")
             self.solve_statistics["safe_paths_time"] = time.time() - start_time
 
         if self.optimize_with_safe_sequences and not self.is_solved():
@@ -222,6 +230,7 @@ class AbstractPathModelDAG(ABC):
                 no_duplicates=False,
                 threads=self.threads,
             )
+            print(f"max safe seq length: {max(len(safe_list) for safe_list in self.safe_lists)}, k {self.k}")
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
 
         # some checks
@@ -317,6 +326,42 @@ class AbstractPathModelDAG(ABC):
                     f"10c_v={v}_i={i}",
                 )
 
+        ###############################
+        #                             #
+        # Encoding lookahead flow     #
+        #                             #
+        ###############################
+
+        if self.optimize_with_lookahead_flow:
+            self.edge_indexes_basic  = [(u, v) for (u, v) in self.G.edges()]
+            self.lookahead_flow_vars = self.solver.add_variables(
+                self.edge_indexes_basic, 
+                name_prefix="lookahead_flow", 
+                lb=0, 
+                ub=1, 
+                var_type="continuous"
+            )
+
+            # Stating flow conservation for lookahead_flow_vars
+            for v in self.G.nodes:  # find all edges u->v->w for v in V\{s,t}
+                if v == self.G.source or v == self.G.sink:
+                    continue
+                self.solver.add_constraint(
+                    self.solver.quicksum(self.lookahead_flow_vars[(u, v)] for u in self.G.predecessors(v))
+                    - self.solver.quicksum(self.lookahead_flow_vars[(v, w)] for w in self.G.successors(v))
+                    == 0,
+                    f"lookahead_v={v}",
+                )
+
+            # # Stating the lookahead flow it at most one
+            # self.solver.add_constraint(
+            #     self.solver.quicksum(
+            #         self.lookahead_flow_vars[(self.G.source, v)] 
+            #         for v in self.G.successors(self.G.source))
+            #     == 1,
+            #     name="lookahead_source",
+            # )
+
         ################################
         #                              #
         # Encoding subpath constraints #
@@ -338,12 +383,25 @@ class AbstractPathModelDAG(ABC):
                         constraint_length = len(self.subpath_constraints[j])
                         # And the fraction of edges that we need to cover is self.subpath_constraints_coverage
                         coverage_fraction = self.subpath_constraints_coverage
-                        self.solver.add_constraint(
-                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j])
-                            >= constraint_length * coverage_fraction
-                            * self.subpaths_vars[(i, j)],
-                            name=f"7a_i={i}_j={j}",
-                        )
+
+                        if not self.optimize_with_lookahead_flow:
+                            self.solver.add_constraint(
+                                self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j])
+                                >= constraint_length * coverage_fraction
+                                * self.subpaths_vars[(i, j)],
+                                name=f"7a_i={i}_j={j}",
+                            )
+                        else:
+                            # If we use lookahead flow, the lookahead flow variables will also be considered
+                            self.solver.add_constraint(
+                                self.solver.quicksum(
+                                    self.edge_vars[(e[0], e[1], i)] 
+                                    + self.lookahead_flow_vars[(e[0], e[1])] 
+                                    for e in self.subpath_constraints[j])
+                                >= constraint_length * coverage_fraction
+                                * self.subpaths_vars[(i, j)],
+                                name=f"7a_i={i}_j={j}",
+                            )
                     else:
                         # If however we specified that the coverage fraction is in terms of edge lengths
                         # Then the constraints length is the sum of the lengths of the edges,
@@ -351,12 +409,26 @@ class AbstractPathModelDAG(ABC):
                         constraint_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in self.subpath_constraints[j])
                         # And the fraction of edges that we need to cover is self.subpath_constraints_coverage_length
                         coverage_fraction = self.subpath_constraints_coverage_length
-                        self.solver.add_constraint(
-                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1) for e in self.subpath_constraints[j])
-                            >= constraint_length * coverage_fraction
-                            * self.subpaths_vars[(i, j)],
-                            name=f"7a_i={i}_j={j}",
-                        )
+                        
+                        if not self.optimize_with_lookahead_flow:
+                            self.solver.add_constraint(
+                                self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1) for e in self.subpath_constraints[j])
+                                >= constraint_length * coverage_fraction
+                                * self.subpaths_vars[(i, j)],
+                                name=f"7a_i={i}_j={j}",
+                            )
+                        else:
+                            # If we use lookahead flow, the lookahead flow variables will also be considered
+                            self.solver.add_constraint(
+                                self.solver.quicksum(
+                                    self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1)
+                                    + self.lookahead_flow_vars[(e[0], e[1])] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1)
+                                    for e in self.subpath_constraints[j]
+                                    )
+                                >= constraint_length * coverage_fraction
+                                * self.subpaths_vars[(i, j)],
+                                name=f"7a_i={i}_j={j}",
+                            )
             for j in range(len(self.subpath_constraints)):
                 self.solver.add_constraint(
                     self.solver.quicksum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
@@ -534,18 +606,11 @@ class AbstractPathModelDAG(ABC):
         # self.write_model(f"model-{self.id}.lp")
         start_time = time.time()
         self.solver.optimize()
-        self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = (
-            time.time() - start_time
-        )
+        self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = time.time() - start_time
 
-        self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = (
-            self.solver.get_model_status()
-        )
+        self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = self.solver.get_model_status()
 
-        if (
-            self.solver.get_model_status() == "kOptimal"
-            or self.solver.get_model_status() == 2
-        ):
+        if self.solver.get_model_status() == "kOptimal":
             self.__is_solved = True
             return True
 
