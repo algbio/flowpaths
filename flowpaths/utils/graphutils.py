@@ -223,8 +223,8 @@ def draw_solution_basic(graph: nx.DiGraph, flow_attr: str, paths: list, weights:
         for u, v, data in graph.edges(data=True):
             dot.edge(str(u), str(v), str(data.get(flow_attr,"")))
 
-        for path in paths:
-            pathColor = colors[len(path) + 73 % len(colors)]
+        for index, path in enumerate(paths):
+            pathColor = colors[index % len(colors)]
             for i in range(len(path) - 1):
                 dot.edge(
                     str(path[i]),
@@ -237,7 +237,7 @@ def draw_solution_basic(graph: nx.DiGraph, flow_attr: str, paths: list, weights:
                 dot.node(str(path[0]), color=pathColor, penwidth="2.0")
         
 
-        dot.render(f"{id}", view=False)
+        dot.render(f"{id}.dot", view=False)
 
 
 def draw_solution(graph: nx.DiGraph, paths: list, weights: list, id:str):

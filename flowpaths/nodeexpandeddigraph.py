@@ -93,6 +93,10 @@ class NodeExpandedDiGraph(nx.DiGraph):
             raise ValueError(f"Every node must have the flow attribute specified as `node_flow_attr` ({node_flow_attr}).")
 
         self.original_G = nx.DiGraph(G)
+
+        if "id" in G.graph:
+            self.graph["id"] = G.graph["id"]
+            
         self.node_flow_attr = node_flow_attr
         self.__edges_to_ignore = []
 
