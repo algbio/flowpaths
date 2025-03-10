@@ -232,13 +232,39 @@ def draw_solution_basic(graph: nx.DiGraph, flow_attr: str, paths: list, weights:
                     fontcolor=pathColor,
                     color=pathColor,
                     penwidth="2.0",
-                )  # label=str(weight)
+                    label=str(weights[index]),
+                )  
             if len(path) == 1:
                 dot.node(str(path[0]), color=pathColor, penwidth="2.0")
         
 
         dot.render(f"{id}.dot", view=False)
 
+
+def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, left: int, right: int) -> nx.DiGraph:
+    """
+    Create a subgraph with the nodes between left and right in the topological order, 
+    including the edges between them, but also the edges from these nodes that are incident to nodes outside this range.
+    """
+
+    if left < 0 or right >= len(topo_order):
+        raise ValueError("Invalid range for topological order")
+    if left > right:
+        raise ValueError("Invalid range for topological order")
+
+    # Create a subgraph with the nodes between left and right in the topological order
+    subgraph = nx.DiGraph()
+    for i in range(left, right):
+        subgraph.add_node(topo_order[i])
+
+    fixed_nodes = set(subgraph.nodes())
+
+    # Add the edges between the nodes in the subgraph
+    for u, v in graph.edges():
+        if u in fixed_nodes or v in fixed_nodes:
+            subgraph.add_edge(u, v, **graph[u][v])
+
+    return subgraph
 
 def draw_solution(graph: nx.DiGraph, paths: list, weights: list, id:str):
 

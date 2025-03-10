@@ -169,6 +169,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # This method is called from the current class to encode the flow decomposition
         self.__encode_flow_decomposition()
 
+        # The given weights optimization
+        self.__encode_given_weights()
+
     def __encode_flow_decomposition(self):
         
         # Encodes the flow decomposition constraints for the given graph.
@@ -218,6 +221,32 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
                 name=f"10d_u={u}_v={v}_i={i}",
             )
+
+    def __encode_given_weights(self):
+
+        weights = self.optimization_options.get("given_weights", None)
+        if weights is None:
+            return
+        if len(weights) > self.k:
+            raise ValueError(f"Length of given weights ({len(weights)}) is greater than k ({self.k})")
+
+        for i, weight in enumerate(weights):
+            self.solver.add_constraint(
+                self.path_weights_vars[i] == weight,
+                name=f"given_weight_{i}",
+            )
+
+        # target_num_paths = self.optimization_options.get("lowerbound_k", 0)
+        # print("target_num_paths", target_num_paths)
+        # self.solver.add_constraint(
+        #     self.solver.quicksum(self.edge_vars[(u, v, i)] for u, v in self.G.edges() for i in range(self.k)) == target_num_paths,
+        #     name=f"target_num_paths",
+        # )
+
+        self.solver.set_objective(
+            self.solver.quicksum(self.edge_vars[(u, v, i)] for u, v in self.G.edges() for i in range(self.k)),
+            sense="minimize",
+        )
 
     def __get_solution_with_greedy(self):
         
@@ -368,6 +397,6 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         self.__lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
-        self.__lowerbound_k = max(self.__lowerbound_k, self.G.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
+        # self.__lowerbound_k = max(self.__lowerbound_k, self.G.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
 
         return self.__lowerbound_k

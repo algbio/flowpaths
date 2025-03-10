@@ -3,11 +3,19 @@ import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.kflowdecomp as kflowdecomp
 import flowpaths.abstractpathmodeldag as pathmodel
+import flowpaths.utils.graphutils as gu
+import flowpaths.utils.solverwrapper as sw
+import copy
+import math
 
 class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
     """
     Class to decompose a flow into a minimum number of weighted paths.
     """
+
+    # Storing some default
+    subgraph_nodes_increment = 30
+
     def __init__(
         self,
         G: nx.DiGraph,
@@ -104,6 +112,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.solve_statistics = {}
         self.__solution = None
         self.__lowerbound_k = None
+        self.__is_solved = None
 
     def solve(self) -> bool:
         """
@@ -121,6 +130,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         """
         start_time = time.time()
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
+            print("Trying with k = ", i)
             fd_model = kflowdecomp.kFlowDecomp(
                 G=self.G,
                 flow_attr=self.flow_attr,
@@ -147,6 +157,248 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 self.fd_model = fd_model
                 return True
         return False
+
+    def solve3(self) -> bool:
+
+        start_time = time.time()
+
+        selfG_nx = nx.DiGraph(self.G)
+        topo_order = list(nx.topological_sort(selfG_nx))
+        # print("topo_order: ", topo_order)
+        all_weights = set({int(selfG_nx.edges[e][self.flow_attr]) for e in selfG_nx.edges() if self.flow_attr in selfG_nx.edges[e]})
+        all_weights_list = list(all_weights)
+        # print("all_weights", all_weights)
+
+        current_lowerbound_k = self.get_lowerbound_k()
+
+        source_flow = 0
+        for n in selfG_nx.nodes():
+            if selfG_nx.in_degree(n) == 0:
+                source_flow += selfG_nx.nodes[n].get(self.flow_attr,0)
+        print("source_flow", source_flow)
+        print("all_weights", all_weights)
+        start_time = time.time()
+        k_gen_solver = MinGeneratingSet(a = all_weights_list, total = source_flow, lowerbound=current_lowerbound_k)
+        generating_set = k_gen_solver.generating_set
+        all_weights.update(generating_set)
+        all_weights_list = list(all_weights)
+        print(f"{time.time() - start_time} sec")
+        
+        current_lowerbound_k = max(current_lowerbound_k, len(generating_set))
+
+        print("current_lowerbound_k", current_lowerbound_k)
+
+        right_node_index = 0
+        left_subpath_constraints = []        
+
+        while right_node_index < selfG_nx.number_of_nodes() - 1:
+
+            right_node_index = min(right_node_index + MinFlowDecomp.subgraph_nodes_increment, selfG_nx.number_of_nodes() - 1)
+            print("right_node_index", right_node_index)
+            left_subgraph = gu.get_subgraph_between_topological_nodes(selfG_nx, topo_order=topo_order, left=right_node_index - MinFlowDecomp.subgraph_nodes_increment, right=right_node_index)
+            if not gu.check_flow_conservation(left_subgraph, self.flow_attr):
+                raise ValueError("Flow conservation not satisfied in subgraph")
+
+            left_subpath_constraints = [c for c in self.subpath_constraints if all(n in left_subgraph.nodes() for n in c)]
+            left_edges_to_ignore = [e for e in self.edges_to_ignore if all(n in left_subgraph.nodes() for n in e)]
+            self.optimization_options["lowerbound_k"] = current_lowerbound_k
+
+            left_mfd_solver = MinFlowDecomp(
+                    G=left_subgraph,
+                    flow_attr=self.flow_attr,
+                    weight_type=self.weight_type,
+                    subpath_constraints=left_subpath_constraints,
+                    subpath_constraints_coverage=self.subpath_constraints_coverage,
+                    subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                    edge_length_attr=self.edge_length_attr,
+                    edges_to_ignore=left_edges_to_ignore,
+                    optimization_options=self.optimization_options,
+                    solver_options=self.solver_options,
+                )
+            left_mfd_solver.solve()
+            if left_mfd_solver.is_solved():
+                left_mfd_solution = left_mfd_solver.get_solution()
+            
+                current_lowerbound_k = max(current_lowerbound_k,len(left_mfd_solution["weights"]))
+                print("left_mfd_solution['weights']", left_mfd_solution["weights"])
+                print("current_lowerbound_k", current_lowerbound_k)
+
+                # If we got a better lowerbound, 
+                full_graph_optimization_options = copy.deepcopy(self.optimization_options)
+                full_graph_optimization_options["optimize_with_greedy"] = False
+                full_graph_optimization_options["optimize_with_safe_paths"] = False
+                full_graph_optimization_options["optimize_with_safe_sequences"] = False
+                full_graph_optimization_options["optimize_with_zero_safe_edges"] = False
+                full_graph_optimization_options["allow_empty_paths"] = True
+                full_graph_optimization_options["given_weights"] = all_weights_list # + left_mfd_solution["weights"]
+
+                print("Now trying the full graph with weights")
+                print(full_graph_optimization_options["given_weights"])
+
+                full_mfd_solver = kflowdecomp.kFlowDecomp(
+                    G=self.G,
+                    k = len(full_graph_optimization_options["given_weights"]),
+                    flow_attr=self.flow_attr,
+                    weight_type=self.weight_type,
+                    subpath_constraints=self.subpath_constraints,
+                    subpath_constraints_coverage=self.subpath_constraints_coverage,
+                    subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                    edge_length_attr=self.edge_length_attr,
+                    edges_to_ignore=self.edges_to_ignore,
+                    optimization_options=full_graph_optimization_options,
+                    solver_options=self.solver_options,
+                    )
+                full_mfd_solver.solve()
+
+                if full_mfd_solver.is_solved():
+                    full_mfd_solution = full_mfd_solver.get_solution()
+                    non_empty_paths = []
+                    non_empty_weights = []
+                    for path, weight in zip(full_mfd_solution["paths"], full_mfd_solution["weights"]):
+                        if len(path) > 1:
+                            non_empty_paths.append(path)
+                            non_empty_weights.append(weight)
+                    
+                    if len(non_empty_weights) == current_lowerbound_k:
+
+                        self.__solution = {"paths": non_empty_paths, "weights": non_empty_weights}
+                        self.set_solved()
+                        self.solve_statistics = full_mfd_solver.solve_statistics
+                        self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+
+                        # storing the fd_model object for further analysis
+                        self.fd_model = full_mfd_solver
+                        return True
+                
+                print("Full graph not solved. Continuing.")
+
+    def solve2(self) -> bool:
+        """
+        Attempts to solve the flow distribution problem using a model with varying number of paths.
+
+        This method iterates over a range of possible path counts, creating and solving a flow decompostion model for each count.
+        If a solution is found, it stores the solution and relevant statistics, and returns True. If no solution is found after
+        iterating through all possible path counts, it returns False.
+
+        Returns:
+            bool: True if a solution is found, False otherwise.
+
+        Note:
+            This overloads the `solve()` method from `AbstractPathModelDAG` class.
+        """
+        start_time = time.time()
+        left_nodes_size = 0
+        left_subpath_constraints = []
+        selfG_nx = nx.DiGraph(self.G)
+        all_weights = set({int(selfG_nx.edges[e][self.flow_attr]) for e in selfG_nx.edges() if self.flow_attr in selfG_nx.edges[e]})
+
+        source_flow = 0
+        for n in selfG_nx.nodes():
+            if selfG_nx.in_degree(n) == 0:
+                source_flow += selfG_nx.nodes[n].get(self.flow_attr,0)
+        print("source_flow", source_flow)
+        print("all_weights", all_weights)
+        # min_gen_set_solver = MinGeneratingSet(values = all_weights, total = int(source_flow))
+
+        # exit()
+
+        self.optimization_options["lowerbound_k"] = self.get_lowerbound_k()
+
+        stG = stdigraph.stDiGraph(self.G)
+        weight_function = {e: 1 for e in stG.edges()}
+        first_iteration = True
+        while left_nodes_size < self.G.number_of_nodes():
+            if not first_iteration:
+                _, left_most_antichain = stG.compute_max_edge_antichain(get_antichain=True, 
+                                                            weight_function=weight_function)
+                print("left_most_antichain", left_most_antichain)    
+            
+                # We get the nodes to the "left" of the heads of the edges in left_most_antichain
+                left_nodes = set()
+                for e in left_most_antichain:
+                    left_nodes.update(stG.reachable_nodes_rev_from[e[1]])
+                    weight_function[e] = 0
+
+                # We get those lists from self.subpath_constraints whose all nodes are in left_nodes
+                left_subpath_constraints = [c for c in self.subpath_constraints if all(n in left_nodes for n in c)]
+                
+                left_edges_to_ignore = [e for e in self.edges_to_ignore if all(n in left_nodes for n in e)]
+                
+                left_nodes_size = len(left_nodes)
+                print("left_nodes len: ", left_nodes_size)
+
+                left_subgraph = selfG_nx.subgraph(left_nodes)
+                # print(left_subgraph.edges(data=True))
+                
+                print("self.optimization_options", self.optimization_options)
+
+                left_mfd_solver = MinFlowDecomp(
+                    G=left_subgraph,
+                    flow_attr=self.flow_attr,
+                    weight_type=self.weight_type,
+                    subpath_constraints=left_subpath_constraints,
+                    subpath_constraints_coverage=self.subpath_constraints_coverage,
+                    subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                    edge_length_attr=self.edge_length_attr,
+                    edges_to_ignore=left_edges_to_ignore,
+                    optimization_options=self.optimization_options,
+                    solver_options=self.solver_options,
+                )
+                left_mfd_solver.solve()
+                if left_mfd_solver.is_solved():
+                    left_mfd_solution = left_mfd_solver.get_solution()
+                
+                    self.optimization_options["lowerbound_k"] = len(left_mfd_solution["weights"])
+                    print("lowerbound_k", self.optimization_options["lowerbound_k"])
+                    print("left_mfd_solution['weights']", left_mfd_solution["weights"])
+
+                    all_weights = all_weights.union(int(weight) for weight in left_mfd_solution["weights"])
+
+            
+            if first_iteration or left_mfd_solver.is_solved():
+                
+                full_graph_optimization_options = copy.deepcopy(self.optimization_options)
+                full_graph_optimization_options["optimize_with_greedy"] = False
+                full_graph_optimization_options["optimize_with_safe_paths"] = False
+                full_graph_optimization_options["optimize_with_safe_sequences"] = False
+                full_graph_optimization_options["optimize_with_zero_safe_edges"] = False
+                full_graph_optimization_options["allow_empty_paths"] = True
+                full_graph_optimization_options["given_weights"] = list(all_weights) * 2 # self.optimization_options["lowerbound_k"]
+
+                print("Now trying the full graph with weights")
+                print(full_graph_optimization_options["given_weights"])
+
+                full_mfd_solver = kflowdecomp.kFlowDecomp(
+                    G=self.G,
+                    k = len(full_graph_optimization_options["given_weights"]),
+                    flow_attr=self.flow_attr,
+                    weight_type=self.weight_type,
+                    subpath_constraints=self.subpath_constraints,
+                    subpath_constraints_coverage=self.subpath_constraints_coverage,
+                    subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                    edge_length_attr=self.edge_length_attr,
+                    edges_to_ignore=self.edges_to_ignore,
+                    optimization_options=full_graph_optimization_options,
+                    solver_options=self.solver_options,
+                    )
+                full_mfd_solver.solve()
+
+                if full_mfd_solver.is_solved():
+                    self.__solution = full_mfd_solver.get_solution()
+                    self.set_solved()
+                    self.solve_statistics = full_mfd_solver.solve_statistics
+                    self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+
+                    # storing the fd_model object for further analysis
+                    self.fd_model = full_mfd_solver
+                    return True
+                else:
+                    print("Full graph not solved. Continuing.")
+
+            first_iteration = False
+
+        return True
+    
 
     def get_solution(self):
         """
@@ -182,8 +434,241 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         
         stG = stdigraph.stDiGraph(self.G)
 
-        self.__lowerbound_k = stG.get_width(edges_to_ignore=self.edges_to_ignore)
+        self.__lowerbound_k = self.optimization_options.get("lowerbound_k", 1) if self.optimization_options != None else 1
 
-        self.__lowerbound_k = max(self.__lowerbound_k, stG.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
+        all_weights = set({int(self.G.edges[e][self.flow_attr]) for e in self.G.edges() if self.flow_attr in self.G.edges[e]})
+        
+        self.__lowerbound_k = max(self.__lowerbound_k, math.ceil(math.log2(len(all_weights))))
+
+        self.__lowerbound_k = max(self.__lowerbound_k, stG.get_width(edges_to_ignore=self.edges_to_ignore))
+
+        # self.__lowerbound_k = max(self.__lowerbound_k, stG.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
 
         return self.__lowerbound_k
+    
+
+class MinGeneratingSet():
+
+    def __init__(self, values: set, total: float):
+        
+        # Creating the graph
+        self.G = nx.DiGraph()
+
+        values_list = list(values)
+        values_list.sort()
+        added_values = set()
+        
+        for value in values_list:
+            if value == total:
+                continue
+            if total - value in values and total - value > value:
+                continue
+            print("Adding ", value)
+            added_values.add(value)
+
+        values_to_remove = set()
+        for a in added_values:
+            for b in added_values:
+                if a+b in added_values or total - (a+b) in added_values:
+                    values_to_remove.add(a+b)
+        for a in added_values:
+            for b in added_values:
+                for c in added_values:
+                    if a+b+c in added_values or total - (a+b+c) in added_values:
+                        values_to_remove.add(a+b+c)
+        
+        print("values_to_remove", list(values_to_remove))
+
+        added_values = added_values - values_to_remove
+
+        print(added_values)
+
+        i = 0
+        added_values_list = list(added_values)
+        added_values_list.sort()
+        for value in added_values:
+            self.G.add_edge(str(i), str(i+2), flow2 = value)
+            self.G.add_edge(str(i), str(i+1), flow2 = total - value)
+            self.G.add_edge(str(i+1), str(i+2), flow2 = total - value)
+            i = i + 2
+
+        print(self.G.edges(data=True))
+        
+        mfd_solver = MinFlowDecomp(
+            G=self.G,
+            flow_attr="flow2",
+            weight_type=float,
+            optimization_options={
+                "optimize_with_safe_paths": False,
+                "optimize_with_safe_sequences": False,
+                "optimize_with_zero_safe_edges": False,
+            }
+        )
+        gu.draw_solution_basic(self.G, flow_attr="flow2", paths = [], weights = [], id = "test_gen_set_empty")
+        mfd_solver.solve()
+
+        if mfd_solver.is_solved():
+            solution = mfd_solver.get_solution()
+            print("MinGenSet solution")
+            print(solution["weights"])
+            print(mfd_solver.solve_statistics)
+
+            gu.draw_solution_basic(self.G, flow_attr="flow2", paths = solution["paths"], weights = solution["weights"], id = "test_gen_set")
+
+
+class MinGeneratingSet2():
+
+    def __init__(self, values: set, total: float):
+        
+        values_list = list(values)
+        values_list.sort()
+
+        i = 0
+        for value in values_list:
+            if value == total:
+                continue
+            if total - value in values and total - value > value:
+                continue
+            self.G.add_edge(str(i), str(i+2), flow2 = value)
+            self.G.add_edge(str(i), str(i+1), flow2 = total - value)
+            self.G.add_edge(str(i+1), str(i+2), flow2 = total - value)
+            i = i + 2
+
+        print(self.G.edges(data=True))
+        
+        mfd_solver = MinFlowDecomp(
+            G=self.G,
+            flow_attr="flow2",
+            weight_type=float,
+            optimization_options={
+                "optimize_with_safe_paths": False,
+                "optimize_with_safe_sequences": False,
+                "optimize_with_zero_safe_edges": False,
+            }
+        )
+        gu.draw_solution_basic(self.G, flow_attr="flow2", paths = [], weights = [], id = "test_gen_set_empty")
+        mfd_solver.solve()
+
+        if mfd_solver.is_solved():
+            solution = mfd_solver.get_solution()
+            print("MinGenSet solution")
+            print(solution["weights"])
+            print(mfd_solver.solve_statistics)
+
+            gu.draw_solution_basic(self.G, flow_attr="flow2", paths = solution["paths"], weights = solution["weights"], id = "test_gen_set")
+
+
+class MinGeneratingSet():
+    def __init__(
+            self, 
+            a: list,
+            total: float,
+            lowerbound: int
+            ):
+        self.a = a
+        self.total = total
+        self.generating_set = None
+
+        elements_to_remove = set()
+
+        for val1 in self.a:
+            for val2 in self.a:
+                if val1 + val2 in self.a:
+                    elements_to_remove.add(val1 + val2)
+
+        self.a = list(set(self.a) - elements_to_remove)
+
+        for val in self.a:
+            if total - val in self.a and total - val > val:
+                elements_to_remove.add(total - val)
+            if val == total:
+                elements_to_remove.add(val)
+
+        self.a = list(set(self.a) - elements_to_remove)
+
+        for i in range(lowerbound, len(self.a)):
+            if self.solve_for_k(i):
+                break
+
+    def solve_for_k(self, k: int) -> bool:
+
+        self.solver = sw.SolverWrapper()
+
+        self.b_indexes = [(i)   for i in range(k)]
+        self.x_indexes = [(i,j) for i in range(k) for j in range(len(self.a))]
+
+        self.genset_vars = self.solver.add_variables(
+            self.b_indexes, 
+            name_prefix="gen_set", 
+            lb=0, 
+            ub=max(self.a),
+            var_type="integer"
+        )
+
+        self.x_vars = self.solver.add_variables(
+            self.x_indexes, 
+            name_prefix="x", 
+            lb=0, 
+            ub=1, 
+            var_type="integer"
+        )
+
+        self.pi_vars = self.solver.add_variables(
+            self.x_indexes, 
+            name_prefix="pi", 
+            lb=0, 
+            ub=max(self.a), 
+            var_type="integer"
+        )
+
+        # Constraints
+
+        # Sum of elements in the base set is total
+        self.solver.add_constraint(
+            self.solver.quicksum(
+                self.genset_vars[i]
+                for i in self.b_indexes
+            )
+            == self.total,
+            name=f"total",
+        )
+
+        for j in range(len(self.a)):                
+
+            # pi_vars[(i, j)] = x_vars[(i, j)] * b_vars[i]
+            for i in range(k):
+                self.solver.add_binary_continuous_product_constraint(
+                    binary_var=self.x_vars[(i, j)],
+                    continuous_var=self.genset_vars[(i)],
+                    product_var=self.pi_vars[(i, j)],
+                    lb=0,
+                    ub=max(self.a),
+                    name=f"pi_i={i}_j={j}",
+                )
+
+            # Sum of pi_vars[(i, j)] for all i is a[j]
+            self.solver.add_constraint(
+                self.solver.quicksum(
+                    self.pi_vars[(i, j)]
+                    for i in self.b_indexes
+                )
+                == self.a[j],
+                name=f"sum_pi_j={j}",
+            )
+
+        for i in range(k - 2):
+            self.solver.add_constraint(
+                self.genset_vars[i] <= self.genset_vars[i+1],
+                name=f"b_{i}_leq_b_{i+1}",
+            )
+
+        self.solver.optimize()
+        if self.solver.get_model_status() == "kOptimal":
+            genset_sol = self.solver.get_variable_values("gen_set", [int])
+            self.generating_set = [genset_sol[i] for i in range(k)]
+            return True
+        else:
+            return False
+
+        
+        
