@@ -254,8 +254,10 @@ def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, 
 
     # Create a subgraph with the nodes between left and right in the topological order
     subgraph = nx.DiGraph()
+    if "id" in graph.graph:
+        subgraph.graph["id"] = graph.graph["id"]
     for i in range(left, right):
-        subgraph.add_node(topo_order[i])
+        subgraph.add_node(topo_order[i], **graph.nodes[topo_order[i]])
 
     fixed_nodes = set(subgraph.nodes())
 
@@ -263,6 +265,10 @@ def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, 
     for u, v in graph.edges():
         if u in fixed_nodes or v in fixed_nodes:
             subgraph.add_edge(u, v, **graph[u][v])
+            if u not in fixed_nodes:
+                subgraph.add_node(u, **graph.nodes[u])
+            if v not in fixed_nodes:
+                subgraph.add_node(v, **graph.nodes[v])
 
     return subgraph
 
