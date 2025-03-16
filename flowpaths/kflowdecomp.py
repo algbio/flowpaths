@@ -295,13 +295,20 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         return False
 
-    def get_solution(self):
+    def get_solution(self, remove_empty_paths=False):
         """
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
         Otherwise, it checks if the problem has been solved, computes the solution paths and weights,
         and caches the solution.
+
+        Parameters
+        ----------
+
+        - `remove_empty_paths: bool`, optional
+
+            If `True`, removes empty paths from the solution. Default is `False`. These can happen only if passed the optimization option `"allow_empty_paths" : True`.
 
         Returns
         -------
@@ -332,6 +339,18 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             "paths": self.get_solution_paths(),
             "weights": self.path_weights_sol,
         }
+
+        if remove_empty_paths:
+            non_empty_paths = []
+            non_empty_weights = []
+            for path, weight in zip(self.__solution["paths"], self.__solution["weights"]):
+                if len(path) > 1:
+                    non_empty_paths.append(path)
+                    non_empty_weights.append(weight)
+            self.__solution = {
+                "paths": non_empty_paths,
+                "weights": non_empty_weights,
+            }
 
         return self.__solution
 
