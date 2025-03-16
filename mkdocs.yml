@@ -21,6 +21,7 @@ nav:
     - Abstract Path Model: abstract-path-model.md
     - Solver Wrapper: solver-wrapper.md
     - stDiGraph: stdigraph.md  
+    - Minimum Generating Set: minimum-generating-set.md
 
 use_directory_urls: false
 

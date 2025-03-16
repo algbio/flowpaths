@@ -8,8 +8,8 @@ class MinGenSet():
             total,
             weight_type: type = float,
             lowerbound: int = 1,
-            remove_sums_of_two: bool = True,
-            remove_complement_values: bool = True
+            remove_complement_values: bool = True,
+            remove_sums_of_two: bool = False,
             ):
         """
         This class solves the minimum generating set problem. Given a list of numbers `a` and a total value `total`, 
@@ -22,17 +22,37 @@ class MinGenSet():
         ----------
 
         - `a` : list
+
             A list of numbers.
+
         - `total` : int | float
+
             The total value that the sum of the elements in the generating set should equal.
+            
         - `weight_type` : type
-            The type of the numbers in `generating_set`. Default is `float`. Other option is `int`.
+
+            The type of the numbers in `generating_set`. Default is `float`. The other option is `int`.
+
         - `lowerbound` : int
+
             The minimum number of elements in the generating set. Default is 1.
-        - `remove_sums_of_two` : bool
-            If True, it removes elements from `a` that are the sum of two other elements in `a`. Default is `True`.
+
         - `remove_complement_values` : bool
-            If True, if `a` contains both `x` and `total - x`, it keeps only the smallest of them. Default is `True`.
+
+            If `True`, if `a` contains both `x` and `total - x`, it keeps only the smallest of them. Default is `True`.
+            This is always correct to do. If say the generating set is $g_1, g_2, g_3, g_4$, with $g_1 + g_2 + g_3 + g_4 = total$.
+            If $x = g_1 + g_3$, then $total - x = g_2 + g_4$. So $total - x$ is expressed as a sum of values in the generating set.
+        
+        - `remove_sums_of_two` : bool
+
+            If `True`, it removes elements from `a` that are the sum of two other elements in `a`. Default is `False`.
+            This is not always correct to do, as it might lead to a smaller generating set. For example, suppose the generating set is $g_1, g_2, g_3, g_4$, with $g_1$ different from $g_4$ 
+            Suppose $x = g_1 + g_2$, $y = g_1 + g_3$ and $x+y \in a$. Then $x+y$ is expressed as $2 g_1 + g_2 + g_3$, 
+            thus it needs repeating $g_1$ **twice**. So $x+y$ cannot be expressed as a sum of elements in the generating set. 
+            
+            !!! note "Note"
+                Setting this to `True` always gives a generating set smaller or of the same size (i.e., not larger) as setting it to `False`. 
+                Thus, the size of the fomer generating set can be used as a lower bound for the size of the latter generating set.
         """
         
         self.numbers = list(numbers) # Make a copy of the list
@@ -69,13 +89,7 @@ class MinGenSet():
         
     def solve(self):
         """
-        Solves the minimum generating set problem.
-
-        Returns
-        -------
-        
-        - `bool`
-            True if the model was solved, False otherwise.
+        Solves the minimum generating set problem. Returns `True` if the model was solved, `False` otherwise.
         """
         start_time = time.time()
 
@@ -172,7 +186,7 @@ class MinGenSet():
 
     def is_solved(self):
         """
-        Returns True if the model was solved, False otherwise.
+        Returns `True` if the model was solved, `False` otherwise.
         """
         if self.__is_solved is None:
             raise Exception("Model not yet solved. If you want to solve it, call the `solve` method first.")
@@ -188,7 +202,10 @@ class MinGenSet():
 
     def get_solution(self):
         """
-        Returns the solution to the minimum generating set problem, if the model was solved. Call `solve` method first.
+        Returns the solution to the minimum generating set problem, if the model was solved. 
+        
+        !!! warning "Warning"
+            Call the `solve` method first.
         """
         if self.__solution is not None:
             return self.__solution
