@@ -568,8 +568,8 @@ class AbstractPathModelDAG(ABC):
     def check_is_solved(self):
         if not self.is_solved():
             raise Exception(
-                "Model not solved. If you want to solve it, call the solve method first. \
-                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
+                "Model not solved. If you want to solve it, call the `solve` method first. \
+                  If you already ran the `solve` method, then the model is infeasible, or you need to increase parameter time_limit."
             )
         
     def is_solved(self):

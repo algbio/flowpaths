@@ -7,6 +7,7 @@ from .numpathsoptimization import NumPathsOptimization
 from .stdigraph import stDiGraph
 from .nodeexpandeddigraph import NodeExpandedDiGraph
 from .utils import graphutils as graphutils
+from .mingenset import MinGenSet
 
 __all__ = [
     "AbstractPathModelDAG",
@@ -18,4 +19,5 @@ __all__ = [
     "stDiGraph",
     "NodeExpandedDiGraph",
     "graphutils",
+    "MinGenSet",
 ]
