@@ -20,6 +20,7 @@ def process_solution(model: fp.MinGenSet):
         print(model.get_solution())
     else:
         print("Model could not be solved.")
+    print(model.solve_statistics)
 
 if __name__ == "__main__":
     main()

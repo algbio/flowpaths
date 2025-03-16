@@ -4,6 +4,7 @@ import flowpaths.stdigraph as stdigraph
 import flowpaths.kflowdecomp as kflowdecomp
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.graphutils as gu
+import flowpaths.mingenset as mgs
 import copy
 import math
 
@@ -176,9 +177,16 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 source_flow += selfG_nx.nodes[n].get(self.flow_attr,0)
         print("source_flow", source_flow)
         print("all_weights", all_weights)
+        
         start_time = time.time()
-        k_gen_solver = MinGeneratingSet(a = all_weights_list, total = source_flow, lowerbound=current_lowerbound_k)
-        generating_set = k_gen_solver.generating_set
+        mingenset_solver = mgs.MinGenSet(
+            numbers = all_weights_list, 
+            total = source_flow, 
+            weight_type = self.weight_type,
+            lowerbound=current_lowerbound_k)
+        mingenset_solver.solve()
+        generating_set = mingenset_solver.get_solution()
+
         all_weights.update(generating_set)
         all_weights_list = list(all_weights)
         print(f"{time.time() - start_time} sec")

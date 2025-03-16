@@ -1,4 +1,5 @@
 import flowpaths.utils.solverwrapper as sw
+import time
 
 class MinGenSet():
     def __init__(
@@ -42,6 +43,7 @@ class MinGenSet():
 
         self.__is_solved = False
         self.__solution = None
+        self.solve_statistics = {}
 
         if self.weight_type not in [int, float]:
             raise ValueError("weight_type must be either `int` or `float`.")
@@ -65,8 +67,6 @@ class MinGenSet():
 
             self.numbers = list(set(self.numbers) - elements_to_remove)
         
-        print(f"Numbers: {self.numbers}")
-        
     def solve(self):
         """
         Solves the minimum generating set problem.
@@ -77,10 +77,10 @@ class MinGenSet():
         - `bool`
             True if the model was solved, False otherwise.
         """
-        
+        start_time = time.time()
+
         # Solve for increasing numbers of elements in the generating set
-        for k in range(self.lowerbound, len(self.initial_numbers)):
-            print(f"Trying with {k} elements in the generating set.")
+        for k in range(self.lowerbound, max(self.lowerbound+1, len(self.initial_numbers))):
             self.solver = sw.SolverWrapper()
 
             self.b_indexes = [(i)   for i in range(k)]
@@ -157,8 +157,17 @@ class MinGenSet():
                 genset_sol = self.solver.get_variable_values("gen_set", [int])
                 self.__solution = sorted(self.weight_type(genset_sol[i]) for i in range(k))
                 self.__is_solved = True
+                self.solve_statistics = {
+                    "time": time.time() - start_time,
+                    "num_elements": k,
+                    "status": self.solver.get_model_status(),
+                }
                 return True
-            
+            else:
+                self.solve_statistics = {
+                    "time": time.time() - start_time,
+                    "status": self.solver.get_model_status(),
+                }
         return False
 
     def is_solved(self):
