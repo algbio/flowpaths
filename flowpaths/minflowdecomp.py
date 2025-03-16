@@ -114,6 +114,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.__lowerbound_k = None
         self.__is_solved = None
 
+        # Internal variables
+        self.__generating_set = None
+
     def solve(self) -> bool:
         """
         Attempts to solve the flow distribution problem using a model with varying number of paths.
@@ -129,6 +132,12 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             This overloads the `solve()` method from `AbstractPathModelDAG` class.
         """
         start_time = time.time()
+
+        if self.optimization_options.get("optimize_with_min_gen_set_and_given_weights", False):            
+            if self.__get_solution_with_min_gen_set_and_given_weights():
+                self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+                return True
+
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
             print("Trying with k = ", i)
             fd_model = kflowdecomp.kFlowDecomp(
@@ -156,6 +165,91 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 # storing the fd_model object for further analysis
                 self.fd_model = fd_model
                 return True
+        return False
+
+    def __get_solution_with_min_gen_set_and_given_weights(self) -> bool:
+
+        start_time = time.time()
+
+        selfG_nx = nx.DiGraph(self.G)
+        all_weights = set({int(selfG_nx.edges[e][self.flow_attr]) for e in selfG_nx.edges() if self.flow_attr in selfG_nx.edges[e]})
+
+        current_lowerbound_k = self.get_lowerbound_k()
+
+        source_flow = sum(selfG_nx.nodes[n].get(self.flow_attr, 0) for n in selfG_nx.nodes() if selfG_nx.in_degree(n) == 0)
+        print("source_flow", source_flow)
+        print("all_weights", all_weights)
+        
+        mingenset_solver = mgs.MinGenSet(
+            numbers = list(all_weights), 
+            total = source_flow, 
+            weight_type = self.weight_type,
+            lowerbound=current_lowerbound_k,
+            remove_sums_of_two=True,
+            )
+        mingenset_solver.solve()
+        
+        # If the min gen set problem is not solved, we cannot proceed
+        if not mingenset_solver.is_solved():
+            return False
+        
+        self.__generating_set = mingenset_solver.get_solution()
+        print("generating_set", self.__generating_set)
+
+        all_weights.update(self.__generating_set)
+        all_weights_list = list(all_weights)
+        
+        current_lowerbound_k = max(current_lowerbound_k, len(self.__generating_set))
+
+        print("current_lowerbound_k", current_lowerbound_k)
+
+        given_weights_optimization_options = copy.deepcopy(self.optimization_options)
+        given_weights_optimization_options["optimize_with_greedy"] = False
+        given_weights_optimization_options["optimize_with_safe_paths"] = False
+        given_weights_optimization_options["optimize_with_safe_sequences"] = False
+        given_weights_optimization_options["optimize_with_zero_safe_edges"] = False
+        given_weights_optimization_options["allow_empty_paths"] = True
+        given_weights_optimization_options["given_weights"] = all_weights_list # + left_mfd_solution["weights"]
+
+        print("Now trying the full graph with weights")
+        print(given_weights_optimization_options["given_weights"])
+
+        given_weights_mfd_solver = kflowdecomp.kFlowDecomp(
+            G=self.G,
+            k = len(given_weights_optimization_options["given_weights"]),
+            flow_attr=self.flow_attr,
+            weight_type=self.weight_type,
+            subpath_constraints=self.subpath_constraints,
+            subpath_constraints_coverage=self.subpath_constraints_coverage,
+            subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+            edge_length_attr=self.edge_length_attr,
+            edges_to_ignore=self.edges_to_ignore,
+            optimization_options=given_weights_optimization_options,
+            solver_options=self.solver_options,
+            )
+        given_weights_mfd_solver.solve()
+
+        if given_weights_mfd_solver.is_solved():
+            full_mfd_solution = given_weights_mfd_solver.get_solution()
+            non_empty_paths = []
+            non_empty_weights = []
+            for path, weight in zip(full_mfd_solution["paths"], full_mfd_solution["weights"]):
+                if len(path) > 1:
+                    non_empty_paths.append(path)
+                    non_empty_weights.append(weight)
+            
+            if len(non_empty_weights) == current_lowerbound_k:
+
+                self.__solution = {"paths": non_empty_paths, "weights": non_empty_weights}
+                self.set_solved()
+                self.solve_statistics = given_weights_mfd_solver.solve_statistics
+                self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+                self.solve_statistics["min_gen_set_solve_time"] = mingenset_solver.solve_statistics["solve_time"]
+
+                # storing the fd_model object for further analysis
+                self.fd_model = given_weights_mfd_solver
+                return True
+            
         return False
 
     def solve3(self) -> bool:

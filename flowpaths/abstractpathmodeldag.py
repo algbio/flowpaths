@@ -627,7 +627,7 @@ class AbstractPathModelDAG(ABC):
             if not found_path:
                 path = []
                 paths.append(path)
-                print("Warning: No path found for path index", i)
+                # print("Warning: No path found for path index", i)
             else:
                 path = [vertex]
                 while vertex != self.G.sink:

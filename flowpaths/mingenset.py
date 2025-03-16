@@ -172,14 +172,14 @@ class MinGenSet():
                 self.__solution = sorted(self.weight_type(genset_sol[i]) for i in range(k))
                 self.__is_solved = True
                 self.solve_statistics = {
-                    "time": time.time() - start_time,
+                    "solve_time": time.time() - start_time,
                     "num_elements": k,
                     "status": self.solver.get_model_status(),
                 }
                 return True
             else:
                 self.solve_statistics = {
-                    "time": time.time() - start_time,
+                    "solve_time": time.time() - start_time,
                     "status": self.solver.get_model_status(),
                 }
         return False
