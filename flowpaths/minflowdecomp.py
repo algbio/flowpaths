@@ -30,7 +30,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
-        optimization_options: dict = None,
+        optimization_options: dict = {},
         solver_options: dict = None,
     ):
         """
