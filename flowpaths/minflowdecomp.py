@@ -181,7 +181,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         all_weights = set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]})
         all_weights_list = list(all_weights)
         
-        current_lowerbound_k = self.get_lowerbound_k()
+        # We call this so that the generating set is computed and stored in the class, if this optimizaiton is activated
+        _ = self.get_lowerbound_k()
 
         if self.__generating_set is not None:
             all_weights.update(self.__generating_set)

@@ -3,7 +3,6 @@ import networkx as nx
 
 bigNumber = 1 << 32
 
-
 def read_graph(graph_raw) -> nx.DiGraph:
     # Input format is: ['#Graph id\n', 'n\n', 'u_1 v_1 w_1\n', ..., 'u_k v_k w_k\n']
     id = graph_raw[0].strip("# ").strip()
@@ -102,12 +101,19 @@ def max_bottleck_path(G: nx.DiGraph, flow_attr) -> tuple:
 
     Parameters
     ----------
-    - G (nx.DiGraph): A directed graph where each edge has a flow attribute.
-    - flow_attr (str): The flow attribute from where to get the flow values.
+    - `G`: nx.DiGraph
+    
+        A directed graph where each edge has a flow attribute.
+
+    - `flow_attr`: str
+    
+        The flow attribute from where to get the flow values.
 
     Returns
-    ----------
+    --------
+
     - tuple: A tuple containing:
+
         - The value of the maximum bottleneck.
         - The path corresponding to the maximum bottleneck (list of nodes).
             If no s-t flow exists in the network, returns (None, None).
@@ -149,12 +155,20 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
 
     Parameters
     ----------
-    - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-    - flow_attr (str): The attribute name from where to get the flow values on the edges.
+    - `G`: nx.DiGraph
+    
+        The input directed acyclic graph, as networkx DiGraph.
+
+    - `flow_attr`: str
+    
+        The attribute name from where to get the flow values on the edges.
 
     Returns
     -------
-    - bool: True if the flow conservation property holds, False otherwise.
+    
+    - bool: 
+    
+        True if the flow conservation property holds, False otherwise.
     """
 
     for v in G.nodes():
@@ -206,46 +220,147 @@ def max_occurrence(seq, paths_in_DAG, edge_lengths: dict = {}) -> int:
             
     return max_occurence
 
-def draw_solution_basic(graph: nx.DiGraph, flow_attr: str, paths: list, weights: list, id:str):
+def draw_solution_basic(
+        graph: nx.DiGraph, 
+        flow_attr: str = None,
+        paths: list = [], 
+        weights: list = [], 
+        id: str = "",
+        draw_options: dict = {
+            "show_graph_edges": True,
+            "show_edge_weights": False,
+            "show_path_weights": False,
+            "show_path_weight_on_first_edge": True,
+            "pathwidth": 3.0
+        }
+        ):
+        """
+        Draw the graph with the paths and their weights highlighted.
 
-        import graphviz as gv
+        Parameters
+        ----------
 
-        dot = gv.Digraph(format="pdf")
-        dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
-        dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
-
-        colors = [
-            "red",
-            "blue",
-            "green",
-            "purple",
-            "brown",
-            "cyan",
-            "yellow",
-            "pink",
-            "grey",
-        ]
-
-        for u, v, data in graph.edges(data=True):
-            dot.edge(str(u), str(v), str(data.get(flow_attr,"")))
-
-        for index, path in enumerate(paths):
-            pathColor = colors[index % len(colors)]
-            for i in range(len(path) - 1):
-                dot.edge(
-                    str(path[i]),
-                    str(path[i + 1]),
-                    fontcolor=pathColor,
-                    color=pathColor,
-                    penwidth="2.0",
-                    label=str(weights[index]),
-                )  
-            if len(path) == 1:
-                dot.node(str(path[0]), color=pathColor, penwidth="2.0")
+        - `graph`: nx.DiGraph 
         
+            The input directed acyclic graph, as networkx DiGraph. 
 
-        dot.render(f"{id}.dot", view=False)
+        - `flow_attr`: str
+        
+            The attribute name from where to get the flow values on the edges.
 
+        - `paths`: list
+        
+            The list of paths to highlight, as lists of nodes. Default is an empty list, in which case no path is drawn.
+
+        - `weights`: list
+        
+            The list of weights corresponding to the paths. Default is an empty list, in which case no path is drawn.
+
+        - `id`: str
+        
+            The identifier of the graph, to be used as filename of the file containing the drawings. Default is an empty string, in which case the object id of the graph object will be used.
+        
+        - `draw_options`: dict
+
+            A dictionary with the following keys:
+
+            - `show_graph_edges`: bool
+
+                Whether to show the edges of the graph. Default is `True`.
+            
+            - `show_edge_weights`: bool
+
+                Whether to show the edge weights in the graph from the `flow_attr`. Default is `False`.
+
+            - `show_path_weights`: bool
+
+                Whether to show the path weights in the graph on every edge. Default is `False`.
+
+            - `show_path_weight_on_first_edge`: bool
+
+                Whether to show the path weight on the first edge of the path. Default is `True`.
+
+            - `pathwidth`: float
+            
+                The width of the path to be drawn. Default is `3.0`.
+        """
+
+        if id == "":
+            id = id(graph)
+
+        if len(paths) != len(weights):
+            raise ValueError("Paths and weights must have the same length, if provided.")
+
+        try:
+            import graphviz as gv
+        
+            dot = gv.Digraph(format="pdf")
+            dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
+            dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
+
+            colors = [
+                "red",
+                "blue",
+                "green",
+                "purple",
+                "brown",
+                "cyan",
+                "yellow",
+                "pink",
+                "grey",
+                "chocolate",
+                "darkblue",
+                "darkolivegreen",
+                "darkslategray",
+                "deepskyblue2",
+                "cadetblue3",
+                "darkmagenta",
+                "goldenrod1"
+            ]
+
+            dot.attr('node', fontname='Arial')
+
+            if draw_options.get("show_graph_edges", True):
+                for u, v, data in graph.edges(data=True):
+                    if draw_options.get("show_edge_weights", False):
+                        dot.edge(
+                            str(u), 
+                            str(v), 
+                            str(data.get(flow_attr,"")),
+                            fontname="Arial",)
+                    else:
+                        dot.edge(str(u), str(v))
+
+            for index, path in enumerate(paths):
+                pathColor = colors[index % len(colors)]
+                for i in range(len(path) - 1):
+                    if i == 0 and draw_options.get("show_path_weight_on_first_edge", True) or \
+                        draw_options.get("show_path_weights", True):
+                        dot.edge(
+                            str(path[i]),
+                            str(path[i + 1]),
+                            fontcolor=pathColor,
+                            color=pathColor,
+                            penwidth=str(draw_options.get("pathwidth", 3.0)),
+                            label=str(weights[index]),
+                            fontname="Arial",
+                        )
+                    else:
+                        dot.edge(
+                            str(path[i]),
+                            str(path[i + 1]),
+                            fontcolor=pathColor,
+                            color=pathColor,
+                            penwidth=str(draw_options.get("pathwidth", 3.0)),
+                            )
+                    
+                if len(path) == 1:
+                    dot.node(str(path[0]), color=pathColor, penwidth=str(draw_options.get("pathwidth", 3.0)))
+            
+            dot.render(f"{id}.dot", view=False)
+        
+        except ImportError:
+            raise ImportError("graphviz module not found. Please install it via pip (pip install graphviz).")
 
 def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, left: int, right: int) -> nx.DiGraph:
     """
