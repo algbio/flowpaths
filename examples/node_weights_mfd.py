@@ -111,7 +111,7 @@ def process_expanded_solution(neGraph: fp.NodeExpandedDiGraph, model: fp.MinFlow
         print("Expanded paths:", expanded_paths)
         print("Original paths:", original_paths)
         print("Weights:", solution["weights"])
-        # fp.utils.graphutils.draw_solution_basic(model.G, flow_attr="flow", paths = solution["paths"], weights = solution["weights"], id = model.G.graph["id"])
+        # fp.utils.draw_solution_basic(model.G, flow_attr="flow", paths = solution["paths"], weights = solution["weights"], id = model.G.graph["id"])
     else:
         print("Model could not be solved.")
 

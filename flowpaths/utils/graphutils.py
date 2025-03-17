@@ -80,17 +80,23 @@ def min_cost_flow(G: nx.DiGraph, s, t, demands_attr = 'l', capacities_attr = 'u'
         flowNetwork.add_edge(z1, z2, weight=0, capacity=u)
         flowNetwork.add_edge(z2, y, weight=0, capacity=u)
 
-    flowCost, flowDictNet = nx.network_simplex(flowNetwork)
+    
+    try:
+        flowCost, flowDictNet = nx.network_simplex(flowNetwork)
 
-    flowDict = {node: dict() for node in G.nodes()}
+        flowDict = {node: dict() for node in G.nodes()}
 
-    for x, y in G.edges():
-        flowDict[x][y] = flowDictNet[x][edgeMap[(x, y)]]
+        for x, y in G.edges():
+            flowDict[x][y] = flowDictNet[x][edgeMap[(x, y)]]
 
-    return flowCost, flowDict
+        return flowCost, flowDict
+    
+    except Exception as e:
+        # If there was no feasible flow, return None    
+        return None, None
 
 
-def maxBottleckPath(G: nx.DiGraph, flow_attr) -> tuple:
+def max_bottleck_path(G: nx.DiGraph, flow_attr) -> tuple:
     """
     Computes the maximum bottleneck path in a directed graph.
 
