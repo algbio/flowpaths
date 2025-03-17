@@ -268,7 +268,7 @@ class stDiGraph(nx.DiGraph):
         temp_G.remove_nodes_from([self.source, self.sink])
 
         while True:
-            bottleneck, path = graphutils.maxBottleckPath(temp_G, flow_attr)
+            bottleneck, path = graphutils.max_bottleck_path(temp_G, flow_attr)
             if path is None:
                 break
 

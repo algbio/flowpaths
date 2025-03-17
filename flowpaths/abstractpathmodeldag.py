@@ -198,6 +198,7 @@ class AbstractPathModelDAG(ABC):
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
+        self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
         
         self.__is_solved = None
         if self.external_solution_paths is not None:
@@ -289,22 +290,34 @@ class AbstractPathModelDAG(ABC):
         )
 
         for i in range(self.k):
-            self.solver.add_constraint(
-                self.solver.quicksum(
-                    self.edge_vars[(self.G.source, v, i)]
-                    for v in self.G.successors(self.G.source)
+            
+            if not self.allow_empty_paths:
+                self.solver.add_constraint(
+                    self.solver.quicksum(
+                        self.edge_vars[(self.G.source, v, i)]
+                        for v in self.G.successors(self.G.source)
+                    )
+                    == 1,
+                    name=f"10a_i={i}",
                 )
-                == 1,
-                name=f"10a_i={i}",
-            )
-            self.solver.add_constraint(
-                self.solver.quicksum(
-                    self.edge_vars[(u, self.G.sink, i)]
-                    for u in self.G.predecessors(self.G.sink)
+            else:
+                self.solver.add_constraint(
+                    self.solver.quicksum(
+                        self.edge_vars[(self.G.source, v, i)]
+                        for v in self.G.successors(self.G.source)
+                    )
+                    <= 1,
+                    name=f"10a_i={i}",
                 )
-                == 1,
-                name=f"10b_i={i}",
-            )
+            # Not needed, follows from the others
+            # self.solver.add_constraint(
+            #     self.solver.quicksum(
+            #         self.edge_vars[(u, self.G.sink, i)]
+            #         for u in self.G.predecessors(self.G.sink)
+            #     )
+            #     == 1,
+            #     name=f"10b_i={i}",
+            # )
 
         for i in range(self.k):
             for v in self.G.nodes:  # find all edges u->v->w for v in V\{s,t}
@@ -457,7 +470,7 @@ class AbstractPathModelDAG(ABC):
         # Returns the paths to fix based on the safe lists.
         # The method finds the longest safe list for each edge and returns the paths to fix based on the longest safe list.
 
-        # IF we have no safe lists, we return an empty list
+        # If we have no safe lists, we return an empty list
         if self.safe_lists is None or len(self.safe_lists) == 0:
             return []
 
@@ -555,8 +568,8 @@ class AbstractPathModelDAG(ABC):
     def check_is_solved(self):
         if not self.is_solved():
             raise Exception(
-                "Model not solved. If you want to solve it, call the solve method first. \
-                  If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."
+                "Model not solved. If you want to solve it, call the `solve` method first. \
+                  If you already ran the `solve` method, then the model is infeasible, or you need to increase parameter time_limit."
             )
         
     def is_solved(self):
@@ -614,7 +627,7 @@ class AbstractPathModelDAG(ABC):
             if not found_path:
                 path = []
                 paths.append(path)
-                print("Warning: No path found for path index", i)
+                # print("Warning: No path found for path index", i)
             else:
                 path = [vertex]
                 while vertex != self.G.sink:

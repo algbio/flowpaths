@@ -169,6 +169,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # This method is called from the current class to encode the flow decomposition
         self.__encode_flow_decomposition()
 
+        # The given weights optimization
+        self.__encode_given_weights()
+
     def __encode_flow_decomposition(self):
         
         # Encodes the flow decomposition constraints for the given graph.
@@ -219,6 +222,25 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 name=f"10d_u={u}_v={v}_i={i}",
             )
 
+    def __encode_given_weights(self):
+
+        weights = self.optimization_options.get("given_weights", None)
+        if weights is None:
+            return
+        if len(weights) > self.k:
+            raise ValueError(f"Length of given weights ({len(weights)}) is greater than k ({self.k})")
+
+        for i, weight in enumerate(weights):
+            self.solver.add_constraint(
+                self.path_weights_vars[i] == weight,
+                name=f"given_weight_{i}",
+            )
+
+        self.solver.set_objective(
+            self.solver.quicksum(self.edge_vars[(u, v, i)] for u, v in self.G.edges() for i in range(self.k)),
+            sense="minimize",
+        )
+
     def __get_solution_with_greedy(self):
         
         # Attempts to find a solution using a greedy algorithm.
@@ -266,13 +288,20 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         return False
 
-    def get_solution(self):
+    def get_solution(self, remove_empty_paths=False):
         """
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
         Otherwise, it checks if the problem has been solved, computes the solution paths and weights,
         and caches the solution.
+
+        Parameters
+        ----------
+
+        - `remove_empty_paths: bool`, optional
+
+            If `True`, removes empty paths from the solution. Default is `False`. These can happen only if passed the optimization option `"allow_empty_paths" : True`.
 
         Returns
         -------
@@ -303,6 +332,18 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             "paths": self.get_solution_paths(),
             "weights": self.path_weights_sol,
         }
+
+        if remove_empty_paths:
+            non_empty_paths = []
+            non_empty_weights = []
+            for path, weight in zip(self.__solution["paths"], self.__solution["weights"]):
+                if len(path) > 1:
+                    non_empty_paths.append(path)
+                    non_empty_weights.append(weight)
+            self.__solution = {
+                "paths": non_empty_paths,
+                "weights": non_empty_weights,
+            }
 
         return self.__solution
 
@@ -368,6 +409,6 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         self.__lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
-        self.__lowerbound_k = max(self.__lowerbound_k, self.G.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
+        # self.__lowerbound_k = max(self.__lowerbound_k, self.G.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
 
         return self.__lowerbound_k
