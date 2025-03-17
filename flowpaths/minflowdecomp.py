@@ -8,16 +8,17 @@ import flowpaths.mingenset as mgs
 import copy
 import math
 
-# TODO: Separate lower bound computation with min gen set from finding a decomposition with given weights
-
 class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
     """
-    Class to decompose a flow into a minimum number of weighted paths.
+    A class to decompose a network flow if a directed acylic graph into a minimum number of weighted paths.
     """
 
-    # Storing some default
+    # Default optimization parameters
     subgraph_nodes_increment = 30
-    optimize_with_min_gen_set_and_given_weights_num_free_paths = 0
+    optimize_with_given_weights_num_free_paths = 0
+    use_min_gen_set_lowerbound = False
+    min_gen_set_remove_sums_of_two = True
+    optimize_with_given_weights = False
 
     def __init__(
         self,
@@ -119,7 +120,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         # Internal variables
         self.__generating_set = None
-        self.__generating_set_given_weights_model = None
+        self.__mingenset_model = None
+        self.__given_weights_model = None
 
     def solve(self) -> bool:
         """
@@ -137,16 +139,16 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         """
         start_time = time.time()
 
-        if self.optimization_options.get("optimize_with_min_gen_set_and_given_weights", False):            
-            self.__solve_mfd_given_weights_and_min_gen_set()
+        if self.optimization_options.get("optimize_with_given_weights", MinFlowDecomp.optimize_with_given_weights):            
+            self.__solve_with_given_weights()
 
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):            
             fd_model = None
             # Checking if we have already found a solution with the same number of paths
             # via the min gen set and given weights approach
-            if self.__generating_set_given_weights_model is not None and self.__generating_set_given_weights_model.is_solved():
-                if len(self.__generating_set_given_weights_model.get_solution(remove_empty_paths=True)["paths"]) == i:
-                    fd_model = self.__generating_set_given_weights_model
+            if self.__given_weights_model is not None and self.__given_weights_model.is_solved():
+                if len(self.__given_weights_model.get_solution(remove_empty_paths=True)["paths"]) == i:
+                    fd_model = self.__given_weights_model
 
             if fd_model is None:
                 fd_model = kflowdecomp.kFlowDecomp(
@@ -169,46 +171,21 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 self.set_solved()
                 self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.time() - start_time
-
-                # storing the fd_model object for further analysis
                 self.fd_model = fd_model
                 return True
             
         return False
 
-    def __solve_mfd_given_weights_and_min_gen_set(self) -> bool:
+    def __solve_with_given_weights(self) -> bool:
 
-        selfG_nx = nx.DiGraph(self.G)
-        all_weights = set({int(selfG_nx.edges[e][self.flow_attr]) for e in selfG_nx.edges() if self.flow_attr in selfG_nx.edges[e]})
-
-        current_lowerbound_k = self.get_lowerbound_k()
-
-        source_flow = sum(selfG_nx.nodes[n].get(self.flow_attr, 0) for n in selfG_nx.nodes() if selfG_nx.in_degree(n) == 0)
-        # print("all_weights", all_weights)
-        
-        mingenset_solver = mgs.MinGenSet(
-            numbers = list(all_weights), 
-            total = source_flow, 
-            weight_type = self.weight_type,
-            lowerbound=current_lowerbound_k,
-            remove_sums_of_two=True,
-            )
-        mingenset_solver.solve()
-        
-        # If the min gen set problem is not solved, we cannot proceed
-        if not mingenset_solver.is_solved():
-            return False
-        
-        self.__generating_set = mingenset_solver.get_solution()
-        # print("generating_set", self.__generating_set)
-
-        all_weights.update(self.__generating_set)
+        all_weights = set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]})
         all_weights_list = list(all_weights)
         
-        current_lowerbound_k = max(current_lowerbound_k, len(self.__generating_set))
-        
-        # Updating also the lowerbound_k because this is correct even if we don't find a solution of the same size here
-        self.__lowerbound_k = current_lowerbound_k
+        current_lowerbound_k = self.get_lowerbound_k()
+
+        if self.__generating_set is not None:
+            all_weights.update(self.__generating_set)
+            all_weights_list = list(all_weights)
 
         given_weights_optimization_options = copy.deepcopy(self.optimization_options)
         given_weights_optimization_options["optimize_with_greedy"] = False
@@ -216,14 +193,11 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         given_weights_optimization_options["optimize_with_safe_sequences"] = False
         given_weights_optimization_options["optimize_with_zero_safe_edges"] = False
         given_weights_optimization_options["allow_empty_paths"] = True
-        given_weights_optimization_options["given_weights"] = all_weights_list # + left_mfd_solution["weights"]
-
-        # print("Now trying the full graph with weights")
-        # print(given_weights_optimization_options["given_weights"])
+        given_weights_optimization_options["given_weights"] = all_weights_list
 
         given_weights_kfd_solver = kflowdecomp.kFlowDecomp(
             G=self.G,
-            k = len(given_weights_optimization_options["given_weights"]) + self.optimization_options.get("optimize_with_min_gen_set_and_given_weights_num_free_paths", MinFlowDecomp.optimize_with_min_gen_set_and_given_weights_num_free_paths),
+            k = len(given_weights_optimization_options["given_weights"]) + self.optimization_options.get("optimize_with_given_weights_num_free_paths", MinFlowDecomp.optimize_with_given_weights_num_free_paths),
             flow_attr=self.flow_attr,
             weight_type=self.weight_type,
             subpath_constraints=self.subpath_constraints,
@@ -237,8 +211,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         given_weights_kfd_solver.solve()
 
         if given_weights_kfd_solver.is_solved():
-            self.__generating_set_given_weights_model = given_weights_kfd_solver
-            self.__generating_set_given_weights_model.solve_statistics["min_gen_set_solve_time"] = mingenset_solver.solve_statistics["solve_time"]
+            self.__given_weights_model = given_weights_kfd_solver
+            self.__given_weights_model.solve_statistics["min_gen_set_solve_time"] = self.__mingenset_model.solve_statistics["solve_time"]
 
     def solve3(self) -> bool:
 
@@ -405,4 +379,24 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         # self.__lowerbound_k = max(self.__lowerbound_k, stG.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
 
+        if self.optimization_options.get("use_min_gen_set_lowerbound", MinFlowDecomp.use_min_gen_set_lowerbound):
+            
+            all_weights = list(set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]}))
+            source_flow = sum(self.G.nodes[n].get(self.flow_attr, 0) for n in self.G.nodes() if self.G.in_degree(n) == 0)
+            
+            mingenset_model = mgs.MinGenSet(
+                numbers = all_weights, 
+                total = source_flow, 
+                weight_type = self.weight_type,
+                lowerbound = self.__lowerbound_k,
+                remove_sums_of_two = self.optimization_options.get("min_gen_set_remove_sums_of_two", MinFlowDecomp.min_gen_set_remove_sums_of_two),
+                )
+            mingenset_model.solve()
+        
+            # If we solved the min gen set problem, we can use the size of the generating set as a lowerbound
+            if mingenset_model.is_solved():        
+                self.__generating_set = mingenset_model.get_solution()
+                self.__mingenset_model = mingenset_model
+                self.__lowerbound_k = max(self.__lowerbound_k, len(self.__generating_set))
+        
         return self.__lowerbound_k

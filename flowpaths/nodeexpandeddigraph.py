@@ -7,7 +7,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self,
             G: nx.DiGraph,
             node_flow_attr: str,
-            fill_in_missing_flow_attr: bool = True,
+            try_filling_in_missing_flow_attr: bool = True,
             node_length_attr: str = None,
             ):
         """
@@ -36,7 +36,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             This attribute must be present in all nodes of the graph. This atrribute for each `v` is then 
             set to the edge `(v.0, v.1)` connecting the new expanded nodes.
 
-        - `fill_in_missing_flow_attr : bool`, optional
+        - `try_filling_in_missing_flow_attr : bool`, optional
 
             If `True`, fill in missing flow values in the expanded graph (i.e., if some original edge does not have the attribute specified by `node_flow_attr`), 
             by setting them to the flow values of a maximum flow between the sources and the sinks of the original graph, with capacity equal to the flow values of the nodes. 
@@ -130,7 +130,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 # This is not necessary, as the edge (node1, succ0) has already been added above, for succ
                 # self.__edges_to_ignore.append((node1, succ0))
 
-        if fill_in_missing_flow_attr:
+        if try_filling_in_missing_flow_attr:
             self.__fill_in_missing_flow_values()
 
         nx.freeze(self)    

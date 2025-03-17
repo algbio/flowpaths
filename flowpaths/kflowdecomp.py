@@ -236,13 +236,6 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 name=f"given_weight_{i}",
             )
 
-        # target_num_paths = self.optimization_options.get("lowerbound_k", 0)
-        # print("target_num_paths", target_num_paths)
-        # self.solver.add_constraint(
-        #     self.solver.quicksum(self.edge_vars[(u, v, i)] for u, v in self.G.edges() for i in range(self.k)) == target_num_paths,
-        #     name=f"target_num_paths",
-        # )
-
         self.solver.set_objective(
             self.solver.quicksum(self.edge_vars[(u, v, i)] for u, v in self.G.edges() for i in range(self.k)),
             sense="minimize",
