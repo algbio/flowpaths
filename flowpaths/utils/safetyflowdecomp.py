@@ -1,4 +1,3 @@
-import networkx as nx
 import flowpaths.stdigraph as stdigraph
 from collections import deque 
 
