@@ -14,11 +14,14 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     """
 
     # Default optimization parameters
-    subgraph_nodes_increment = 30
+    subgraph_lowerbound_size = 20
+    subgraph_lowerbound_shift = 18
     optimize_with_given_weights_num_free_paths = 0
     use_min_gen_set_lowerbound = False
     min_gen_set_remove_sums_of_two = True
     optimize_with_given_weights = False
+    use_subgraph_scanning_lowerbound = False
+    use_subgraph_scanning_weights_in_given_weights_optimization = True
 
     def __init__(
         self,
@@ -80,7 +83,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         - `optimization_options : dict`, optional
             
-            Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
+            Dictionary with the optimization options. Default is an empty dict. See [optimization options documentation](solver-options-optimizations.md).
             This class also supports the optimization `"optimize_with_greedy": True` (this is the default value). This
             will use a greedy algorithm to solve the problem, and if the number of paths returned by it equals a lowerbound on the solution size,
             then we know the greedy solution is optimum, and it will use that. The lowerbound used currently is the edge-width of the graph,
@@ -120,7 +123,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         # Internal variables
         self.__generating_set = None
-        self.__mingenset_model = None
+        self.__all_subgraph_weights = None
         self.__given_weights_model = None
 
     def solve(self) -> bool:
@@ -188,6 +191,15 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             all_weights.update(self.__generating_set)
             all_weights_list = list(all_weights)
 
+        # print("all_weights_list", sorted(all_weights_list))
+
+        if self.optimization_options.get("use_subgraph_scanning_weights_in_given_weights_optimization", MinFlowDecomp.use_subgraph_scanning_weights_in_given_weights_optimization):
+            if self.__all_subgraph_weights is not None:
+                all_weights.update(self.__all_subgraph_weights)
+                all_weights_list = list(all_weights)
+        
+        # print("all_weights_list", sorted(all_weights_list))
+
         given_weights_optimization_options = copy.deepcopy(self.optimization_options)
         given_weights_optimization_options["optimize_with_greedy"] = False
         given_weights_optimization_options["optimize_with_safe_paths"] = False
@@ -213,128 +225,90 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         if given_weights_kfd_solver.is_solved():
             self.__given_weights_model = given_weights_kfd_solver
-            self.__given_weights_model.solve_statistics["min_gen_set_solve_time"] = self.__mingenset_model.solve_statistics["solve_time"]
 
-    def solve3(self) -> bool:
+    def __get_lowerbound_with_min_gen_set(self) -> int:
 
         start_time = time.time()
+        all_weights = list(set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]}))
+        source_flow = sum(self.G.nodes[n].get(self.flow_attr, 0) for n in self.G.nodes() if self.G.in_degree(n) == 0)
+        current_lowerbound_k = self.__lowerbound_k if self.__lowerbound_k is not None else 1
+        min_gen_set_lowerbound = None
 
-        selfG_nx = nx.DiGraph(self.G)
-        topo_order = list(nx.topological_sort(selfG_nx))
-        # print("topo_order: ", topo_order)
-        all_weights = set({int(selfG_nx.edges[e][self.flow_attr]) for e in selfG_nx.edges() if self.flow_attr in selfG_nx.edges[e]})
-        all_weights_list = list(all_weights)
-        # print("all_weights", all_weights)
-
-        current_lowerbound_k = self.get_lowerbound_k()
-
-        source_flow = 0
-        for n in selfG_nx.nodes():
-            if selfG_nx.in_degree(n) == 0:
-                source_flow += selfG_nx.nodes[n].get(self.flow_attr,0)
-        print("source_flow", source_flow)
-        print("all_weights", all_weights)
-        
-        start_time = time.time()
-        mingenset_solver = mgs.MinGenSet(
-            numbers = all_weights_list, 
+        mingenset_model = mgs.MinGenSet(
+            numbers = all_weights, 
             total = source_flow, 
             weight_type = self.weight_type,
-            lowerbound=current_lowerbound_k)
-        mingenset_solver.solve()
-        generating_set = mingenset_solver.get_solution()
-
-        all_weights.update(generating_set)
-        all_weights_list = list(all_weights)
-        print(f"{time.time() - start_time} sec")
+            lowerbound = current_lowerbound_k,
+            remove_sums_of_two = self.optimization_options.get("min_gen_set_remove_sums_of_two", MinFlowDecomp.min_gen_set_remove_sums_of_two),
+            )
+        mingenset_model.solve()
+    
+        # If we solved the min gen set problem, we store it and the model, and return the number of elements in the generating set
+        if mingenset_model.is_solved():        
+            self.__generating_set = mingenset_model.get_solution()
+            min_gen_set_lowerbound = len(self.__generating_set)
         
-        current_lowerbound_k = max(current_lowerbound_k, len(generating_set))
+        self.solve_statistics["min_gen_set_solve_time"] = time.time() - start_time
+        
+        return min_gen_set_lowerbound
+    
+    def __get_lowerbound_with_subgraph_scanning(self) -> int:
 
-        print("current_lowerbound_k", current_lowerbound_k)
-
+        start_time = time.time()
+        topo_order = list(nx.topological_sort(self.G))
         right_node_index = 0
-        left_subpath_constraints = []        
+        subgraph_subpath_constraints = []    
+        current_lowerbound_k = self.__lowerbound_k if self.__lowerbound_k is not None else 1    
+        subgraph_scanning_lowerbound = 0
+        all_subgraph_weights = set()
 
-        while right_node_index < selfG_nx.number_of_nodes() - 1:
+        right_node_index = MinFlowDecomp.subgraph_lowerbound_size
 
-            right_node_index = min(right_node_index + MinFlowDecomp.subgraph_nodes_increment, selfG_nx.number_of_nodes() - 1)
-            print("right_node_index", right_node_index)
-            left_subgraph = gu.get_subgraph_between_topological_nodes(selfG_nx, topo_order=topo_order, left=right_node_index - MinFlowDecomp.subgraph_nodes_increment, right=right_node_index)
-            if not gu.check_flow_conservation(left_subgraph, self.flow_attr):
-                raise ValueError("Flow conservation not satisfied in subgraph")
+        while right_node_index < self.G.number_of_nodes() - 1:
+            
+            # print("right_node_index", right_node_index)
+            subgraph = gu.get_subgraph_between_topological_nodes(
+                self.G, 
+                topo_order=topo_order, 
+                left=right_node_index - MinFlowDecomp.subgraph_lowerbound_size, 
+                right=right_node_index)
 
-            left_subpath_constraints = [c for c in self.subpath_constraints if all(n in left_subgraph.nodes() for n in c)]
-            left_edges_to_ignore = [e for e in self.edges_to_ignore if all(n in left_subgraph.nodes() for n in e)]
-            self.optimization_options["lowerbound_k"] = current_lowerbound_k
+            subgraph_subpath_constraints = [c for c in self.subpath_constraints if all(n in subgraph.nodes() for n in c)]
+            subgraph_edges_to_ignore = [e for e in self.edges_to_ignore if all(n in subgraph.nodes() for n in e)]
+            
+            subgraph_optimization_options = copy.deepcopy(self.optimization_options)
+            subgraph_optimization_options["use_subgraph_scanning_lowerbound"] = False
+            subgraph_optimization_options["lowerbound_k"] = current_lowerbound_k
 
-            left_mfd_solver = MinFlowDecomp(
-                    G=left_subgraph,
+            subgraph_mfd_solver = MinFlowDecomp(
+                    G=subgraph,
                     flow_attr=self.flow_attr,
                     weight_type=self.weight_type,
-                    subpath_constraints=left_subpath_constraints,
+                    subpath_constraints=subgraph_subpath_constraints,
                     subpath_constraints_coverage=self.subpath_constraints_coverage,
                     subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
                     edge_length_attr=self.edge_length_attr,
-                    edges_to_ignore=left_edges_to_ignore,
-                    optimization_options=self.optimization_options,
+                    edges_to_ignore=subgraph_edges_to_ignore,
+                    optimization_options=subgraph_optimization_options,
                     solver_options=self.solver_options,
                 )
-            left_mfd_solver.solve()
-            if left_mfd_solver.is_solved():
-                left_mfd_solution = left_mfd_solver.get_solution()
-            
-                current_lowerbound_k = max(current_lowerbound_k,len(left_mfd_solution["weights"]))
-                print("left_mfd_solution['weights']", left_mfd_solution["weights"])
-                print("current_lowerbound_k", current_lowerbound_k)
+            subgraph_mfd_solver.solve()
+            if subgraph_mfd_solver.is_solved():
+                subgraph_mfd_solution = subgraph_mfd_solver.get_solution()
+                subgraph_scanning_lowerbound = max(subgraph_scanning_lowerbound, len(subgraph_mfd_solution["weights"]))
+                all_subgraph_weights.update(subgraph_mfd_solution["weights"])
 
-                # If we got a better lowerbound, 
-                full_graph_optimization_options = copy.deepcopy(self.optimization_options)
-                full_graph_optimization_options["optimize_with_greedy"] = False
-                full_graph_optimization_options["optimize_with_safe_paths"] = False
-                full_graph_optimization_options["optimize_with_safe_sequences"] = False
-                full_graph_optimization_options["optimize_with_zero_safe_edges"] = False
-                full_graph_optimization_options["allow_empty_paths"] = True
-                full_graph_optimization_options["given_weights"] = all_weights_list # + left_mfd_solution["weights"]
+            right_node_index = min(right_node_index + MinFlowDecomp.subgraph_lowerbound_shift, self.G.number_of_nodes() - 1)
 
-                print("Now trying the full graph with weights")
-                print(full_graph_optimization_options["given_weights"])
+        # Removing zero weight
+        if 0 in all_subgraph_weights:
+            all_subgraph_weights.remove(0)
 
-                full_mfd_solver = kflowdecomp.kFlowDecomp(
-                    G=self.G,
-                    k = len(full_graph_optimization_options["given_weights"]),
-                    flow_attr=self.flow_attr,
-                    weight_type=self.weight_type,
-                    subpath_constraints=self.subpath_constraints,
-                    subpath_constraints_coverage=self.subpath_constraints_coverage,
-                    subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-                    edge_length_attr=self.edge_length_attr,
-                    edges_to_ignore=self.edges_to_ignore,
-                    optimization_options=full_graph_optimization_options,
-                    solver_options=self.solver_options,
-                    )
-                full_mfd_solver.solve()
+        self.__all_subgraph_weights = all_subgraph_weights
 
-                if full_mfd_solver.is_solved():
-                    full_mfd_solution = full_mfd_solver.get_solution()
-                    non_empty_paths = []
-                    non_empty_weights = []
-                    for path, weight in zip(full_mfd_solution["paths"], full_mfd_solution["weights"]):
-                        if len(path) > 1:
-                            non_empty_paths.append(path)
-                            non_empty_weights.append(weight)
-                    
-                    if len(non_empty_weights) == current_lowerbound_k:
-
-                        self.__solution = {"paths": non_empty_paths, "weights": non_empty_weights}
-                        self.set_solved()
-                        self.solve_statistics = full_mfd_solver.solve_statistics
-                        self.solve_statistics["mfd_solve_time"] = time.time() - start_time
-
-                        # storing the fd_model object for further analysis
-                        self.fd_model = full_mfd_solver
-                        return True
-                
-                print("Full graph not solved. Continuing.")    
+        self.solve_statistics["subgraph_scanning_time"] = time.time() - start_time
+        
+        return subgraph_scanning_lowerbound if subgraph_scanning_lowerbound > 0 else None
 
     def get_solution(self):
         """
@@ -370,7 +344,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         
         stG = stdigraph.stDiGraph(self.G)
 
-        self.__lowerbound_k = self.optimization_options.get("lowerbound_k", 1) if self.optimization_options != None else 1
+        self.__lowerbound_k = self.optimization_options.get("lowerbound_k", 1)
 
         all_weights = set({int(self.G.edges[e][self.flow_attr]) for e in self.G.edges() if self.flow_attr in self.G.edges[e]})
         
@@ -380,24 +354,14 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         # self.__lowerbound_k = max(self.__lowerbound_k, stG.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
 
-        if self.optimization_options.get("use_min_gen_set_lowerbound", MinFlowDecomp.use_min_gen_set_lowerbound):
-            
-            all_weights = list(set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]}))
-            source_flow = sum(self.G.nodes[n].get(self.flow_attr, 0) for n in self.G.nodes() if self.G.in_degree(n) == 0)
-            
-            mingenset_model = mgs.MinGenSet(
-                numbers = all_weights, 
-                total = source_flow, 
-                weight_type = self.weight_type,
-                lowerbound = self.__lowerbound_k,
-                remove_sums_of_two = self.optimization_options.get("min_gen_set_remove_sums_of_two", MinFlowDecomp.min_gen_set_remove_sums_of_two),
-                )
-            mingenset_model.solve()
-        
-            # If we solved the min gen set problem, we can use the size of the generating set as a lowerbound
-            if mingenset_model.is_solved():        
-                self.__generating_set = mingenset_model.get_solution()
-                self.__mingenset_model = mingenset_model
-                self.__lowerbound_k = max(self.__lowerbound_k, len(self.__generating_set))
+        if self.optimization_options.get("use_min_gen_set_lowerbound", MinFlowDecomp.use_min_gen_set_lowerbound):  
+            mingenset_lowerbound = self.__get_lowerbound_with_min_gen_set()
+            if mingenset_lowerbound is not None:
+                self.__lowerbound_k = max(self.__lowerbound_k, mingenset_lowerbound)
+
+        if self.optimization_options.get("use_subgraph_scanning_lowerbound", MinFlowDecomp.use_subgraph_scanning_lowerbound):
+            subgraph_scanning_lowerbound = self.__get_lowerbound_with_subgraph_scanning()
+            if subgraph_scanning_lowerbound is not None:
+                self.__lowerbound_k = max(self.__lowerbound_k, subgraph_scanning_lowerbound)
         
         return self.__lowerbound_k
