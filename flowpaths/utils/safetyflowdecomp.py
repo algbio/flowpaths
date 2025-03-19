@@ -9,19 +9,37 @@ def compute_flow_decomp_safe_paths(
     A path is called flow decompostion safe if it appears in all flow
     decompositions as a subpath of a path.
 
+    Parameters
+    ----------
+    - `G`: stDiGraph: 
+
+        A directed graph of type stDiGraph.
+
+    - `flow_attr`: str
+
+        The name of the edge attribute where to get the flow values from.
+
+    - `no_duplicates`: bool
+
+        If `True`, the function returns a set of paths without duplicates.
+        
     Returns
     -------
-    - Paths (list of lists): A list of flow safe paths
+    
+    - `paths` (list of lists):
+    
+        A list of flow safe paths, as lists of nodes.
 
     Raises
-    -------
+    ------
+
     - ValueError: If an edge does not have the required flow attribute.
     - ValueError: If an edge has a negative flow value.
     """
 
     # Check that flow is non-negative
-    G.get_max_flow_value_and_check_positive_flow(
-        flow_attr,
+    G.get_max_flow_value_and_check_non_negative_flow(
+        flow_attr=flow_attr,
         edges_to_ignore=set(G.out_edges(G.source))|set(G.in_edges(G.sink))
     )
 
@@ -77,7 +95,7 @@ def compute_flow_decomp_safe_paths(
             L += 1
             path_not_suffix_of_previous = False
 
-
     if no_duplicates:
         safe_paths_list = [list(sp) for sp in safe_paths_set]
+    
     return safe_paths_list

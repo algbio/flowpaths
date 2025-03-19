@@ -299,7 +299,7 @@ class stDiGraph(nx.DiGraph):
 
         return non_zero_flow_edges
 
-    def get_max_flow_value_and_check_positive_flow(
+    def get_max_flow_value_and_check_non_negative_flow(
         self, flow_attr: str, edges_to_ignore: set
     ) -> float:
         """

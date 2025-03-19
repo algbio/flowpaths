@@ -115,7 +115,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore)
         self.flow_attr = flow_attr
         self.w_max = self.weight_type(
-            self.G.get_max_flow_value_and_check_positive_flow(
+            self.G.get_max_flow_value_and_check_non_negative_flow(
                 flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
             )
         )

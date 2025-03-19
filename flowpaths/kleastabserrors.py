@@ -128,7 +128,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         self.flow_attr = flow_attr
         self.w_max = k * self.weight_type(
-            self.G.get_max_flow_value_and_check_positive_flow(
+            self.G.get_max_flow_value_and_check_non_negative_flow(
                 flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
             )
         )
