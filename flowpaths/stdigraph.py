@@ -104,8 +104,10 @@ class stDiGraph(nx.DiGraph):
     def get_width(self, edges_to_ignore: list = None) -> int:
         """
         Calculate and return the width of the graph.
-        The width is computed as the maximum edge antichain if it has not been
-        previously calculated and stored. If the width has already been computed,
+        The width is computed as the minimum number of paths needed to cover all the edges of the graph, 
+        except those in the `edges_to_ignore` list. 
+        
+        If the width has already been computed and `edges_to_ignore` is empty,
         the stored value is returned.
 
         Returns
@@ -113,7 +115,7 @@ class stDiGraph(nx.DiGraph):
         - int: The width of the graph.
         """
 
-        if self.width != None:
+        if self.width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
             return self.width
         
         edges_to_ignore_set = set(edges_to_ignore or [])

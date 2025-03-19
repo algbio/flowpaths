@@ -41,6 +41,9 @@ This class implements a more general version, as follows:
     \lambda_{u,v} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right| \leq \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }\rho_i \cdot \alpha(|P_i|), ~\forall (u,v) \in E'.
     $$
 
+!!! warning "A lowerbound on $k$"
+    The value of $k$ must be at least the edge width of graph, meaning the minimum number of paths to cover all the edges in $E'$, except those edges $(u,v)$ for which $\lambda_{u,v} = 0$.
+
 ## 3. References
 
 1. Fernando H. C. Dias, Alexandru I. Tomescu

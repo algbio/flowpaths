@@ -6,9 +6,7 @@ import flowpaths.abstractpathmodeldag as pathmodel
 class kMinPathError(pathmodel.AbstractPathModelDAG):
     """
     This class implements the k-MinPathError model from 
-    Dias, Tomescu, "Accurate Flow Decomposition via Robust Integer Linear Programming", IEEE/ACM TCBB 2024
-    https://doi.org/10.1109/TCBB.2024.3433523
-    (see also https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content)
+    Dias, Tomescu, [Accurate Flow Decomposition via Robust Integer Linear Programming](https://doi.org/10.1109/TCBB.2024.3433523), IEEE/ACM TCBB 2024 (see [preprint](https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content))
 
     Given an edge-weighted DAG, this model looks for k paths, with associated weights and slacks, such that for every edge (u,v), 
     the sum of the weights of the paths going through (u,v) minus the flow value of (u,v) is at most 
@@ -73,8 +71,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
-            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`, see below) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+
+        - `edge_length_attr: str`, optional
+
+            The attribute name from where to get the edge lengths. Default is `None`.
 
         - `edges_to_ignore: list`, optional
             
@@ -164,6 +166,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
             if value == 0:
                 self.edges_to_ignore.add(key)
+
+        edge_width = self.G.get_width(self.edges_to_ignore)
+        if k < edge_width:
+            raise ValueError(f"k must be greater or equal than the minimum number of paths needed to cover the edges of the graph\n not in `edges_to_ignore` or with `edge_error_scaling` not 0 (in this case, this is {edge_width}). Otherwise, the model is infeasible. \nYou can get this number as `width = fp.stDiGraph(G).get_width()` or `width = fp.stDiGraph(G).get_width(ignore)`, where `ignore` contains\n the edges that you passed in `edges_to_ignore` and with `edge_error_scaling` that you set to 0.")
             
         self.path_length_ranges = path_length_ranges
         self.path_length_factors = path_length_factors
@@ -192,7 +198,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
             self.G, 
-            k, 
+            self.k, 
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
@@ -538,11 +544,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         if self.__lowerbound_k != None:
             return self.__lowerbound_k
 
-        weight_function = dict()
-        for e in self.G.edges():
-            if e not in self.edges_to_ignore:
-                weight_function[e] = 1
-
-        self.__lowerbound_k = self.G.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+        self.__lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
         return self.__lowerbound_k
