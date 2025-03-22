@@ -253,6 +253,9 @@ class stDiGraph(nx.DiGraph):
         in the graph and decomposes the flow along that path. The process continues
         until no more paths can be found.
 
+        !!! note "Note"
+            The decomposition path do not contain the global source nor sink.
+
         Returns
         ----------
         - tuple: A tuple containing two lists:
@@ -301,7 +304,7 @@ class stDiGraph(nx.DiGraph):
 
         return non_zero_flow_edges
 
-    def get_max_flow_value_and_check_positive_flow(
+    def get_max_flow_value_and_check_non_negative_flow(
         self, flow_attr: str, edges_to_ignore: set
     ) -> float:
         """

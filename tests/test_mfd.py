@@ -9,21 +9,24 @@ class TestMinFlowDecomp(unittest.TestCase):
 
     def setUp(self):
         weight_type = [int, float]  # 0
-        optimize_with_safe_paths = [True, False]  # 1
-        optimize_with_safe_sequences = [True, False]  # 2
-        optimize_with_safe_zero_edges = [True, False]  # 3
-        optimize_with_greedy = [True, False]  # 4
-        solvers = ["highs", "gurobi"]  # 5
+        solvers = ["highs", "gurobi"]  # 1
+        optimize_with_safe_paths = [True, False]  # 2
+        optimize_with_safe_sequences = [True, False]  # 3
+        optimize_with_safe_zero_edges = [True, False]  # 4
+        optimize_with_flow_safe_paths = [True, False]  # 5
+        optimize_with_greedy = [True, False]  # 6
+        
 
         self.graphs = fp.graphutils.read_graphs("./tests/tests.graph")
         self.params = list(
             itertools.product(
                 weight_type,
+                solvers,
                 optimize_with_safe_paths,
                 optimize_with_safe_sequences,
                 optimize_with_safe_zero_edges,
+                optimize_with_flow_safe_paths,
                 optimize_with_greedy,
-                solvers,
             )
         )
 
@@ -31,34 +34,51 @@ class TestMinFlowDecomp(unittest.TestCase):
 
         for graph in self.graphs:
 
+            print("*******************************************")
             print("Testing graph: ", graph.graph["id"])
+            print("*******************************************")
 
             first_solution_size = None
 
             for settings in self.params:
-                # safe paths and safe sequences cannot be both True
-                if settings[1] == True and settings[2] == True:
-                    continue
-                # we don't allow safe paths and safe sequences both False
-                if (
-                    settings[1] == False
-                    and settings[2] == False
-                ):
-                    continue
-                # if optimize_with_greedy, it makes no sense to try the safety optimizations
-                if settings[4] == True and (
-                    settings[2] == True or settings[3] == True or settings[4] == True
-                ):
-                    continue
 
                 optimization_options = {
-                    "optimize_with_safe_paths": settings[1],
-                    "optimize_with_safe_sequences": settings[2],
-                    "optimize_with_safe_zero_edges": settings[3],
-                    "optimize_with_greedy": settings[4],
+                    "optimize_with_safe_paths":         settings[2],
+                    "optimize_with_safe_sequences":     settings[3],
+                    "optimize_with_safe_zero_edges":    settings[4],
+                    "optimize_with_flow_safe_paths":    settings[5],
+                    "optimize_with_greedy":             settings[6],
                 }
 
-                solver_options = {"external_solver": settings[5]}
+                # we don't allow safe paths and safe sequences both True
+                if optimization_options["optimize_with_safe_paths"] and optimization_options["optimize_with_safe_sequences"]:
+                    continue
+
+                # we don't allow flow safe paths and safe sequences both True
+                if optimization_options["optimize_with_flow_safe_paths"] and optimization_options["optimize_with_safe_sequences"]:
+                    continue
+
+                # we don't allow safe paths and flow safe paths both True
+                if optimization_options["optimize_with_safe_paths"] and optimization_options["optimize_with_flow_safe_paths"]:
+                    continue
+                
+                # we don't allow safe paths, safe sequences, flow safe paths all False
+                if not optimization_options["optimize_with_safe_paths"] and not optimization_options["optimize_with_safe_sequences"] and not optimization_options["optimize_with_flow_safe_paths"]:
+                    continue
+                
+                # if optimize_with_greedy, it makes no sense to try the safety optimizations
+                if optimization_options["optimize_with_greedy"] and (
+                    optimization_options["optimize_with_safe_paths"]
+                    or optimization_options["optimize_with_safe_sequences"]
+                    or optimization_options["optimize_with_safe_zero_edges"]
+                    or optimization_options["optimize_with_flow_safe_paths"]
+                ):
+                    continue
+
+                print("-------------------------------------------")
+                print("Solving with optimization options:", {key for key in optimization_options if optimization_options[key]})
+
+                solver_options = {"solver": settings[1]}
 
                 mfd_model = fp.MinFlowDecomp(
                     graph,
@@ -68,7 +88,9 @@ class TestMinFlowDecomp(unittest.TestCase):
                     solver_options=solver_options,
                 )
                 mfd_model.solve()
-                # print(optimization_options, solver_options)
+                # optimization_options.pop("trusted_edges_for_safety", None)
+                # optimization_options.pop("external_safe_paths", None)
+                # print(optimization_options)
                 print(mfd_model.solve_statistics)
                 self.assertTrue(mfd_model.is_solved(), "Model should be solved")
                 self.assertTrue(
