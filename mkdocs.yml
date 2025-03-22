@@ -76,6 +76,9 @@ plugins:
       default_handler: python
       handlers:
         python:
+          inventories:
+          - url: https://docs.python-requests.org/en/master/objects.inv
+            domains: [std, py]
           options:
             show_root_toc_entry: false
             docstring_options:
@@ -83,7 +86,9 @@ plugins:
             # docstring_section_style: spacy
             separate_signature: true
             show_signature_annotations: true
-            # signature_crossrefs: true
-            # line_length: 60
+            modernize_annotations: true
+            signature_crossrefs: false
+            line_length: 30
+          load_external_modules: true
 
       
