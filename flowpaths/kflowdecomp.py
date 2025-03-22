@@ -164,7 +164,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
             self.G, 
-            k, 
+            self.k,
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,

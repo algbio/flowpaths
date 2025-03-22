@@ -49,7 +49,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         - `k: int`
             
-            The number of paths to decompose in.
+            The number of paths to decompose in. 
+
+            !!! note "Unknown $k$"
+                If you do not have a good guess for $k$, you can pass `k=None` and the model will set $k$ to the edge width of the graph.
 
         - `weight_type: int | float`, optional
             
@@ -145,21 +148,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             )
         self.weight_type = weight_type
 
-        self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
-
-        self.flow_attr = flow_attr
-        self.w_max = k * self.weight_type(
-            self.G.get_max_flow_value_and_check_non_negative_flow(
-                flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
-            )
-        )
-
-        self.k = k
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.edge_length_attr = edge_length_attr
         self.edge_error_scaling = edge_error_scaling
+
+        self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
         # Checking that every entry in self.edge_error_scaling is between 0 and 1
         for key, value in self.edge_error_scaling.items():
             if value < 0 or value > 1:
@@ -167,10 +162,19 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             if value == 0:
                 self.edges_to_ignore.add(key)
 
-        edge_width = self.G.get_width(self.edges_to_ignore)
-        if k < edge_width:
-            raise ValueError(f"k must be greater or equal than the minimum number of paths needed to cover the edges of the graph\n not in `edges_to_ignore` or with `edge_error_scaling` not 0 (in this case, this is {edge_width}). Otherwise, the model is infeasible. \nYou can get this number as `width = fp.stDiGraph(G).get_width()` or `width = fp.stDiGraph(G).get_width(ignore)`, where `ignore` contains\n the edges that you passed in `edges_to_ignore` and with `edge_error_scaling` that you set to 0.")
-            
+        self.flow_attr = flow_attr
+
+        self.k = k
+        # If we get the width of the graph and k is not specified, we set k to the edge width of the graph
+        if self.k is None:
+            self.k = self.G.get_width(self.edges_to_ignore)
+
+        self.w_max = self.k * self.weight_type(
+            self.G.get_max_flow_value_and_check_non_negative_flow(
+                flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
+            )
+        )
+
         self.path_length_ranges = path_length_ranges
         self.path_length_factors = path_length_factors
         if len(self.path_length_ranges) != len(self.path_length_factors):

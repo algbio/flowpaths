@@ -238,7 +238,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         if self.lowerbound_k != None:
             return self.lowerbound_k
         
-        tmp_model = self.model_type(**self.kwargs, k=1)
+        tmp_model = self.model_type(**self.kwargs, k = 1)
         self.lowerbound_k = tmp_model.get_lowerbound_k()
 
         return self.lowerbound_k
