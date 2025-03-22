@@ -3,7 +3,7 @@ import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
-
+import flowpaths.utils.safetyflowdecomp as sfd
 
 class kFlowDecomp(pathmodel.AbstractPathModelDAG):
     """
@@ -11,6 +11,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
     """
     # storing some defaults
     optimize_with_greedy = True
+    optimize_with_flow_safe_paths = True
 
     def __init__(
         self,
@@ -23,7 +24,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         subpath_constraints_coverage_length: float = None,
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
-        optimization_options: dict = None,
+        optimization_options: dict = {},
         solver_options: dict = None,
     ):
         """
@@ -138,12 +139,24 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         greedy_solution_paths = None
         self.optimize_with_greedy = self.optimization_options.get("optimize_with_greedy", kFlowDecomp.optimize_with_greedy)
+        self.optimize_with_flow_safe_paths = self.optimization_options.get("optimize_with_flow_safe_paths", kFlowDecomp.optimize_with_flow_safe_paths)
         
-        # We can apply the greedy algorithm only if there are no edges to ignore (in the original input graph)
-        if self.optimize_with_greedy and satisfies_flow_conservation:
+        # We can apply the greedy algorithm only if 
+        # - there are no edges to ignore (in the original input graph), and 
+        # - the graph satisfies flow conservation
+        if self.optimize_with_greedy and len(edges_to_ignore) == 0 and satisfies_flow_conservation:
             if self.__get_solution_with_greedy():
                 greedy_solution_paths = self.__solution["paths"]
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths
+        
+        if self.optimize_with_flow_safe_paths and satisfies_flow_conservation:
+            self.optimization_options["external_safe_paths"] = sfd.compute_flow_decomp_safe_paths(G=G, flow_attr=self.flow_attr)
+            # If we optimize with flow safe paths, we need to disable optimizing with safe paths and sequences
+            if self.optimization_options.get("optimize_with_safe_paths", False):
+                raise ValueError("Cannot optimize with both flow safe paths and safe paths")
+            if self.optimization_options.get("optimize_with_safe_sequences", False):
+                raise ValueError("Cannot optimize with both flow safe paths and safe sequences")
+        
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
 
         # Call the constructor of the parent class AbstractPathModelDAG
@@ -177,7 +190,6 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # Encodes the flow decomposition constraints for the given graph.
         # This method sets up the path weight variables and the edge variables encoding
         # the sum of the weights of the paths going through the edge.
-        
 
         # If already solved, no need to encode further
         if self.is_solved():

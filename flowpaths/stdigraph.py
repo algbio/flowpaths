@@ -251,6 +251,9 @@ class stDiGraph(nx.DiGraph):
         in the graph and decomposes the flow along that path. The process continues
         until no more paths can be found.
 
+        !!! note "Note"
+            The decomposition path do not contain the global source nor sink.
+
         Returns
         ----------
         - tuple: A tuple containing two lists:

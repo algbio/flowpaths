@@ -194,6 +194,7 @@ class AbstractPathModelDAG(ABC):
         if optimization_options is None:
             optimization_options = {}
         self.optimize_with_safe_paths = optimization_options.get("optimize_with_safe_paths", AbstractPathModelDAG.optimize_with_safe_paths)
+        self.external_safe_paths = optimization_options.get("external_safe_paths", None)
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDAG.optimize_with_safe_sequences)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
@@ -204,7 +205,24 @@ class AbstractPathModelDAG(ABC):
         if self.external_solution_paths is not None:
             self.__is_solved = True
 
+        # some checks
+        if self.optimize_with_safe_paths and self.external_safe_paths is None and self.trusted_edges_for_safety is None:
+            raise ValueError(
+                "trusted_edges_for_safety must be provided when optimizing with safe lists"
+            )
+        if self.optimize_with_safe_paths and self.external_safe_paths is not None:
+            raise ValueError("Cannot optimize with both safe paths and external safe paths")
+        
+        if self.optimize_with_safe_sequences and self.external_safe_paths is not None:
+            raise ValueError("Cannot optimize with both external safe paths and safe sequences")
+
+        if self.optimize_with_safe_paths and self.optimize_with_safe_sequences:
+            raise ValueError("Cannot optimize with both safe paths and safe sequences")        
+        
         self.safe_lists = None
+        if self.external_safe_paths is not None:
+            self.safe_lists = self.external_safe_paths
+        
         if self.optimize_with_safe_paths and not self.is_solved() and self.trusted_edges_for_safety is not None:
             start_time = time.time()
             self.safe_lists = safetypathcovers.safe_paths(
@@ -224,14 +242,6 @@ class AbstractPathModelDAG(ABC):
                 threads=self.threads,
             )
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
-
-        # some checks
-        if self.safe_lists is not None and self.trusted_edges_for_safety is None:
-            raise ValueError(
-                "trusted_edges_for_safety must be provided when optimizing with safe lists"
-            )
-        if self.optimize_with_safe_paths and self.optimize_with_safe_sequences:
-            raise ValueError("Cannot optimize with both safe paths and safe sequences")
 
     def create_solver_and_paths(self):
         """
