@@ -205,6 +205,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         given_weights_optimization_options["optimize_with_safe_paths"] = False
         given_weights_optimization_options["optimize_with_safe_sequences"] = False
         given_weights_optimization_options["optimize_with_zero_safe_edges"] = False
+        given_weights_optimization_options["optimize_with_flow_safe_paths"] = False
         given_weights_optimization_options["allow_empty_paths"] = True
         given_weights_optimization_options["given_weights"] = all_weights_list
 
