@@ -1,8 +1,9 @@
 import flowpaths.stdigraph as stdigraph
+import networkx as nx
 from collections import deque 
 
 def compute_inexact_flow_decomp_safe_paths(
-    G: stdigraph.stDiGraph, 
+    G: nx.DiGraph, 
     lowerbound_attr: str, 
     upperbound_attr: str, 
     decomp_paths: list, 
@@ -18,9 +19,9 @@ def compute_inexact_flow_decomp_safe_paths(
 
     Parameters
     ----------
-    - `G`: stDiGraph: 
+    - `G`: nx.DiGraph: 
 
-        A directed graph of type stDiGraph.
+        A directed graph as networkx DiGraph.
 
     - `lowerbound_attr`: str
 
@@ -45,7 +46,7 @@ def compute_inexact_flow_decomp_safe_paths(
     
     - `paths` (list of lists):
     
-        A list of maximal-length flow decomposition safe paths, as lists of nodes.
+        A list of maximal-length flow decomposition safe paths, as lists of edges.
 
     Raises
     ------
@@ -131,11 +132,19 @@ def compute_inexact_flow_decomp_safe_paths(
     if no_duplicates:
         safe_paths_list = [list(sp) for sp in safe_paths_set]
     
-    return safe_paths_list
+    # converting each path from a list of nodes to a list of edges
+    safe_paths_list_edges = []
+    for safe_path in safe_paths_list:
+        assert len(safe_path) > 1
+        safe_path_edges = []
+        for i in range(len(safe_path)-1):
+            safe_path_edges.append((safe_path[i], safe_path[i+1]))
+        safe_paths_list_edges.append(safe_path_edges)
 
+    return safe_paths_list_edges
 
 def compute_flow_decomp_safe_paths(
-    G: stdigraph.stDiGraph, 
+    G: nx.DiGraph, 
     flow_attr: str, 
     no_duplicates: bool = True
 ) -> list:
@@ -146,9 +155,9 @@ def compute_flow_decomp_safe_paths(
 
     Parameters
     ----------
-    - `G`: stDiGraph:
+    - `G`: nx.DiGraph:
 
-        A directed graph of type stDiGraph.
+        A directed graph as networkx DiGraph.
 
     - `flow_attr`: str
 
@@ -163,7 +172,7 @@ def compute_flow_decomp_safe_paths(
 
     - `paths` (list of lists):
 
-        A list of flow safe paths, as lists of nodes.
+        A list of flow safe paths, as lists of edges.
 
     Raises
     ------
@@ -172,13 +181,8 @@ def compute_flow_decomp_safe_paths(
     - ValueError: If an edge has a negative flow value.
     """
 
-    # Check that flow is non-negative and all edges have the required flow attributes
-    G.get_max_flow_value_and_check_non_negative_flow(
-        flow_attr=flow_attr,
-        edges_to_ignore=set(G.out_edges(G.source))|set(G.in_edges(G.sink))
-    )
-
-    decomp_paths = G.decompose_using_max_bottleck(flow_attr)[0]
+    stG = stdigraph.stDiGraph(G)
+    decomp_paths = stG.decompose_using_max_bottleck(flow_attr)[0]
     return compute_inexact_flow_decomp_safe_paths(
         G = G, 
         lowerbound_attr = flow_attr, 
