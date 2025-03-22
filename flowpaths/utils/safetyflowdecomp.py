@@ -2,12 +2,19 @@ import flowpaths.stdigraph as stdigraph
 from collections import deque 
 
 def compute_inexact_flow_decomp_safe_paths(
-    G: stdigraph.stDiGraph, lowerbound_attr: str, upperbound_attr: str, decomp_paths: list, no_duplicates: bool = True
-) -> set():
+    G: stdigraph.stDiGraph, 
+    lowerbound_attr: str, 
+    upperbound_attr: str, 
+    decomp_paths: list, 
+    no_duplicates: bool = True
+) -> list:
     """
-    Computes all flow decomposition safe paths for a given non-negative inexact flow.
-    A path is called flow decomposition safe if it appears in all flow
-    decompositions as a subpath of a path.
+    Computes all flow-decomposition safe paths for a given non-negative inexact flow,
+    given as intervals [lowerbound_attr, upperbound_attr] for every edge.
+    A path is called *flow-decomposition safe* if for all flow decompositions of an inexact flow,
+    it appears as a subpath of some path of the decomposition.
+    See https://doi.org/10.1109/BIBM47256.2019.8983180, https://doi.org/10.1007/978-3-031-04749-7_14, 
+    https://doi.org/10.4230/LIPIcs.SEA.2024.14
 
     Parameters
     ----------
@@ -128,12 +135,14 @@ def compute_inexact_flow_decomp_safe_paths(
 
 
 def compute_flow_decomp_safe_paths(
-    G: stdigraph.stDiGraph, flow_attr: str, no_duplicates: bool = True
-) -> set():
+    G: stdigraph.stDiGraph, 
+    flow_attr: str, 
+    no_duplicates: bool = True
+) -> list:
     """
-    Computes all flow decomposition safe paths for a given non-negative flow.
-    A path is called flow decompostion safe if it appears in all flow
-    decompositions as a subpath of a path.
+    Computes all flow-decomposition safe paths for a given non-negative flow.
+    A path is called *flow-decompostion safe* if for all flow decompositions,
+    it appears as a subpath of some path of the decomposition.
 
     Parameters
     ----------
@@ -170,4 +179,10 @@ def compute_flow_decomp_safe_paths(
     )
 
     decomp_paths = G.decompose_using_max_bottleck(flow_attr)[0]
-    return compute_inexact_flow_decomp_safe_paths(G = G, lowerbound_attr = flow_attr, upperbound_attr = flow_attr, decomp_paths = decomp_paths, no_duplicates = no_duplicates)
+    return compute_inexact_flow_decomp_safe_paths(
+        G = G, 
+        lowerbound_attr = flow_attr, 
+        upperbound_attr = flow_attr, 
+        decomp_paths = decomp_paths, 
+        no_duplicates = no_duplicates
+        )
