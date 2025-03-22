@@ -42,7 +42,9 @@ This class implements a more general version, as follows:
     $$
 
 !!! warning "A lowerbound on $k$"
-    The value of $k$ must be at least the edge width of graph, meaning the minimum number of paths to cover all the edges in $E'$, except those edges $(u,v)$ for which $\lambda_{u,v} = 0$.
+    The value of $k$ must be at least the edge width of graph, meaning the minimum number of paths to cover all the edges in $E'$, except those edges $(u,v)$ for which $\lambda_{u,v} = 0$. This value always gives a feasible model. 
+    
+    If you do not know this lower bound, you can pass `k = None` and the model will automatically set `k` to this lowerbound value.
 
 ## 3. References
 
