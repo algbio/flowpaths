@@ -84,6 +84,6 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
             # signature_crossrefs: true
-            line_length: 60
+            # line_length: 60
 
       
