@@ -81,7 +81,7 @@ plugins:
             domains: [std, py]
           options:
             show_root_toc_entry: false
-            docstring_options:
+            # docstring_options:
             merge_init_into_class: true
             # docstring_section_style: spacy
             separate_signature: true
