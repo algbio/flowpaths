@@ -11,7 +11,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
     """
     # storing some defaults
     optimize_with_greedy = True
-    optimize_with_flow_safe_paths = True
+    optimize_with_flow_safe_paths = False
 
     def __init__(
         self,
@@ -150,7 +150,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths
         
         if self.optimize_with_flow_safe_paths and satisfies_flow_conservation:
+            start_time = time.time()
             self.optimization_options["external_safe_paths"] = sfd.compute_flow_decomp_safe_paths(G=G, flow_attr=self.flow_attr)
+            self.solve_statistics["flow_safe_paths_time"] = time.time() - start_time
             # If we optimize with flow safe paths, we need to disable optimizing with safe paths and sequences
             if self.optimization_options.get("optimize_with_safe_paths", False):
                 raise ValueError("Cannot optimize with both flow safe paths and safe paths")
@@ -239,6 +241,13 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         weights = self.optimization_options.get("given_weights", None)
         if weights is None:
             return
+        
+        if self.optimization_options.get("optimize_with_safe_paths", False) or \
+            self.optimization_options.get("optimize_with_safe_sequences", False) or \
+            self.optimization_options.get("optimize_with_safe_zero_edges", False) or \
+            self.optimization_options.get("optimize_with_flow_safe_paths", False):
+            raise ValueError("Cannot optimize with both given weights and safety optimizations")
+            
         if len(weights) > self.k:
             raise ValueError(f"Length of given weights ({len(weights)}) is greater than k ({self.k})")
 
