@@ -165,7 +165,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.flow_attr = flow_attr
 
         self.k = k
-        # If we get the width of the graph and k is not specified, we set k to the edge width of the graph
+        # If k is not specified, we set k to the edge width of the graph
         if self.k is None:
             self.k = self.G.get_width(self.edges_to_ignore)
 
