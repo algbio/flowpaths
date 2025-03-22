@@ -84,7 +84,7 @@ plugins:
             # docstring_options:
             merge_init_into_class: true
             # docstring_section_style: spacy
-            separate_signature: true
+            separate_signature: true 
             show_signature_annotations: true
             modernize_annotations: true
             signature_crossrefs: false
