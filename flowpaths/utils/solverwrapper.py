@@ -23,7 +23,7 @@ class SolverWrapper:
     """
     # storing some defaults
     threads = 4
-    time_limit = 300
+    time_limit = float('inf')
     presolve = "choose"
     log_to_console = "false"
     external_solver = "highs"
