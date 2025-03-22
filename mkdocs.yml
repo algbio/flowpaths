@@ -73,7 +73,7 @@ plugins:
   - macros:
       module_name: docs/getversion
   - mkdocstrings:
-      # default_handler: python
+      default_handler: python
       handlers:
         python:
           options:
