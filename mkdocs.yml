@@ -23,6 +23,7 @@ nav:
     - Solver Wrapper: solver-wrapper.md
     - stDiGraph: stdigraph.md  
     - Minimum Generating Set: minimum-generating-set.md
+    - Minimum Set Cover: minimum-set-cover.md
 
 use_directory_urls: false
 

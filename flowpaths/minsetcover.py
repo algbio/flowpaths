@@ -10,7 +10,7 @@ class MinSetCover():
         ):
         """
         This class solves the minimum set cover problem. Given a universe `universe` and a list of subsets `subsets`,
-        the goal is to find the smallest list of subsets `set_cover` such that: 
+        the goal is to find the minimum-weight list of subsets `set_cover` such that: 
         
         - every element in `universe` is in at least one subset in `set_cover`.
         - the sum of the weights of the subsets in `set_cover` is minimized.
@@ -18,15 +18,15 @@ class MinSetCover():
         Parameters
         ----------
 
-        - `universe` : list`
+        - `universe: list`
 
             The universe of elements that must be covered.
 
-        - `subsets : list`
+        - `subsets: list`
 
             A list of subsets that can be used to cover the universe.
 
-        - `subset_weights : list`
+        - `subset_weights: list`
 
             The weight of each subset, as a list in the same order that the subsets appear in the list `subsets`. 
             If not provided, each subset is assumed to have a weight of 1.
@@ -129,6 +129,12 @@ class MinSetCover():
     def get_solution(self, as_subsets: bool = False):
         """
         Returns the solution to the minimum generating set problem, if the model was solved. 
+
+        Parameters
+        ----------
+        - `as_subsets: bool`
+            
+            If `True`, returns the subsets themselves. If `False`, returns the indices of the subsets in the list `subsets`.
         
         !!! warning "Warning"
             Call the `solve` method first.
