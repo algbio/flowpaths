@@ -69,8 +69,9 @@ class AbstractPathModelDAG(ABC):
         solve_statistics: dict = {},
     ):
         """
-        Args
-        ----
+        Parameters
+        ----------
+        
         - `G: stDiGraph.stDiGraph`  
             
             The directed acyclic graph (DAG) to be used.

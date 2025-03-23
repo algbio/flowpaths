@@ -53,3 +53,6 @@ flowchart LR
 !!! info "The $x_{u,v,i}$ variables are implemented as `edge_vars[(u, v, i)]`, see the class documentation below."
 
 ::: flowpaths.abstractpathmodeldag
+    options:
+      filters: 
+        - "!^__"

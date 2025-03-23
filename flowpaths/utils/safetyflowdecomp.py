@@ -50,11 +50,12 @@ def compute_inexact_flow_decomp_safe_paths(
 
     Raises
     ------
-
-    - ValueError: If an edge in a path from decomp_paths does not have the required flow attributes `lowerbound_attr` and `upperbound_attr`.
-    - ValueError: If an edge in a path from decomp_paths has a negative flow lower or upper bound.
-    - ValueError: If an edge in a path from decomp_paths has a larger lower bound than upper bound flow attribute.
-    - ValueError: If an edge in a path from decomp_paths has a zero flow upper bound.
+    - ValueError
+    
+        - If an edge in a path from decomp_paths does not have the required flow attributes `lowerbound_attr` and `upperbound_attr`.
+        - If an edge in a path from decomp_paths has a negative flow lower or upper bound.
+        - If an edge in a path from decomp_paths has a larger lower bound than upper bound flow attribute.
+        - If an edge in a path from decomp_paths has a zero flow upper bound.
     """
 
     # Check the necessary constraints
