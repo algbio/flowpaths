@@ -22,6 +22,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     optimize_with_given_weights = False
     use_subgraph_scanning_lowerbound = False
     use_subgraph_scanning_weights_in_given_weights_optimization = True
+    optimize_with_gen_set_weights = False
 
     def __init__(
         self,
@@ -125,6 +126,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.__generating_set = None
         self.__all_subgraph_weights = None
         self.__given_weights_model = None
+        self.__gen_set_weights_model = None
 
     def solve(self) -> bool:
         """
@@ -145,6 +147,12 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         if self.optimization_options.get("optimize_with_given_weights", MinFlowDecomp.optimize_with_given_weights):            
             self.__solve_with_given_weights()
 
+        if self.optimization_options.get("optimize_with_gen_set_weights", MinFlowDecomp.optimize_with_gen_set_weights):
+            if self.__solve_with_generating_set_weights():
+                print("Solved with generating set weights")
+
+        print("Starting the for loop")
+
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):            
             fd_model = None
             # Checking if we have already found a solution with the same number of paths
@@ -152,6 +160,10 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             if self.__given_weights_model is not None and self.__given_weights_model.is_solved():
                 if len(self.__given_weights_model.get_solution(remove_empty_paths=True)["paths"]) == i:
                     fd_model = self.__given_weights_model
+
+            # Checking if we have already found a solution via the min gen set weight model
+            if self.__gen_set_weights_model is not None and self.__gen_set_weights_model.is_solved():
+                fd_model = self.__gen_set_weights_model
 
             if fd_model is None:
                 fd_model = kflowdecomp.kFlowDecomp(
@@ -226,6 +238,39 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         if given_weights_kfd_solver.is_solved():
             self.__given_weights_model = given_weights_kfd_solver
+
+    def __solve_with_generating_set_weights(self) -> bool:
+
+        # We call this so that the generating set is computed and stored in the class, if this optimizaiton is activated
+        current_lowerbound_k = self.get_lowerbound_k()
+
+        if self.__generating_set is None:
+            return False
+
+        print("Now solving with generating set weights")
+        print("Generating set", self.__generating_set)
+
+        gen_set_weights_optimization_options = copy.deepcopy(self.optimization_options)
+        gen_set_weights_optimization_options["weights_from_gen_set"] = self.__generating_set
+
+        gen_set_weights_kfd_solver = kflowdecomp.kFlowDecomp(
+            G=self.G,
+            k = len(self.__generating_set),
+            flow_attr=self.flow_attr,
+            weight_type=self.weight_type,
+            subpath_constraints=self.subpath_constraints,
+            subpath_constraints_coverage=self.subpath_constraints_coverage,
+            subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+            edge_length_attr=self.edge_length_attr,
+            edges_to_ignore=self.edges_to_ignore,
+            optimization_options=gen_set_weights_optimization_options,
+            solver_options=self.solver_options,
+            )
+        gen_set_weights_kfd_solver.solve()
+
+        if gen_set_weights_kfd_solver.is_solved():
+            self.__gen_set_weights_model = gen_set_weights_kfd_solver
+
 
     def __get_lowerbound_with_min_gen_set(self) -> int:
 

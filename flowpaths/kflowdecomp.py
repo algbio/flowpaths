@@ -187,6 +187,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # The given weights optimization
         self.__encode_given_weights()
 
+        # The weights from the gen set optimization
+        self.__encode_weights_from_gen_set()
+
     def __encode_flow_decomposition(self):
         
         # Encodes the flow decomposition constraints for the given graph.
@@ -207,7 +210,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         )
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
-            name_prefix="w",
+            name_prefix="path_weights",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
@@ -242,6 +245,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         if weights is None:
             return
         
+        print("kFD given_weights: ", weights)
+        
         if self.optimization_options.get("optimize_with_safe_paths", False):
             raise ValueError("Cannot optimize with both given weights and safe paths")
         if self.optimization_options.get("optimize_with_safe_sequences", False):
@@ -264,6 +269,44 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             self.solver.quicksum(self.edge_vars[(u, v, i)] for u, v in self.G.edges() for i in range(self.k)),
             sense="minimize",
         )
+
+    def __encode_weights_from_gen_set(self):
+
+        gen_set_weights = self.optimization_options.get("weights_from_gen_set", None)
+        if gen_set_weights is None:
+            return
+        print("kFD gen_set_weights: ", gen_set_weights)
+        print("kFD k: ", self.k)
+
+        self.weight_indexes = [(i, j) for i in range(self.k) for j in range(len(gen_set_weights))]
+
+        self.weight_gen_set_var = self.solver.add_variables(
+            self.weight_indexes,
+            name_prefix="weight_gen_set",
+            lb=0,
+            ub=1,
+            var_type="integer",
+        )
+
+        for i in range(self.k):
+            self.solver.add_constraint(
+                1 
+                == self.solver.quicksum(
+                    self.weight_gen_set_var[(i, j)] 
+                    for j in range(len(gen_set_weights))
+                    ),
+                name=f"sum_weight_gen_set_{i}",
+            )
+            
+            self.solver.add_constraint(
+                self.path_weights_vars[i] 
+                == self.solver.quicksum(
+                    self.weight_gen_set_var[(i, j)] 
+                    * gen_set_weights[j] 
+                    for j in range(len(gen_set_weights))
+                    ),
+                name=f"weight_gen_set_{i}",
+            )
 
     def __get_solution_with_greedy(self):
         
@@ -342,7 +385,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             return self.__solution
 
         self.check_is_solved()
-        weights_sol_dict = self.solver.get_variable_values("w", [int])
+        weights_sol_dict = self.solver.get_variable_values("path_weights", [int])
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])
