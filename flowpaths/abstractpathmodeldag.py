@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 class AbstractPathModelDAG(ABC):
     """
-    This is an abstract class modelling a path-finding (M)ILP in a DAG. The desing of this package is based on the
+    This is an abstract class modelling a path-finding (M)ILP in a DAG. The design of this package is based on the
     following principles:
 
     - The class is designed to be extended by other classes that model specific path-finding problems in DAGs.
@@ -35,7 +35,7 @@ class AbstractPathModelDAG(ABC):
         - Note that the length of a path is the sum of the lengths of the edges in the path
         - If you set `edge_length_attr`, then the lengths are the sum of the lengths of the edges in the path
         - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
-        - **NOTE**: the length also includes the edges from gobal source to the first vertex, and from the last vertex to the global sink. By default, these do not have a length attached, so each gets length 1.
+        - **NOTE**: the length also includes the edges from global source to the first vertex, and from the last vertex to the global sink. By default, these do not have a length attached, so each gets length 1.
         
     - **solver**: a solver object to solve the (M)ILP, implemented using our [SolverWrapper](solver-wrapper.md) class.
 
@@ -71,7 +71,7 @@ class AbstractPathModelDAG(ABC):
         """
         Parameters
         ----------
-        
+
         - `G: stDiGraph.stDiGraph`  
             
             The directed acyclic graph (DAG) to be used.
@@ -124,10 +124,10 @@ class AbstractPathModelDAG(ABC):
                 Set of trusted edges for safety. Defaults to `None`.
 
                 !!! warning "Global optimality"
-                    In order for the optimizations to still guarantee a global optimium, you must guarantee that:
+                    In order for the optimizations to still guarantee a global optimum, you must guarantee that:
 
                     1. The solution is made up of source-to-sink paths, and
-                    2. Every edge in `trusted_edges_for_safety` appears in some solution path, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decompositon](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
+                    2. Every edge in `trusted_edges_for_safety` appears in some solution path, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decomposition](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
 
             - `"external_solution_paths" : list`
             

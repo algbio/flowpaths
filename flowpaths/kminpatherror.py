@@ -256,7 +256,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         
         # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content
         # We will encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
-        # assuming self.w_max is a bound for self.path_wslacks_vars[(i)]
+        # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
         self.gamma_vars = self.solver.add_variables(
             self.edge_indexes,
             name_prefix="gamma",

@@ -156,7 +156,7 @@ class SolverWrapper:
         Args:
             binary_var (variable): The binary variable.
             continuous_var (variable): The continuous variable (can also be integer).
-            product_var (variable): The variable that should be equal to the product of the binary and continous variables.
+            product_var (variable): The variable that should be equal to the product of the binary and continuous variables.
             lb (float): The lower bound of the continuous variable.
             ub (float): The upper bound of the continuous variable.
             name (str): The name of the constraint.
@@ -185,7 +185,7 @@ class SolverWrapper:
         continuous_var : Variable
             The continuous variable (can also be integer).
         product_var : Variable
-            The variable that should be equal to the product of the binary and continous variables.
+            The variable that should be equal to the product of the binary and continuous variables.
         lb, ub : float
             The lower and upper bounds of the continuous variable.
         name : str

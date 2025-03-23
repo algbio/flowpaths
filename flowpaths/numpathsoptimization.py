@@ -100,7 +100,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             )
         
         if 'k' in self.kwargs:
-            raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths accoring to the stopping criteria.")
+            raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths according to the stopping criteria.")
         
         self.lowerbound_k = None
         self.__solution = None

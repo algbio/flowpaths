@@ -10,7 +10,7 @@ import math
 
 class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
     """
-    A class to decompose a network flow if a directed acylic graph into a minimum number of weighted paths.
+    A class to decompose a network flow if a directed acyclic graph into a minimum number of weighted paths.
     """
 
     # Default optimization parameters
@@ -130,7 +130,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         """
         Attempts to solve the flow distribution problem using a model with varying number of paths.
 
-        This method iterates over a range of possible path counts, creating and solving a flow decompostion model for each count.
+        This method iterates over a range of possible path counts, creating and solving a flow decomposition model for each count.
         If a solution is found, it stores the solution and relevant statistics, and returns True. If no solution is found after
         iterating through all possible path counts, it returns False.
 
@@ -184,7 +184,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         all_weights = set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]})
         all_weights_list = list(all_weights)
         
-        # We call this so that the generating set is computed and stored in the class, if this optimizaiton is activated
+        # We call this so that the generating set is computed and stored in the class, if this optimization is activated
         _ = self.get_lowerbound_k()
 
         if self.__generating_set is not None:

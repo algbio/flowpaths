@@ -28,7 +28,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         solver_options: dict = None,
     ):
         """
-        Initialize the Flow Decompostion model for a given number of paths `num_paths`.
+        Initialize the Flow Decomposition model for a given number of paths `num_paths`.
 
         Parameters
         ----------
@@ -279,9 +279,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         
 
         start_time = time.time()
-        (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
+        (paths, weights) = self.G.decompose_using_max_bottleneck(self.flow_attr)
 
-        # Check if the greedy decomposition satisfies the subpath contraints
+        # Check if the greedy decomposition satisfies the subpath constraints
         if self.subpath_constraints:
             for subpath in self.subpath_constraints:
                 if self.subpath_constraints_coverage_length is None:

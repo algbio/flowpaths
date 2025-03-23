@@ -7,7 +7,7 @@ The [AbstractPathModelDAG](abstract-path-model.md) class can receive several opt
 Set this options by passing a dictionary `solver_options`, with the following possible keys, and values:
 
 - `"threads"` (int): Number of threads to use. Defaults to 4.
-- `"time_limit"` (int): Time limit for solving in secods. Defaults to 300. 
+- `"time_limit"` (int): Time limit for solving in seconds. Defaults to Infinity.
 - `"presolve"` (str): Presolve option. Defaults to `"choose"`.
 - `"log_to_console"` (str): Log to console option. Defaults to `"false"`.
 - `"external_solver"` (str): External solver to use. Defaults to `"highs"`.
@@ -24,9 +24,9 @@ solver_options = {
 }
 
 your_model = fp.kMinPathError(
-    graph,
+    G=graph,
+    k=5,
     flow_attr="flow",
-    num_paths=5,
     solver_options=solver_options,
 )
 ```
@@ -36,6 +36,7 @@ your_model = fp.kMinPathError(
 Flowpaths implements several optimizations that reduce the search space for the solution paths, based on the structure of the graph, while guaranteeing exact solutions. A typical user does not need to worry about these. However, they can be changed by passing a dictionary `optimization_options`, with the following possible keys, and values:
 
 - `"optimize_with_safe_paths"` (bool): Whether to optimize with safe paths. Defaults to `True`.
+- `"optimize_with_flow_safe_paths"` (bool): Whether to optimize with flow-safe paths. This applied only to the Minimum Flow Decomposition problem and defaults to `True`. This overrides `"optimize_with_safe_paths"`.
 - `"optimize_with_safe_sequences"` (bool): Whether to optimize with safe sequences. Defaults to `False`. At the moment, you cannot set both `"optimize_with_safe_paths"` and `"optimize_with_safe_sequences"`.
 - `"optimize_with_safe_zero_edges"` (bool): Whether to optimize with safe zero edges. Defaults to `False`. You cannot set this without setting one of the above.
 
@@ -48,10 +49,10 @@ optimization_options = {
 }
 
 your_model = fp.kMinPathError(
-    graph,
+    G=graph,
+    k=5,
     flow_attr="flow",
-    num_paths=5,
-    solver_options=solver_options,
+    optimization_options=optimization_options,
 )
 ```
 

@@ -75,7 +75,7 @@ class stDiGraph(nx.DiGraph):
         self.reachable_nodes_from = {node:{node} for node in self.nodes()}
         self.reachable_edges_from = {node:set() for node in self.nodes()}
         # Initialize reachable_nodes_from and reachable_edges_from by 
-        # traversing the nodes in reverse topoloigical order.
+        # traversing the nodes in reverse topological order.
         for node in self.topological_order_rev:
             for v in self.successors(node):
                 self.reachable_nodes_from[node] |= self.reachable_nodes_from[v]
@@ -86,7 +86,7 @@ class stDiGraph(nx.DiGraph):
         self.reachable_nodes_rev_from = {node:{node} for node in self.nodes()}
         self.reachable_edges_rev_from = {node:set() for node in self.nodes()}
         # Initialize reachable_nodes_from and reachable_edges_from by 
-        # traversing the nodes in reverse topoloigical order.
+        # traversing the nodes in reverse topological order.
         for node in self.topological_order:
             for v in self.predecessors(node):
                 self.reachable_nodes_rev_from[node] |= self.reachable_nodes_rev_from[v]
@@ -246,7 +246,7 @@ class stDiGraph(nx.DiGraph):
 
         return minFlowCost
 
-    def decompose_using_max_bottleck(self, flow_attr: str):
+    def decompose_using_max_bottleneck(self, flow_attr: str):
         """
         Decomposes the flow greedily into paths using the maximum bottleneck algorithm.
         This method iteratively finds the path with the maximum bottleneck capacity
@@ -273,7 +273,7 @@ class stDiGraph(nx.DiGraph):
         temp_G.remove_nodes_from([self.source, self.sink])
 
         while True:
-            bottleneck, path = graphutils.max_bottleck_path(temp_G, flow_attr)
+            bottleneck, path = graphutils.max_bottleneck_path(temp_G, flow_attr)
             if path is None:
                 break
 

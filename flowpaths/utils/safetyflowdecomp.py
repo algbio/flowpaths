@@ -51,7 +51,7 @@ def compute_inexact_flow_decomp_safe_paths(
     Raises
     ------
     - ValueError
-    
+
         - If an edge in a path from decomp_paths does not have the required flow attributes `lowerbound_attr` and `upperbound_attr`.
         - If an edge in a path from decomp_paths has a negative flow lower or upper bound.
         - If an edge in a path from decomp_paths has a larger lower bound than upper bound flow attribute.
@@ -151,7 +151,7 @@ def compute_flow_decomp_safe_paths(
 ) -> list:
     """
     Computes all flow-decomposition safe paths for a given non-negative flow.
-    A path is called *flow-decompostion safe* if for all flow decompositions,
+    A path is called *flow-decomposition safe* if for all flow decompositions,
     it appears as a subpath of some path of the decomposition.
 
     Parameters
@@ -183,7 +183,7 @@ def compute_flow_decomp_safe_paths(
     """
 
     stG = stdigraph.stDiGraph(G)
-    decomp_paths = stG.decompose_using_max_bottleck(flow_attr)[0]
+    decomp_paths = stG.decompose_using_max_bottleneck(flow_attr)[0]
     return compute_inexact_flow_decomp_safe_paths(
         G = G, 
         lowerbound_attr = flow_attr, 

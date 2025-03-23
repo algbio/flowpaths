@@ -95,7 +95,7 @@ def min_cost_flow(G: nx.DiGraph, s, t, demands_attr = 'l', capacities_attr = 'u'
         return None, None
 
 
-def max_bottleck_path(G: nx.DiGraph, flow_attr) -> tuple:
+def max_bottleneck_path(G: nx.DiGraph, flow_attr) -> tuple:
     """
     Computes the maximum bottleneck path in a directed graph.
 
