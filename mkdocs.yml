@@ -1,4 +1,5 @@
 site_name: flowpaths
+repo_url: https://github.com/algbio/flowpaths
 
 nav:
   - Home: 
@@ -38,6 +39,9 @@ theme:
     - navigation.expand
     - navigation.path
   logo: flowpaths-logo.svg  
+  favicon: flowpaths-logo.svg
+  icon:
+    repo: fontawesome/brands/github
 
 extra_javascript:
   - javascripts/katex.js
