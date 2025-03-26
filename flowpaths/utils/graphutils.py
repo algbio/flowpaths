@@ -232,7 +232,9 @@ def draw_solution_basic(
             "show_path_weights": False,
             "show_path_weight_on_first_edge": True,
             "pathwidth": 3.0
-        }
+        },
+        additional_starts: list = [],
+        additional_ends: list = [],
         ):
         """
         Draw the graph with the paths and their weights highlighted.
@@ -283,6 +285,14 @@ def draw_solution_basic(
             - `pathwidth`: float
             
                 The width of the path to be drawn. Default is `3.0`.
+
+            - `additional_starts`: list
+
+                A list of additional nodes to highlight in green as starting nodes. Default is an empty list.
+
+            - `additional_ends`: list
+
+                A list of additional nodes to highlight in red as ending nodes. Default is an empty list.
         """
 
         if id == "":
@@ -321,6 +331,23 @@ def draw_solution_basic(
             dot.attr('node', fontname='Arial')
 
             if draw_options.get("show_graph_edges", True):
+                # drawing nodes
+                for node in graph.nodes():
+                    color = "black"
+                    penwidth = "1.0"
+                    if node in additional_starts:
+                        color = "green"
+                        penwidth = "2.0"
+                    elif node in additional_ends:
+                        color = "red"
+                        penwidth = "2.0"
+                    
+                    dot.node(
+                            str(node), 
+                            color=color, 
+                            penwidth=penwidth)
+
+                # drawing edges
                 for u, v, data in graph.edges(data=True):
                     if draw_options.get("show_edge_weights", False):
                         dot.edge(
