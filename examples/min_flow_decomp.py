@@ -52,7 +52,6 @@ def main():
 def process_solution(model: fp.MinFlowDecomp):
     if model.is_solved():
         print(model.get_solution())
-        # fp.utils.draw_solution_basic(model.G, flow_attr="flow", paths = solution["paths"], weights = solution["weights"], id = model.G.graph["id"])
     else:
         print("Model could not be solved.")
 

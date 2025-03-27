@@ -22,12 +22,12 @@ mpe_model.solve()
 # Draw the solution
 if mpe_model.is_solved():
     solution = mpe_model.get_solution()
-    fp.utils.draw_solution_basic(
+    fp.utils.draw_solution(
         graph=graph,
+        filename="simple_graph.pdf",
         flow_attr="flow",
         paths=solution["paths"],
         weights=solution["weights"],
-        id=graph.graph["id"],
         draw_options={
         "show_graph_edges": True,
         "show_edge_weights": False,

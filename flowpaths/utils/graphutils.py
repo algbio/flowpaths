@@ -220,12 +220,15 @@ def max_occurrence(seq, paths_in_DAG, edge_lengths: dict = {}) -> int:
             
     return max_occurence
 
-def draw_solution_basic(
+def draw_solution(
         graph: nx.DiGraph, 
+        filename: str,
         flow_attr: str = None,
         paths: list = [], 
         weights: list = [], 
-        id: str = "",
+        additional_starts: list = [],
+        additional_ends: list = [],
+        subpath_constraints: list = [],
         draw_options: dict = {
             "show_graph_edges": True,
             "show_edge_weights": False,
@@ -233,8 +236,6 @@ def draw_solution_basic(
             "show_path_weight_on_first_edge": True,
             "pathwidth": 3.0
         },
-        additional_starts: list = [],
-        additional_ends: list = [],
         ):
         """
         Draw the graph with the paths and their weights highlighted.
@@ -246,21 +247,33 @@ def draw_solution_basic(
         
             The input directed acyclic graph, as networkx DiGraph. 
 
+        - `filename`: str
+        
+            The name of the file to save the drawing. The file type is inferred from the extension. Supported extensions are '.bmp', '.canon', '.cgimage', '.cmap', '.cmapx', '.cmapx_np', '.dot', '.dot_json', '.eps', '.exr', '.fig', '.gd', '.gd2', '.gif', '.gtk', '.gv', '.ico', '.imap', '.imap_np', '.ismap', '.jp2', '.jpe', '.jpeg', '.jpg', '.json', '.json0', '.pct', '.pdf', '.pic', '.pict', '.plain', '.plain-ext', '.png', '.pov', '.ps', '.ps2', '.psd', '.sgi', '.svg', '.svgz', '.tga', '.tif', '.tiff', '.tk', '.vml', '.vmlz', '.vrml', '.wbmp', '.webp', '.x11', '.xdot', '.xdot1.2', '.xdot1.4', '.xdot_json', '.xlib'
+
         - `flow_attr`: str
         
-            The attribute name from where to get the flow values on the edges.
+            The attribute name from where to get the flow values on the edges. Default is an empty string, in which case no edge weights are shown.
 
         - `paths`: list
         
-            The list of paths to highlight, as lists of nodes. Default is an empty list, in which case no path is drawn.
+            The list of paths to highlight, as lists of nodes. Default is an empty list, in which case no path is drawn. Default is an empty list.
 
         - `weights`: list
         
-            The list of weights corresponding to the paths. Default is an empty list, in which case no path is drawn.
+            The list of weights corresponding to the paths, of various colors. Default is an empty list, in which case no path is drawn.
 
-        - `id`: str
+        - `additional_starts`: list
+
+                A list of additional nodes to highlight in green as starting nodes. Default is an empty list.
+
+        - `additional_ends`: list
+
+                A list of additional nodes to highlight in red as ending nodes. Default is an empty list.
         
-            The identifier of the graph, to be used as filename of the file containing the drawings. Default is an empty string, in which case the object id of the graph object will be used.
+        - `subpath_constraints`: list
+
+            A list of subpaths to highlight in the graph as dashed edges, of various colors. Each subpath is a list of edges. Default is an empty list. There is no association between the subpath colors and the path colors.
         
         - `draw_options`: dict
 
@@ -286,17 +299,7 @@ def draw_solution_basic(
             
                 The width of the path to be drawn. Default is `3.0`.
 
-            - `additional_starts`: list
-
-                A list of additional nodes to highlight in green as starting nodes. Default is an empty list.
-
-            - `additional_ends`: list
-
-                A list of additional nodes to highlight in red as ending nodes. Default is an empty list.
         """
-
-        if id == "":
-            id = id(graph)
 
         if len(paths) != len(weights):
             raise ValueError("Paths and weights must have the same length, if provided.")
@@ -376,15 +379,27 @@ def draw_solution_basic(
                         dot.edge(
                             str(path[i]),
                             str(path[i + 1]),
-                            fontcolor=pathColor,
                             color=pathColor,
                             penwidth=str(draw_options.get("pathwidth", 3.0)),
                             )
+                
+            for index, path in enumerate(subpath_constraints):
+                pathColor = colors[index % len(colors)]
+                for i in range(len(path)):
+                    if len(path[i]) != 2:
+                        raise ValueError("Subpaths must be lists of edges.")
+                    dot.edge(
+                        str(path[i][0]),
+                        str(path[i][1]),
+                        color=pathColor,
+                        style="dashed",
+                        penwidth="2.0"
+                        )
                     
                 if len(path) == 1:
                     dot.node(str(path[0]), color=pathColor, penwidth=str(draw_options.get("pathwidth", 3.0)))
-            
-            dot.render(f"{id}.dot", view=False)
+
+            dot.render(outfile=filename, view=False, cleanup=True)
         
         except ImportError:
             raise ImportError("graphviz module not found. Please install it via pip (pip install graphviz).")
@@ -420,7 +435,7 @@ def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, 
 
     return subgraph
 
-def draw_solution(graph: nx.DiGraph, paths: list, weights: list, id:str):
+def draw_solution_WIP(graph: nx.DiGraph, paths: list, weights: list, id:str):
 
     import matplotlib.pyplot as plt
     import pydot

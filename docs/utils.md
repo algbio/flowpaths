@@ -29,12 +29,12 @@ mpe_model.solve()
 # Draw the solution
 if mpe_model.is_solved():
     solution = mpe_model.get_solution()
-    fp.utils.draw_solution_basic(
+    fp.utils.draw_solution(
         graph=graph,
+        filename="simple_graph.pdf",
         flow_attr="flow",
         paths=solution["paths"],
         weights=solution["weights"],
-        id=graph.graph["id"], # this will be used as filename
         draw_options={
         "show_graph_edges": True,
         "show_edge_weights": False,
@@ -44,7 +44,7 @@ if mpe_model.is_solved():
     })
 ```
 
-This produces two files: one with extension `.dot` storing the source of the dot graph, and one `.pdf` storing the PDF image of the graph.
+This produces a file with extension `.pdf` storing the PDF image of the graph.
 
 !!! warning "Graphviz dependency"
     Drawing graphs as above requires the Python package `graphviz`. Install via: 

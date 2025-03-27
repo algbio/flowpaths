@@ -1,11 +1,11 @@
 from .graphutils import min_cost_flow
 from .graphutils import max_bottleneck_path
 from .graphutils import check_flow_conservation
-from .graphutils import draw_solution_basic
+from .graphutils import draw_solution
 
 __all__ = [
     "min_cost_flow",
     "max_bottleneck_path",
     "check_flow_conservation",
-    "draw_solution_basic",
+    "draw_solution",
 ]
