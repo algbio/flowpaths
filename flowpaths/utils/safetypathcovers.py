@@ -31,7 +31,7 @@ def find_all_bridges(adj_dict, s, t) -> list:
     while component[t] == 0:  # do while :(
 
         if i != 1:
-            # find first node u of P with component[u]=0. all in all we pay |P| time for this
+            # find first node u of P with component[u]=0. all in all we pay |P|=O(n) time for this
             while component[p[first_node]] != 0:
                 first_node += 1
 
@@ -59,11 +59,66 @@ def find_all_bridges(adj_dict, s, t) -> list:
     return bridges
 
 
+def is_core(G : stdigraph.stDiGraph, u: int, v: int) -> bool:
+    return (G.out_degree(v) < 1 or G.in_degree(v) != 1) and (G.in_degree(u) < 1 or G.out_degree(u) != 1)
+
+
+def find_unitig_of_arc(G : stdigraph.stDiGraph, e : tuple):
+    u,v = e
+    #assert(G.is_edge(e))
+    unitig = [(u,v)]
+    while G.has_unique_out_neighbor(v) and G.has_unique_in_neighbor(v):
+        x = G.out_neighbors(v)[0]
+        unitig.append((v,x))
+        v = x
+    while G.has_unique_in_neighbor(u) and G.has_unique_out_neighbor(u):
+        x = G.in_neighbors(u)[0]
+        unitig = [(x,u)] + unitig
+        u = x
+    return u,v,unitig
+
+
 def safe_sequences_of_base_edges(
     G: stdigraph.stDiGraph, no_duplicates=False, threads: int = 4
 ) -> list:
 
     return safe_sequences(G, G.base_graph.edges(), no_duplicates, threads=threads)
+
+
+def safe_maximal_sequences(
+    G : stdigraph.stDiGraph, arcs_to_cover = [], threads: int = 4
+) -> list :
+
+    sequences      = []
+    processed_arcs = set()
+    cores          = []
+
+    for e in arcs_to_cover:
+
+        if e in processed_arcs:
+            continue
+
+        L,R,unitig = find_unitig_of_arc(G,e) #every arc-unitig has an identifying pair of leftmost and rightmost nonunivocal vertices (or at least one of them is the source or the sink)
+        
+        for arc in unitig:
+            processed_arcs.add(arc)
+
+        if is_core(G,L,R):
+            cores.append( (L,R,unitig) )
+
+    for (L,R,unitig) in cores: #can paralelize this loop if we wish to
+        left_extension  = find_all_bridges(G.get_adj_list_R(), L, G.source)
+        right_extension = find_all_bridges(G.get_adj_list()  , R, G.sink  )
+
+        for i in range(len(left_extension)): #reverse edges of left extension (recall the definition of G^R)
+            x,y = left_extension[i]
+            left_extension[i] = (y,x)
+
+        seq = left_extension[::-1] + unitig + right_extension
+
+        sequences.append(seq)
+
+    return sequences
 
 
 def safe_sequences(
@@ -129,6 +184,45 @@ def safe_paths_of_base_edges(
 ) -> list:
 
     return safe_paths(G, G.base_graph.edges(), no_duplicates, threads=threads)
+
+
+def safe_maximal_paths(G : stdigraph.stDiGraph, arcs_to_cover = []) -> list :
+    
+    paths          = []
+    processed_arcs = set()
+    cores          = []
+
+    for e in arcs_to_cover:
+        if e in processed_arcs: #is the arc e part of a unitig that has been tested for being a core?
+            continue
+
+        L,R,unitig = find_unitig_of_arc(G,e) #every edge-unitig U has a leftmost and rightmost nonunivocal vertex (or s/t), which together identify U
+
+        for arc in unitig:
+            processed_arcs.add(arc)
+
+        if is_core(G,L,R):
+            cores.append((L,R,unitig))
+        
+    for (L,R,unitig) in cores: #can paralelize this loop if we wish to
+        path = []
+
+        while G.has_unique_in_neighbor(L):
+            x = G.in_neighbors(L)[0]
+            path.append( (x,L) )
+            L = x
+
+        path  = path[::-1]
+        path += unitig
+        
+        while G.has_unique_out_neighbor(R):
+            x = G.out_neighbors(R)[0]
+            path.append( (R,x) )
+            R = x
+            
+        paths.append(path)
+
+    return paths
 
 
 def safe_paths(
