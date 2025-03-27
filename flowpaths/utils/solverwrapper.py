@@ -1,6 +1,7 @@
 from math import log2
 from math import ceil
 import highspy
+import re
 
 class SolverWrapper:
     """
@@ -300,6 +301,28 @@ class SolverWrapper:
         for index, var in enumerate(varNames):
             print(f"{var} = {varValues[index]}")
 
+    # def parse_var_name(self, string, name_prefix):
+    #     pattern = rf"{name_prefix}\(\s*('?[\w(),]+'?|[0-9]+)\s*,\s*('?[\w(),]+'?|[0-9]+)\s*,\s*([0-9]+)\s*\)"
+    #     match = re.match(pattern, string)
+
+    #     return match.groups()
+
+    def parse_var_name(self, string, name_prefix):
+        # Dynamic regex pattern to extract components inside parentheses
+        pattern = rf"{name_prefix}\(\s*(.*?)\s*\)$"
+        match = re.match(pattern, string)
+
+        if not match:
+            raise ValueError(f"Invalid format: {string}")
+
+        # Extract the component list inside parentheses
+        components_str = match.group(1)
+
+        # Split components while handling quoted strings
+        components = re.findall(r"'[^']*'|\d+", components_str)
+
+        return components
+
     def get_variable_values(
         self, name_prefix, index_types: list, binary_values: bool = False 
     ) -> dict:
@@ -338,7 +361,7 @@ class SolverWrapper:
             if var == name_prefix:
                 if len(index_types) > 0:
                     raise Exception(
-                        f"We are getting the value of variable {var}, but the provided list of var_types is not empty ({index_types})."
+                        f"We are getting the value of variable `{var}`, but the provided list of var_types is not empty `{index_types}`."
                     )
                 values[0] = varValues[index]
                 if binary_values and round(values[0]) not in [0,1]:
@@ -348,37 +371,27 @@ class SolverWrapper:
                 return values
 
             if var.startswith(name_prefix):
-                if var.count("(") == 1:
-                    elements = [
-                        elem.strip(" '")
-                        for elem in var.replace(name_prefix, "", 1)
-                        .replace("(", "")
-                        .replace(")", "")
-                        .split(",")
-                    ]
-                    tuple_index = tuple(
-                        [index_types[i](elements[i]) for i in range(len(elements))]
-                    )
+                
+                # If there are some parentheses in the variable name, we assume that the variable is indexed as var(0,...), var(1,...), ...
+                if var.count("(") > 0:
+                    # We extract the elements inside the parentheses, and remove the ' character from the elements
+                    elements = [elem.strip("'") for elem in self.parse_var_name(var, name_prefix)]
 
                     if len(index_types) != len(elements):
-                        raise Exception(
-                            f"We are getting the value of variable {var}, indexed by ({tuple_index}), but the provided list of var_types ({index_types}) has different length."
-                        )
+                        raise Exception(f"We are getting the value of variable `{var}`, indexed by `{tuple_index}`, but the provided list of var_types `{index_types}` has different length.")
+
+                    # We cast the elements to the appropriate types
+                    tuple_index = tuple([index_types[i](elements[i]) for i in range(len(elements))])
 
                     values[tuple_index] = varValues[index]
-                    if (
-                        binary_values
-                        and round(values[tuple_index]) not in [0,1]
-                    ):
-                        raise Exception(
-                            f"Variable {var} has value {values[tuple_index]}, which is not binary."
-                        )
+                    if binary_values and round(values[tuple_index]) not in [0,1]:
+                        raise Exception(f"Variable {var} has value {values[tuple_index]}, which is not binary.")
+                
+                # If there are no parentheses in the variable name, we assume that the variable is indexed as var0, var1, ...
                 else:
                     element = var.replace(name_prefix, "", 1)
                     if len(index_types) > 1:
-                        raise Exception(
-                            f"We are getting the value of variable {var}, with only one index ({element}), but the provided list of var_types is not of length one ({index_types})."
-                        )
+                        raise Exception(f"We are getting the value of variable `{var}` for name_prefix `{name_prefix}`, with only one index `{element}`, but the provided list of var_types is not of length one `{index_types}`.")
 
                     elem_index = index_types[0](element)
                     values[elem_index] = varValues[index]
