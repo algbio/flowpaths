@@ -11,6 +11,7 @@ nav:
       - k-Flow Decomposition: k-flow-decomposition.md
       - k-Least Absolute Errors: k-least-absolute-errors.md
       - k-Minimum Path Error: k-min-path-error.md
+      - Minimum Error Flow: minimum-error-flow.md
     - Additional options:
       - Solver options and optimizations: solver-options-optimizations.md
       - Subpath constraints: subpath-constraints.md

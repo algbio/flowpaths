@@ -218,18 +218,11 @@ class MinErrorFlow():
 
     def get_solution(self):
         """
-        Returns the solution to the problem, if the model was solved. 
+        Returns the solution to the problem, if the model was solved, as a dictionary containing the following keys:
 
-        Returns
-        -------
-
-        -  `dict`
-
-            A dictionary containing the following keys:
-
-            - `graph`: the corrected graph, as a networkx DiGraph.
-            - `error`: the error of the solution, i.e. the sum of the absolute differences between the original weights and the corrected weights.
-            - `objective_value`: the value of the objective function.
+        - `graph`: the corrected graph, as a networkx DiGraph.
+        - `error`: the error of the solution, i.e. the sum of the absolute differences between the original weights and the corrected weights.
+        - `objective_value`: the value of the objective function.
         
         !!! warning "Warning"
             Call the `solve` method first.
