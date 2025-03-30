@@ -156,7 +156,7 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
     
     def get_lowerbound_k(self):
         # AbstractPathModelDAG requires implementing a method to get the lowerbound for the number of paths.
-        # A possible implemenattion is as followed
+        # A possible implementation is as follows.
         # We know that each edge with lb > 0 must be covered by at least one path.
         # Therefore, a lowerbound is the minimum number of paths needed to cover all the edges with lb > 0.
 

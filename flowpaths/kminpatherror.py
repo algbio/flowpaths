@@ -143,9 +143,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
 
         if weight_type not in [int, float]:
-            raise ValueError(
-                f"weight_type must be either int or float, not {weight_type}"
-            )
+            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
         self.subpath_constraints = subpath_constraints

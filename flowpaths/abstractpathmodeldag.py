@@ -182,14 +182,10 @@ class AbstractPathModelDAG(ABC):
         self.encode_path_length = encode_path_length
         self.edge_position_vars = {}
 
-        if solver_options is None:
-            solver_options = {}
-        self.threads = solver_options.get("threads", sw.SolverWrapper.threads)
-        self.time_limit = solver_options.get("time_limit", sw.SolverWrapper.time_limit)
-        self.presolve = solver_options.get("presolve", sw.SolverWrapper.presolve)
-        self.log_to_console = solver_options.get("log_to_console", sw.SolverWrapper.log_to_console)
-        self.external_solver = solver_options.get("external_solver", sw.SolverWrapper.external_solver)
-
+        self.solver_options = solver_options
+        if self.solver_options is None:
+            self.solver_options = {}
+        self.threads = self.solver_options.get("threads", sw.SolverWrapper.threads)
 
         # optimizations
         if optimization_options is None:
@@ -257,13 +253,7 @@ class AbstractPathModelDAG(ABC):
         if self.external_solution_paths is not None:
             return
 
-        self.solver = sw.SolverWrapper(
-            external_solver=self.external_solver,
-            threads=self.threads,
-            time_limit=self.time_limit,
-            presolve=self.presolve,
-            log_to_console=self.log_to_console,
-        )
+        self.solver = sw.SolverWrapper(**self.solver_options)
 
         self.__encode_paths()
 
@@ -292,9 +282,7 @@ class AbstractPathModelDAG(ABC):
 
         # The identifiers of the constraints come from https://arxiv.org/pdf/2201.10923 page 14-15
 
-        self.edge_vars = self.solver.add_variables(
-            self.edge_indexes, name_prefix="edge", lb=0, ub=1, var_type="integer"
-        )
+        self.edge_vars = self.solver.add_variables(self.edge_indexes, name_prefix="edge", lb=0, ub=1, var_type="integer")
 
         for i in range(self.k):
             

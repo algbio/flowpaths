@@ -44,12 +44,11 @@ class SolverWrapper:
     }
 
     def __init__(
-        self, 
-        external_solver="highs", 
+        self,
         **kwargs
         ):
 
-        self.external_solver = external_solver
+        self.external_solver = kwargs.get("external_solver", SolverWrapper.external_solver)  # Default solver
         self.tolerance = kwargs.get("tolerance", SolverWrapper.tolerance)  # Default tolerance value
         if self.tolerance < 1e-9:
             raise ValueError("The tolerance value must be >=1e-9.")
@@ -60,7 +59,7 @@ class SolverWrapper:
 
         self.variable_name_prefixes = []
 
-        if external_solver == "highs":
+        if self.external_solver == "highs":
             self.solver = highspy.Highs()
             self.solver.setOptionValue("solver", "choose")
             self.solver.setOptionValue("threads", kwargs.get("threads", SolverWrapper.threads))
@@ -72,7 +71,7 @@ class SolverWrapper:
             self.solver.setOptionValue("mip_abs_gap", self.tolerance)
             self.solver.setOptionValue("mip_rel_gap", self.tolerance)
             self.solver.setOptionValue("primal_feasibility_tolerance", self.tolerance)
-        elif external_solver == "gurobi":
+        elif self.external_solver == "gurobi":
             import gurobipy
 
             self.env = gurobipy.Env(empty=True)
@@ -89,7 +88,7 @@ class SolverWrapper:
             self.solver = gurobipy.Model(env=self.env)
         else:
             raise ValueError(
-                f"Unsupported solver type `{external_solver}`, supported solvers are `highs` and `gurobi`."
+                f"Unsupported solver type `{self.external_solver}`, supported solvers are `highs` and `gurobi`."
             )
 
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
@@ -247,12 +246,12 @@ class SolverWrapper:
 
     def set_objective(self, expr, sense="minimize"):
 
-        if sense not in ["minimize", "maximize"]:
-            raise ValueError(f"Objective sense {sense} is not supported. Only [\"minimize\", \"maximize\"] are supported.")
+        if sense not in ["minimize", "min", "maximize", "max"]:
+            raise ValueError(f"Objective sense {sense} is not supported. Only [\"minimize\", \"min\", \"maximize\", \"max\"] are supported.")
         self.optimization_sense = sense
 
         if self.external_solver == "highs":
-            if sense == "minimize":
+            if sense in ["minimize", "min"]:
                 self.solver.minimize(expr)
             else:
                 self.solver.maximize(expr)
@@ -261,7 +260,7 @@ class SolverWrapper:
 
             self.solver.setObjective(
                 expr,
-                gurobipy.GRB.MINIMIZE if sense == "minimize" else gurobipy.GRB.MAXIMIZE,
+                gurobipy.GRB.MINIMIZE if sense in ["minimize", "min"] else gurobipy.GRB.MAXIMIZE,
             )
 
     def optimize(self):
