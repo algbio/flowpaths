@@ -9,6 +9,7 @@ from .nodeexpandeddigraph import NodeExpandedDiGraph
 from .utils import graphutils as graphutils
 from .mingenset import MinGenSet
 from .minsetcover import MinSetCover
+from .minerrorflow import MinErrorFlow
 
 __all__ = [
     "AbstractPathModelDAG",
@@ -22,4 +23,5 @@ __all__ = [
     "graphutils",
     "MinGenSet",
     "MinSetCover",
+    "MinErrorFlow",
 ]
