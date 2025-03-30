@@ -90,7 +90,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             
             Dictionary `edge: factor` storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge weight and path weights.
             Default is an empty dict. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
-            difference between the flow value of the edge and the sum of the weights of the paths going through the edge.
+            difference between the flow value of the edge and the sum of the weights of the paths going through the edge. See [ignoring edges documentation](ignoring-edges.md)
 
         - `path_length_ranges: list`, optional
             
@@ -114,11 +114,11 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         - `additional_starts: list`, optional
             
-            List of additional start nodes of the paths. Default is an empty list.
+            List of additional start nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `additional_ends: list`, optional
             
-            List of additional end nodes of the paths. Default is an empty list.
+            List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `optimization_options: dict`, optional
 
@@ -126,7 +126,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         - `solver_options: dict`, optional
 
-            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
+            Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
 
         Raises
         ----------

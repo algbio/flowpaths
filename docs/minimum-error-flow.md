@@ -1,8 +1,8 @@
 # Minimum Correction of Weights to a Flow
 
-Often, the edge weights of a graph are not a flow (i.e. do not satisfy flow conservation for non- source/sink nodes). While the models [k-Minimum Path Error](k-min-path-error.md) or [k-Least Absolute Errors](k-least-absolute-errors.md) can decompose such graphs, as a less principled approach, one can first minimally correct the graph weights to become a flow, and then optimally decompose the resulting flow flow using the [Minimum Flow Decomposition](minimum-flow-decomposition.md) model. 
+Often, the edge weights of a graph are not a flow (i.e. do not satisfy flow conservation for non- source/sink nodes). While the models [k-Minimum Path Error](k-min-path-error.md) or [k-Least Absolute Errors](k-least-absolute-errors.md) can decompose such graphs, as a less principled approach, one can first minimally correct the graph weights to become a flow, and then optimally decompose the resulting flow using the [Minimum Flow Decomposition](minimum-flow-decomposition.md) model. 
 
-This is faster in practice, because the Minimum Flow Decomposition solver is faster than the ones decomposing graphs without flow conservation. In some sense, we are delegating error correction to a pre-processing step, and then remove the error-resolution when decomposing the resulting graph.
+This is faster in practice, because the Minimum Flow Decomposition solver is faster than the ones decomposing graphs without flow conservation. We are thus delegating error correction to a pre-processing step, and then avoiding the error-handling difficulty when decomposing the resulting graph.
 
 ## 1. Definition
 
@@ -134,13 +134,14 @@ flowchart LR
 This class implements a more general version, as follows:
 
 1. The corrected flow can start/end not only in source/sink nodes, but also in given sets of start/end nodes (set parameters `additional_starts` and `additional_ends`). See also [Additional start/end nodes](additional-start-end-nodes.md).
-2. The error can count only for a given subset $E' \subseteq E$ of the edges (set parameter `edges_to_ignore` to be $E \setminus E'$), 
-3. One can also ensure some "sparsity" in the solution, meaning the total corrected flow exiting the source node is counts also in the minimization function, with a given multiplier $\lambda$ (see ref. [2]). If $\lambda = 0$, this has no effect.
+2. The error can count only for a given subset $E' \subseteq E$ of the edges (set parameter `edges_to_ignore` to be $E \setminus E'$). See also [ignoring edges documentation](ignoring-edges.md).
+3. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `edge_error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ will add the edge $(u,v)$ to `edges_to_ignore`, because the constraint for $(u,v)$ becomes always true. See also [ignoring edges documentation](ignoring-edges.md).
+4. One can also ensure some "sparsity" in the solution, meaning the total corrected flow exiting the source node is counts also in the minimization function, with a given multiplier $\lambda$ (see ref. [2]). If $\lambda = 0$, this has no effect.
 
 !!! info "Generalized objective function"
-    Formally, the objective function generalized as in 2. and 3. above is:
+    Formally, the objective function generalized as in 2., 3. and 4. above is:
     $$
-    \sum_{(u,v) \in E'}\Big|f(u,v) - w(u,v)\Big| + \lambda \sum_{(s,v) \in E} f(s,v).
+    \sum_{(u,v) \in E'}\lambda_{(u,v)} \cdot \Big|f(u,v) - w(u,v)\Big| + \lambda \sum_{(s,v) \in E} f(s,v).
     $$
 
 ## 4. References

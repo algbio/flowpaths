@@ -12,6 +12,7 @@ class MinErrorFlow():
             weight_type: type = float,
             sparsity_lambda: float = 0,
             edges_to_ignore: list = [],
+            edge_error_scaling: dict = {},
             additional_starts: list = [],
             additional_ends: list = [],
             solver_options: dict = {},
@@ -33,31 +34,37 @@ class MinErrorFlow():
 
             The name of the attribute in the edges of the graph that contains the weight of the edge.
 
-        - `weight_type: type`
+        - `weight_type: type`, optional
 
             The type of the weights of the edges. It can be either `int` or `float`. Default is `float`.
 
-        - `sparsity_lambda: float`
+        - `sparsity_lambda: float`, optional
 
             The sparsity parameter. It is used to control the trade-off between the sparsity of the solution and the closeness to the original weights. Default is `0`.
             If `sparsity_lambda` is set to `0`, then the solution will be as close as possible to the original weights. If `sparsity_lambda` is set to a positive value, then the solution will be sparser, i.e. it will have less flow going out of the source.
             The higher the value of `sparsity_lambda`, the sparser the solution will be.
 
-        - `edges_to_ignore: list`
+        - `edges_to_ignore: list`, optional
 
-            A list of edges to ignore. The weights of these edges will still be corrected, but their error will not count in the objective function that is being minimized. Default is `[]`.
+            A list of edges to ignore. The weights of these edges will still be corrected, but their error will not count in the objective function that is being minimized. Default is `[]`. See [ignoring edges documentation](ignoring-edges.md)
 
-        - `additional_starts: list`
+        - `edge_error_scaling: dict`, optional
+            
+            Dictionary `edge: factor` storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge weight and path weights.
+            Default is an empty dict. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
+            difference between the flow value of the edge and the sum of the weights of the paths going through the edge. See [ignoring edges documentation](ignoring-edges.md)
 
-            A list of nodes to be added as additional sources. Flow is allowed to start start at these nodes, meaning that their out going flow can be greater than their incoming flow. Default is `[]`.
+        - `additional_starts: list`, optional
 
-        - `additional_ends: list`
+            A list of nodes to be added as additional sources. Flow is allowed to start start at these nodes, meaning that their out going flow can be greater than their incoming flow. Default is `[]`. See also [additional start/end nodes documentation](additional-start-end-nodes.md).
 
-            A list of nodes to be added as additional sinks. Flow is allowed to end at these nodes, meaning that their incoming flow can be greater than their outgoing flow. Default is `[]`.
+        - `additional_ends: list`, optional
 
-        - `solver_options: dict`
+            A list of nodes to be added as additional sinks. Flow is allowed to end at these nodes, meaning that their incoming flow can be greater than their outgoing flow. Default is `[]`. See also [additional start/end nodes documentation](additional-start-end-nodes.md).
 
-            A dictionary containing the options for the solver. The options are passed to the solver wrapper. Default is `{}`.
+        - `solver_options: dict`, optional
+
+            A dictionary containing the options for the solver. The options are passed to the solver wrapper. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
         """
         
         self.original_graph_copy = deepcopy(G)
@@ -66,9 +73,18 @@ class MinErrorFlow():
         if weight_type not in [int, float]:
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
+        self.solver_options = solver_options
+
         self.sparsity_lambda = sparsity_lambda
         self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
-        self.solver_options = solver_options
+        self.edge_error_scaling = edge_error_scaling
+        # Checking that every entry in self.edge_error_scaling is between 0 and 1
+        for key, value in self.edge_error_scaling.items():
+            if value < 0 or value > 1:
+                raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
+            if value == 0:
+                self.edges_to_ignore.add(key)
+        
 
         self.__solution = None
         self.__is_solved = None
@@ -173,7 +189,7 @@ class MinErrorFlow():
         # plus the sparsity of the solution (i.e. sparsity_lambda * sum of the corrected flow going out of the source)
         self.solver.set_objective(
             self.solver.quicksum(
-                self.edge_error_vars[(u, v)]
+                self.edge_error_vars[(u, v)] * self.edge_error_scaling.get((u, v), 1)
                 for (u, v) in self.G.edges()
                 if (u, v) not in self.edges_to_ignore
             ) + self.sparsity_lambda * self.solver.quicksum(
