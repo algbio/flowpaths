@@ -37,7 +37,7 @@ correction_model = fp.MinErrorFlow(
 correction_model.solve()
 corrected_neGraph = correction_model.get_solution()["graph"]
 
-# This is a constraint that we want to enforce in the solution
+# This is a constraint in the original graph that we want to enforce in the solution
 subpath_constraints=[[('a', 'c'), ('c', 't')]]
 
 # We solve the problem on the corrected_neGraph 
