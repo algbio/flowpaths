@@ -8,18 +8,20 @@ nav:
   - Decomposition models:
     - Models:
       - Minimum Flow Decomposition: minimum-flow-decomposition.md
-      - k-Flow Decomposition: k-flow-decomposition.md
-      - k-Least Absolute Errors: k-least-absolute-errors.md
-      - k-Minimum Path Error: k-min-path-error.md
-      - Minimum Error Flow: minimum-error-flow.md
-    - Additional options:
-      - Solver options and optimizations: solver-options-optimizations.md
+      - $k$-Flow Decomposition: k-flow-decomposition.md
+      - $k$-Least Absolute Errors: k-least-absolute-errors.md
+      - $k$-Minimum Path Error: k-min-path-error.md
+      - Optimizing $k$: numpathsoptimization.md
+    - Additional features:
+      - Flows/weights on nodes: node-expanded-digraph.md
       - Subpath constraints: subpath-constraints.md
       - Ignoring edges: ignoring-edges.md
       - Additional start/end nodes: additional-start-end-nodes.md
-      - Optimization Routine for k: numpathsoptimization.md
-      - Flows/weights on nodes: node-expanded-digraph.md
+      - Correcting weights: minimum-error-flow.md
+    - Further options:
+      - Solver options and optimizations: solver-options-optimizations.md
       - Various utils: utils.md
+    
   - Developing new models:
     - Abstract Path Model: abstract-path-model.md
     - Solver Wrapper: solver-wrapper.md

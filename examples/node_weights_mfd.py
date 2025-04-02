@@ -11,7 +11,7 @@ def example1():
     graph = nx.DiGraph()
     graph.add_node("s", flow=13)
     graph.add_node("a", flow=6)
-    graph.add_node("b", flow=9)
+    graph.add_node("b", ) # flow=9 # Note that we are not adding flow values to this node
     graph.add_node("c", flow=13)
     graph.add_node("d", flow=6)
     graph.add_node("t", flow=13)
@@ -27,7 +27,7 @@ def example1():
     subpath_constraints_nodes=[['s', 'b', 'c', 'd']]
 
     # We transform the constraints into constraints in the node expanded graph
-    ne_subpath_constraints_nodes = neGraph.get_expanded_subpath_constraints_nodes(subpath_constraints_nodes)    
+    ne_subpath_constraints_nodes = neGraph.get_expanded_subpath_constraints(subpath_constraints_nodes)    
 
     # We solve the problem on the node expanded graph
     # To play with, we also set the subpath constraint coverage to 0.75, meaning that only 75% of the nodes in the constraint need to be covered by some solution path
@@ -47,7 +47,7 @@ def example1():
     subpath_constraints_edges=[[('a', 'c'), ('c', 't')]]
 
     # We transform the constraints into constraints in the node expanded graph
-    ne_subpath_constraints_edges = neGraph.get_expanded_subpath_constraints_edges(subpath_constraints_edges)
+    ne_subpath_constraints_edges = neGraph.get_expanded_subpath_constraints(subpath_constraints_edges)
 
     # We solve the problem on the node expanded graph  
     ne_mfd_model_edges = fp.MinFlowDecomp(
@@ -81,12 +81,12 @@ def example2():
     neGraph = fp.NodeExpandedDiGraph(graph, node_flow_attr="flow", node_length_attr="length")
 
     # This is a constraint that we want to enforce in the solution,
-    # in terms of edges. Notice that because of acyclicty the edges are now enforced 
+    # in terms of edges. Notice that because of acyclicity the edges are now enforced 
     # to appear consecutively in a solution path
     subpath_constraints_edges=[[('a', 'c'), ('c', 't')]]
 
     # We transform the constraints into constraints in the node expanded graph
-    ne_subpath_constraints_edges = neGraph.get_expanded_subpath_constraints_edges(subpath_constraints_edges)
+    ne_subpath_constraints_edges = neGraph.get_expanded_subpath_constraints(subpath_constraints_edges)
 
     # We solve the problem on the node expanded graph
     # We also set the subpath constraint coverage to 0.7 in terms of length, because we pass

@@ -33,8 +33,9 @@ class NodeExpandedDiGraph(nx.DiGraph):
         - `node_flow_attr : str`
 
             The attribute name from where to get the flow values / weights on the nodes. 
-            This attribute must be present in all nodes of the graph. This atrribute for each `v` is then 
-            set to the edge `(v.0, v.1)` connecting the new expanded nodes.
+            This attribute for each `v` is then set to the edge `(v.0, v.1)` connecting the new expanded nodes.
+            This attribute can be missing from some nodes of the graph, in which case 
+            the edge `(v.0, v.1)` is added to `edges_to_ignore`.
 
         - `try_filling_in_missing_flow_attr : bool`, optional
 
@@ -46,7 +47,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         - `node_length_attr : str`, optional
 
             The attribute name from where to get the length values on the nodes. Default is `None`. 
-            If you specify this attribute, it must be present in all nodes of the graph.
+            If you specify this attribute, it may be missing from some nodes of the graph.
 
         !!! example "Example"
 
@@ -89,9 +90,9 @@ class NodeExpandedDiGraph(nx.DiGraph):
 
         if not all(isinstance(node, str) for node in G.nodes()):
             raise ValueError("Every node of the graph must be a string.")
-        # if not all nodes have the flow attribute, raise an error
-        if not all(node_flow_attr in G.nodes[node] for node in G.nodes()):
-            raise ValueError(f"Every node must have the flow attribute specified as `node_flow_attr` ({node_flow_attr}).")
+        # # if not all nodes have the flow attribute, raise an error
+        # if not all(node_flow_attr in G.nodes[node] for node in G.nodes()):
+        #     raise ValueError(f"Every node must have the flow attribute specified as `node_flow_attr` ({node_flow_attr}).")
 
         self.original_G = nx.DiGraph(G)
 
@@ -107,11 +108,13 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self.add_node(node0, **G.nodes[node])
             self.add_node(node1, **G.nodes[node])
             self.add_edge(node0, node1, **G.nodes[node])
-            self[node0][node1][node_flow_attr] = G.nodes[node][node_flow_attr]
+            if node_flow_attr in G.nodes[node]:
+                self[node0][node1][node_flow_attr] = G.nodes[node][node_flow_attr]
+            else:
+                self.__edges_to_ignore.append((node0, node1))
             if node_length_attr is not None:
-                if node_length_attr not in G.nodes[node]:
-                    raise ValueError(f"Every node must have the length attribute specified as `node_length_attr` ({node_length_attr}).")
-                self[node0][node1][node_length_attr] = G.nodes[node][node_length_attr]
+                if node_length_attr in G.nodes[node]:
+                    self[node0][node1][node_length_attr] = G.nodes[node][node_length_attr]
 
             # Adding in-coming edges
             for pred in G.predecessors(node):
@@ -196,7 +199,43 @@ class NodeExpandedDiGraph(nx.DiGraph):
         """
         return self.__edges_to_ignore
     
-    def get_expanded_subpath_constraints_nodes(self, subpath_constraints):
+    def get_expanded_subpath_constraints(self, subpath_constraints):
+        """
+        Expand a list of subpath constraints from the original graph (where every constraint is a list **nodes** or **edges**
+        in the original graph) to a list of subpath constraints in the expanded graph (where every constraint 
+        is a list of edges in the expanded graph). 
+        
+        - If the constraints are lists of nodes, then the corresponding edges are of type `('node.0', 'node.1')` 
+        - If the constraints are lists of edges of the form `(u,v)`, then the corresponding edges are of type `('u.1', 'v.0')`
+
+        Parameters
+        ----------
+        - `subpath_constraints : list`
+            
+            List of subpath constraints in the original graph.
+
+        Returns
+        -------
+        - `expanded_constraints : list`
+            
+            List of subpath constraints in the expanded graph.
+        """
+        
+        # Check if the subpath constraints are lists of node or lists of edges,
+        # and expand them accordingly, using the two functions already implemented.
+        
+        if not isinstance(subpath_constraints, list):
+            raise ValueError("Subpath constraints must be a list.")
+        if not all(isinstance(constraint, list) for constraint in subpath_constraints):
+            raise ValueError("Subpath constraints must be a list of lists.")
+        if isinstance(subpath_constraints[0][0], str):
+            return self.__get_expanded_subpath_constraints_nodes(subpath_constraints)
+        elif isinstance(subpath_constraints[0][0], tuple):
+            return self.__get_expanded_subpath_constraints_edges(subpath_constraints)
+        else:
+            raise ValueError("Subpath constraints must be a list of lists of nodes or edges.")
+
+    def __get_expanded_subpath_constraints_nodes(self, subpath_constraints):
         """
         Expand a list of subpath constraints from the original graph (where every constraint is a list **nodes**
         in the original graph) to a list of subpath constraints in the expanded graph (where every constraint 
@@ -227,7 +266,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
 
         return expanded_constraints
     
-    def get_expanded_subpath_constraints_edges(self, subpath_constraints):
+    def __get_expanded_subpath_constraints_edges(self, subpath_constraints):
         """
         Expand a list of subpath constraints from the original graph (where every constraint is a list **edges** 
         in the original graph) to a list of subpath constraints in the expanded graph where every constraint 
