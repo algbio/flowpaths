@@ -58,4 +58,4 @@ ne_mfd_model_edges = fp.MinFlowDecomp(
     subpath_constraints=corrected_neGraph.get_expanded_subpath_constraints(subpath_constraints),
     )
 ne_mfd_model_edges.solve()
-process_expanded_solution(graph, neGraph, ne_mfd_model_edges)
+process_expanded_solution(graph, corrected_neGraph, ne_mfd_model_edges)
