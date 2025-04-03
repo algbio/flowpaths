@@ -1,6 +1,6 @@
 import flowpaths as fp
 
-def main():
+def example1():
     numbers = [2,4,6,7,9]
     total=13
 
@@ -8,6 +8,23 @@ def main():
         numbers,
         total=total,
         weight_type=int,
+        # remove_sums_of_two=False,
+        # remove_complement_values=False,
+        )
+    
+    mgs_solver.solve()
+    process_solution(mgs_solver)
+
+def example2():
+    numbers = [2,4,6,7,9]
+    total=13
+    subset_constraints = [[6,4,3]]
+
+    mgs_solver = fp.MinGenSet(
+        numbers,
+        total=total,
+        weight_type=int,
+        partition_constraints=subset_constraints,
         # remove_sums_of_two=False,
         # remove_complement_values=False,
         )
@@ -23,4 +40,5 @@ def process_solution(model: fp.MinGenSet):
     print(model.solve_statistics)
 
 if __name__ == "__main__":
-    main()
+    example1()
+    example2()

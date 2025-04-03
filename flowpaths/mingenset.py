@@ -8,6 +8,7 @@ class MinGenSet():
             total,
             weight_type: type = float,
             lowerbound: int = 1,
+            partition_constraints: list = None,
             remove_complement_values: bool = True,
             remove_sums_of_two: bool = False,
             ):
@@ -37,6 +38,14 @@ class MinGenSet():
 
             The minimum number of elements in the generating set. Default is 1.
 
+        - `partition_constraints` : list
+
+            A list of lists, where each inner list is made up of numbers, such that the sum of the numbers in each inner list is equal to `total`.
+            That is, each inner list is a number partition of `total`.
+            These constraints are imposed as:
+            - each number in an inner list must be obtained by summing up a subset of numbers in the generating set, and
+            - each number in the generating set must be used exactly once to obtain the numbers in the inner list.
+
         - `remove_complement_values` : bool
 
             If `True`, if `a` contains both `x` and `total - x`, it keeps only the smallest of them. Default is `True`.
@@ -60,9 +69,11 @@ class MinGenSet():
         self.total = total
         self.weight_type = weight_type
         self.lowerbound = lowerbound
+        self.partition_constraints = partition_constraints
 
         self.__is_solved = False
         self.__solution = None
+        self.solver = None
         self.solve_statistics = {}
 
         if self.weight_type not in [int, float]:
@@ -86,7 +97,156 @@ class MinGenSet():
                     elements_to_remove.add(val)
 
             self.numbers = list(set(self.numbers) - elements_to_remove)
+
+    def __create_solver(self, k):
+
+        self.solver = sw.SolverWrapper()
+
+        self.genset_indexes = [(i)   for i in range(k)]
+        self.x_indexes = [(i,j) for i in range(k) for j in range(len(self.numbers))]
+
+        self.genset_vars = self.solver.add_variables(
+            self.genset_indexes, 
+            name_prefix="gen_set", 
+            lb=0, 
+            ub=self.total,
+            var_type="integer" if self.weight_type == int else "continuous"
+        )
+
+        self.x_vars = self.solver.add_variables(
+            self.x_indexes, 
+            name_prefix="x", 
+            lb=0, 
+            ub=1, 
+            var_type="integer"
+        )
+
+        self.pi_vars = self.solver.add_variables(
+            self.x_indexes, 
+            name_prefix="pi", 
+            lb=0, 
+            ub=self.total, 
+            var_type="integer" if self.weight_type == int else "continuous"
+        )
+
+        # Constraints
+
+        # Sum of elements in the generating set equals total
+        self.solver.add_constraint(
+            self.solver.quicksum(
+                self.genset_vars[i]
+                for i in self.genset_indexes
+            )
+            == self.total,
+            name=f"total",
+        )
+
+        for j in range(len(self.numbers)):              
+
+            # pi_vars[(i, j)] = x_vars[(i, j)] * genset_vars[i]
+            for i in range(k):
+                self.solver.add_binary_continuous_product_constraint(
+                    binary_var=self.x_vars[(i, j)],
+                    continuous_var=self.genset_vars[(i)],
+                    product_var=self.pi_vars[(i, j)],
+                    lb=0,
+                    ub=self.total,
+                    name=f"pi_i={i}_j={j}",
+                )
+
+            # Sum of pi_vars[(i, j)] for all i is self.numbers[j]
+            self.solver.add_constraint(
+                self.solver.quicksum(
+                    self.pi_vars[(i, j)]
+                    for i in self.genset_indexes
+                )
+                == self.numbers[j],
+                name=f"sum_pi_j={j}",
+            )
+
+        # Encoding the symmetry breaking constraints
+        self.__encode_symmetry_breaking(k)
+
+        # Encoding the subset constraints
+        if self.partition_constraints is not None:
+            self.__encode_partition_constraints(k)
+
+    def __encode_symmetry_breaking(self, k):
+        for i in range(k - 2):
+            self.solver.add_constraint(
+                self.genset_vars[i] <= self.genset_vars[i+1],
+                name=f"b_{i}_leq_b_{i+1}",
+            )
+
+    def __encode_partition_constraints(self, k):
+
+        if self.partition_constraints is None:
+            return
+
+        if not all(isinstance(constraint, list) for constraint in self.partition_constraints):
+            raise ValueError("partition_constraints must be a list of lists.")
         
+        if not all(sum(constraint) == self.total for constraint in self.partition_constraints):
+            raise ValueError("The sum of the numbers inside each subset constraint must equal the total value.")
+
+        # t is maximum number of subsets in a subset constraint
+        t = max(len(c) for c in self.partition_constraints)            
+
+        # The indices of the y_vars
+        y_indexes = [(i, j, c) for i in range(k) for j in range(t) for c in range(len(self.partition_constraints))]
+
+        # y_vars[(i, j, c)] = 1 iff the i-th element of the generating set is used in the j-th subset of the c-th constraint
+        y_vars = self.solver.add_variables(
+            y_indexes, 
+            name_prefix="y", 
+            lb=0, 
+            ub=1, 
+            var_type="integer"
+        )
+        # pi_y_vars[(i, j, c)] = y_vars[(i, j, c)] * genset_vars[i]
+        pi_y_vars = self.solver.add_variables(
+            y_indexes, 
+            name_prefix="product_y", 
+            lb=0, 
+            ub=self.total, 
+            var_type="integer" if self.weight_type == int else "continuous"
+        )
+        for i in range(k):
+            for j in range(t):
+                for c in range(len(self.partition_constraints)):
+                    self.solver.add_binary_continuous_product_constraint(
+                        binary_var=y_vars[(i, j, c)],
+                        continuous_var=self.genset_vars[(i)],
+                        product_var=pi_y_vars[(i, j, c)],
+                        lb=0,
+                        ub=self.total,
+                        name=f"pi_y_i={i}_j={j}_c={c}",
+                    )
+
+        # Every element in the generating set must be used exactly once to obtain the numbers in each subset
+        for i in range(k):
+            for c in range(len(self.partition_constraints)):
+                self.solver.add_constraint(
+                    self.solver.quicksum(
+                        y_vars[(i, j, c)]
+                        for j in range(t)
+                    )
+                    == 1,
+                    name=f"used_exactly_once_constr={c}_i={j}",
+                )
+
+        # Imposing the subset constraints
+        for c, constraint in enumerate(self.partition_constraints):
+            for j in range(len(constraint)):
+                self.solver.add_constraint(
+                    self.solver.quicksum(
+                        pi_y_vars[(i, j, c)]
+                        for i in range(k)
+                    )
+                    == constraint[j],
+                    name=f"subset_sum_constr={c}_subset_j={j}",
+                )
+                
     def solve(self):
         """
         Solves the minimum generating set problem. Returns `True` if the model was solved, `False` otherwise.
@@ -95,78 +255,9 @@ class MinGenSet():
 
         # Solve for increasing numbers of elements in the generating set
         for k in range(self.lowerbound, max(self.lowerbound+1, len(self.initial_numbers))):
-            self.solver = sw.SolverWrapper()
-
-            self.b_indexes = [(i)   for i in range(k)]
-            self.x_indexes = [(i,j) for i in range(k) for j in range(len(self.numbers))]
-
-            self.genset_vars = self.solver.add_variables(
-                self.b_indexes, 
-                name_prefix="gen_set", 
-                lb=0, 
-                ub=self.total,
-                var_type="integer" if self.weight_type == int else "continuous"
-            )
-
-            self.x_vars = self.solver.add_variables(
-                self.x_indexes, 
-                name_prefix="x", 
-                lb=0, 
-                ub=1, 
-                var_type="integer"
-            )
-
-            self.pi_vars = self.solver.add_variables(
-                self.x_indexes, 
-                name_prefix="pi", 
-                lb=0, 
-                ub=self.total, 
-                var_type="integer" if self.weight_type == int else "continuous"
-            )
-
-            # Constraints
-
-            # Sum of elements in the base set equals total
-            self.solver.add_constraint(
-                self.solver.quicksum(
-                    self.genset_vars[i]
-                    for i in self.b_indexes
-                )
-                == self.total,
-                name=f"total",
-            )
-
-            for j in range(len(self.numbers)):                
-
-                # pi_vars[(i, j)] = x_vars[(i, j)] * b_vars[i]
-                for i in range(k):
-                    self.solver.add_binary_continuous_product_constraint(
-                        binary_var=self.x_vars[(i, j)],
-                        continuous_var=self.genset_vars[(i)],
-                        product_var=self.pi_vars[(i, j)],
-                        lb=0,
-                        ub=self.total,
-                        name=f"pi_i={i}_j={j}",
-                    )
-
-                # Sum of pi_vars[(i, j)] for all i is a[j]
-                self.solver.add_constraint(
-                    self.solver.quicksum(
-                        self.pi_vars[(i, j)]
-                        for i in self.b_indexes
-                    )
-                    == self.numbers[j],
-                    name=f"sum_pi_j={j}",
-                )
-
-            # Symmetry breaking
-            for i in range(k - 2):
-                self.solver.add_constraint(
-                    self.genset_vars[i] <= self.genset_vars[i+1],
-                    name=f"b_{i}_leq_b_{i+1}",
-                )
-
+            self.__create_solver(k=k)
             self.solver.optimize()
+
             if self.solver.get_model_status() == "kOptimal":
                 genset_sol = self.solver.get_variable_values("gen_set", [int])
                 self.__solution = sorted(self.weight_type(genset_sol[i]) for i in range(k))
