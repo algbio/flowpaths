@@ -189,6 +189,9 @@ class MinGenSet():
         if not all(sum(constraint) == self.total for constraint in self.partition_constraints):
             raise ValueError("The sum of the numbers inside each subset constraint must equal the total value.")
 
+        if len(self.partition_constraints) == 0:
+            return
+
         # t is maximum number of subsets in a subset constraint
         t = max(len(c) for c in self.partition_constraints)            
 

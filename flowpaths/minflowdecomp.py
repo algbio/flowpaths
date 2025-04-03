@@ -18,6 +18,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     subgraph_lowerbound_shift = 18
     optimize_with_given_weights_num_free_paths = 0
     use_min_gen_set_lowerbound = False
+    use_min_gen_set_lowerbound_partition_constraints = False
+    use_min_gen_set_lowerbound_partition_constraints_min_constraint_len = 2
+    use_min_gen_set_lowerbound_partition_constraints_limit_num_constraints = 3
     min_gen_set_remove_sums_of_two = True
     optimize_with_given_weights = False
     use_subgraph_scanning_lowerbound = False
@@ -227,6 +230,71 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         if given_weights_kfd_solver.is_solved():
             self.__given_weights_model = given_weights_kfd_solver
 
+    def __get_partition_constraints_for_min_gen_set(
+            self, 
+            min_constraint_len: int = 1, 
+            limit_num_constraints: int = None) -> list:
+        """
+        Get the partition constraints for the min gen set problem. 
+
+        Returns
+        -------
+        - `partition_constraints: list`
+        
+            A list of partition constraints, where each constraint is a list of numbers, 
+            such that numbers of each constraint sum up to the flow value.
+        """
+
+        partition_constraints = set()
+
+        # Sources get level 0, nodes with in-neighbors only sources get level 1, and so on
+        level = dict()
+        max_level = 0
+        for node in nx.topological_sort(self.G):
+            if self.G.in_degree(node) == 0:
+                level[node] = 0
+            else:
+                level[node] = max([level[n] for n in self.G.predecessors(node)]) + 1
+                max_level = max(max_level, level[node])
+
+        level_edges = [[] for _ in range(max_level)]
+
+        # An edge (u,v) is at level i if level[u] <= i and level[v] >= i+1
+        for u, v in self.G.edges():
+            for i in range(level[u], level[v]):
+                level_edges[i].append((u, v))
+
+        source_flow = sum(self.G.nodes[n].get(self.flow_attr, 0) for n in self.G.nodes() if self.G.in_degree(n) == 0)
+
+        # Now we create the partition constraints
+        for i in range(max_level):
+            
+            level_flow_sum = 0
+            level_flow_parts = []
+            for u, v in level_edges[i]:
+                if (u, v) in self.edges_to_ignore or self.flow_attr not in self.G.edges[u, v]:
+                    continue
+                level_flow_sum += self.G.edges[u, v][self.flow_attr]
+                level_flow_parts.append(self.G.edges[u, v][self.flow_attr])
+            
+            if level_flow_sum == source_flow and len(level_flow_parts) >= min_constraint_len:
+                # We add the constraint for this level
+                partition_constraints.add(tuple(sorted(level_flow_parts)))
+
+        partition_constraints_list = [list(constraint) for constraint in partition_constraints]
+        
+        partition_constraints_list = sorted(partition_constraints_list, key=lambda x: min(x), reverse=False)
+
+        # We remove the constraints whose min value equals the min value of the previous constraint
+        partition_constraints_list = [constraint for i, constraint in enumerate(partition_constraints_list) if i == 0 or min(constraint) != min(partition_constraints_list[i-1])]
+
+        if limit_num_constraints is not None:
+            partition_constraints_list = partition_constraints_list[:limit_num_constraints]
+
+        print("partition_constraints", partition_constraints_list)
+
+        return partition_constraints_list
+    
     def __get_lowerbound_with_min_gen_set(self) -> int:
 
         start_time = time.time()
@@ -235,11 +303,19 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         current_lowerbound_k = self.__lowerbound_k if self.__lowerbound_k is not None else 1
         min_gen_set_lowerbound = None
 
+        partition_constraints = None
+        if self.optimization_options.get("use_min_gen_set_lowerbound_partition_constraints", MinFlowDecomp.use_min_gen_set_lowerbound_partition_constraints):
+            partition_constraints = self.__get_partition_constraints_for_min_gen_set(
+                min_constraint_len = self.optimization_options.get("use_min_gen_set_lowerbound_partition_constraints_min_constraint_len", MinFlowDecomp.use_min_gen_set_lowerbound_partition_constraints_min_constraint_len),
+                limit_num_constraints = self.optimization_options.get("use_min_gen_set_lowerbound_partition_constraints_limit_num_constraints", MinFlowDecomp.use_min_gen_set_lowerbound_partition_constraints_limit_num_constraints),
+                )
+
         mingenset_model = mgs.MinGenSet(
             numbers = all_weights, 
             total = source_flow, 
             weight_type = self.weight_type,
             lowerbound = current_lowerbound_k,
+            partition_constraints=partition_constraints,
             remove_sums_of_two = self.optimization_options.get("min_gen_set_remove_sums_of_two", MinFlowDecomp.min_gen_set_remove_sums_of_two),
             )
         mingenset_model.solve()

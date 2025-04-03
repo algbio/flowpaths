@@ -228,6 +228,10 @@ class NodeExpandedDiGraph(nx.DiGraph):
             raise ValueError("Subpath constraints must be a list.")
         if not all(isinstance(constraint, list) for constraint in subpath_constraints):
             raise ValueError("Subpath constraints must be a list of lists.")
+        
+        if len(subpath_constraints) == 0:
+            return []
+        
         if isinstance(subpath_constraints[0][0], str):
             return self.__get_expanded_subpath_constraints_nodes(subpath_constraints)
         elif isinstance(subpath_constraints[0][0], tuple):

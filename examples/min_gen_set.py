@@ -18,13 +18,13 @@ def example1():
 def example2():
     numbers = [2,4,6,7,9]
     total=13
-    subset_constraints = [[6,4,3]]
+    partition_constraints = [[6,4,3]]
 
     mgs_solver = fp.MinGenSet(
         numbers,
         total=total,
         weight_type=int,
-        partition_constraints=subset_constraints,
+        partition_constraints=partition_constraints,
         # remove_sums_of_two=False,
         # remove_complement_values=False,
         )
