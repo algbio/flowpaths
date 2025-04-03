@@ -221,7 +221,7 @@ def max_occurrence(seq, paths_in_DAG, edge_lengths: dict = {}) -> int:
     return max_occurence
 
 def draw_solution(
-        graph: nx.DiGraph, 
+        G: nx.DiGraph, 
         filename: str,
         flow_attr: str = None,
         paths: list = [], 
@@ -232,6 +232,7 @@ def draw_solution(
         draw_options: dict = {
             "show_graph_edges": True,
             "show_edge_weights": False,
+            "show_node_weights": False,
             "show_path_weights": False,
             "show_path_weight_on_first_edge": True,
             "pathwidth": 3.0
@@ -243,7 +244,7 @@ def draw_solution(
         Parameters
         ----------
 
-        - `graph`: nx.DiGraph 
+        - `G`: nx.DiGraph 
         
             The input directed acyclic graph, as networkx DiGraph. 
 
@@ -287,6 +288,10 @@ def draw_solution(
 
                 Whether to show the edge weights in the graph from the `flow_attr`. Default is `False`.
 
+            - `show_node_weights`: bool
+
+                Whether to show the node weights in the graph from the `flow_attr`. Default is `False`.
+
             - `show_path_weights`: bool
 
                 Whether to show the path weights in the graph on every edge. Default is `False`.
@@ -310,6 +315,7 @@ def draw_solution(
             dot = gv.Digraph(format="pdf")
             dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
             dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
+            dot.node_attr["style"] = "rounded"  # Rounded rectangle nodes
 
             colors = [
                 "red",
@@ -335,7 +341,7 @@ def draw_solution(
 
             if draw_options.get("show_graph_edges", True):
                 # drawing nodes
-                for node in graph.nodes():
+                for node in G.nodes():
                     color = "black"
                     penwidth = "1.0"
                     if node in additional_starts:
@@ -345,21 +351,34 @@ def draw_solution(
                         color = "red"
                         penwidth = "2.0"
                     
-                    dot.node(
-                            str(node), 
+                    if draw_options.get("show_node_weights", False) and flow_attr is not None and flow_attr in G.nodes[node]:
+                        dot.node(
+                            name=str(node),
+                            #label=f"{{{node} | {G.nodes[node][flow_attr]}}}",
+                            label=f"{G.nodes[node][flow_attr]}\\n{node}",
+                            #xlabel=str(G.nodes[node][flow_attr]),
+                            shape="record",
+                            color=color, 
+                            penwidth=penwidth)
+                    else:
+                        dot.node(
+                            name=str(node), 
+                            label=str(node), 
                             color=color, 
                             penwidth=penwidth)
 
                 # drawing edges
-                for u, v, data in graph.edges(data=True):
+                for u, v, data in G.edges(data=True):
                     if draw_options.get("show_edge_weights", False):
                         dot.edge(
-                            str(u), 
-                            str(v), 
-                            str(data.get(flow_attr,"")),
+                            tail_name=str(u), 
+                            head_name=str(v), 
+                            label=str(data.get(flow_attr,"")),
                             fontname="Arial",)
                     else:
-                        dot.edge(str(u), str(v))
+                        dot.edge(
+                            tail_name=str(u), 
+                            head_name=str(v))
 
             for index, path in enumerate(paths):
                 pathColor = colors[index % len(colors)]

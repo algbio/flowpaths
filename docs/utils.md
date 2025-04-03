@@ -30,7 +30,7 @@ mpe_model.solve()
 if mpe_model.is_solved():
     solution = mpe_model.get_solution()
     fp.utils.draw_solution(
-        graph=graph,
+        G=graph,
         filename="simple_graph.pdf",
         flow_attr="flow",
         paths=solution["paths"],

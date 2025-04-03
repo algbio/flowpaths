@@ -1,7 +1,7 @@
 import flowpaths as fp
 import networkx as nx
 
-def process_expanded_solution(neGraph: fp.NodeExpandedDiGraph, model: fp.MinFlowDecomp):
+def process_expanded_solution(graph: nx.DiGraph, neGraph: fp.NodeExpandedDiGraph, model: fp.MinFlowDecomp):
     if model.is_solved():
         solution = model.get_solution()
         expanded_paths = solution["paths"]
@@ -9,6 +9,15 @@ def process_expanded_solution(neGraph: fp.NodeExpandedDiGraph, model: fp.MinFlow
         print("Expanded paths:", expanded_paths)
         print("Original paths:", original_paths)
         print("Weights:", solution["weights"])
+        fp.utils.draw_solution(
+            G=graph, 
+            filename="expanded_graph.pdf", 
+            flow_attr="flow", 
+            paths=original_paths,
+            weights=solution["weights"],
+            draw_options={
+                "show_node_weights": True,
+            })
     else:
         print("Model could not be solved.")
 
@@ -49,4 +58,4 @@ ne_mfd_model_edges = fp.MinFlowDecomp(
     subpath_constraints=corrected_neGraph.get_expanded_subpath_constraints(subpath_constraints),
     )
 ne_mfd_model_edges.solve()
-process_expanded_solution(neGraph, ne_mfd_model_edges)
+process_expanded_solution(graph, neGraph, ne_mfd_model_edges)

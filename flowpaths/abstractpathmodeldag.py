@@ -238,7 +238,7 @@ class AbstractPathModelDAG(ABC):
             )
             self.solve_statistics["safe_sequences_time"] = time.time() - start_time
 
-        if self.optimize_with_subpath_constraints_as_safe_sequences and not self.is_solved():
+        if self.optimize_with_subpath_constraints_as_safe_sequences and self.subpath_constraints is not None and not self.is_solved():
             if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
                 start_time = time.time()
                 self.safe_lists += safetypathcovers.safe_sequences(

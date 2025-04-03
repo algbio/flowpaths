@@ -128,6 +128,9 @@ def safe_sequences(
     threads: int = 4
 ) -> list:
 
+    if edges_or_subpath_constraints_to_cover is None:
+        return []
+
     sequences = set() if no_duplicates else []
 
     adj_dict = {u: list(G.successors(u)) for u in G.nodes()}
