@@ -259,15 +259,26 @@ class MinErrorFlow():
         edge_error_sol_dict = self.solver.get_variable_values("edge_error_vars", [str, str])
         error = sum(edge_error_sol_dict.values())
 
-        for u, v in self.original_graph_copy.edges():
-            self.original_graph_copy[u][v][self.flow_attr] = self.edge_sol[(u, v)]
+        corrected_graph = deepcopy(self.original_graph_copy)
+        for u, v in corrected_graph.edges():
+            if self.flow_attr in corrected_graph[u][v]:
+                corrected_graph[u][v][self.flow_attr] = self.edge_sol[(u, v)]
 
         self.__solution = {
-            "graph": self.original_graph_copy,
+            "graph": corrected_graph,
             "error": error,
             "objective_value": self.solver.get_objective_value(),
         }
         
         return self.__solution  
-
+    
+    def get_corrected_graph(self):
+        """
+        Returns the corrected graph, as a networkx DiGraph. This is a deep copy of the original graph, but having the corrected weights.
+        
+        !!! warning "Warning"
+            Call the `solve` method first.
+        """
+        solution = self.get_solution()
+        return solution["graph"]
         

@@ -26,7 +26,7 @@ correction_model = fp.MinErrorFlow(graph, flow_attr="flow")
 correction_model.solve()
 
 if correction_model.is_solved():
-    corrected_graph = correction_model.get_solution()["graph"]
+    corrected_graph = correction_model.get_corrected_graph()
     mfd_model = fp.MinFlowDecomp(corrected_graph, flow_attr="flow")
     mfd_model.solve()
     if mfd_model.is_solved():

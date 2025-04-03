@@ -35,19 +35,18 @@ correction_model = fp.MinErrorFlow(
     edges_to_ignore=neGraph.edges_to_ignore,
     )
 correction_model.solve()
-corrected_neGraph = correction_model.get_solution()["graph"]
+corrected_neGraph: fp.NodeExpandedDiGraph = correction_model.get_corrected_graph()
+# Or just: corrected_neGraph = correction_model.get_corrected_graph()
 
 # This is a constraint in the original graph that we want to enforce in the solution
 subpath_constraints=[[('a', 'c'), ('c', 't')]]
 
 # We solve the problem on the corrected_neGraph 
-# NOTE: we are using `edges_to_ignore` from the uncorrected neGraph
-# NOTE: we are using `subpath_constraints` from the uncorrected neGraph
 ne_mfd_model_edges = fp.MinFlowDecomp(
     corrected_neGraph,
     flow_attr="flow",
-    edges_to_ignore=neGraph.edges_to_ignore,
-    subpath_constraints=neGraph.get_expanded_subpath_constraints(subpath_constraints),
+    edges_to_ignore=corrected_neGraph.edges_to_ignore,
+    subpath_constraints=corrected_neGraph.get_expanded_subpath_constraints(subpath_constraints),
     )
 ne_mfd_model_edges.solve()
 process_expanded_solution(neGraph, ne_mfd_model_edges)

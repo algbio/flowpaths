@@ -90,7 +90,8 @@ Once we have corrected the weights, we can get the corrected graph and e.g. appl
 
 ```python hl_lines="2 3"
 if correction_model.is_solved():
-    corrected_graph = correction_model.get_solution()["graph"]
+    corrected_graph = correction_model.get_corrected_graph()
+    # This is equivalent to: corrected_graph = correction_model.get_solution()["graph"]
     mfd_model = fp.MinFlowDecomp(corrected_graph, flow_attr="flow")
     mfd_model.solve()
     if mfd_model.is_solved():
