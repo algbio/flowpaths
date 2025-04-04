@@ -360,7 +360,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.check_is_solved()
 
         # sum of edge errors
-        return sum(self.edge_errors_sol[(u, v)] for (u,v) in self.edge_indexes_basic)
+        edge_errors = self.get_solution()["edge_errors"]
+        return sum(edge_errors.values())
     
     def get_lowerbound_k(self):
 
