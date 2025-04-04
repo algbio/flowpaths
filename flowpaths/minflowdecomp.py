@@ -215,6 +215,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         given_weights_optimization_options["optimize_with_flow_safe_paths"] = False
         given_weights_optimization_options["allow_empty_paths"] = True
         given_weights_optimization_options["given_weights"] = all_weights_list
+        utils.logger.info(f"{__name__}: Solving with given weights = {given_weights_optimization_options['given_weights']}")
 
         given_weights_kfd_solver = kflowdecomp.kFlowDecomp(
             G=self.G,
@@ -233,7 +234,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         if given_weights_kfd_solver.is_solved():
             self.__given_weights_model = given_weights_kfd_solver
-            utils.logger.info(f"{__name__}: found an MFD solution with given weights")
+            sol = self.__given_weights_model.get_solution(remove_empty_paths=True)
+            utils.logger.info(f"{__name__}: found an MFD solution with given weights in {len(sol['paths'])} paths weights {sol['weights']}")
 
     def __get_partition_constraints_for_min_gen_set(
             self, 

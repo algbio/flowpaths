@@ -315,6 +315,33 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         return False
 
+    def __remove_empty_paths(self, solution):
+        """
+        Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
+
+        Parameters
+        ----------
+        - `solution: dict`
+            
+            The solution dictionary containing paths and weights.
+
+        Returns
+        -------
+        - `solution: dict`
+            
+            The solution dictionary with empty paths removed.
+
+        """
+        non_empty_paths = []
+        non_empty_weights = []
+        for path, weight in zip(solution["paths"], solution["weights"]):
+            if len(path) > 1:
+                non_empty_paths.append(path)
+                non_empty_weights.append(weight)
+        return {"paths": non_empty_paths, "weights": non_empty_weights}
+    
+
+
     def get_solution(self, remove_empty_paths=False):
         """
         Retrieves the solution for the flow decomposition problem.
@@ -341,8 +368,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - `exception` If model is not solved.
         """
 
-        if self.__solution is not None:
-            return self.__solution
+        if self.__solution is not None:            
+            return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
 
         self.check_is_solved()
         weights_sol_dict = self.solver.get_variable_values("w", [int])
@@ -360,19 +387,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             "weights": self.path_weights_sol,
         }
 
-        if remove_empty_paths:
-            non_empty_paths = []
-            non_empty_weights = []
-            for path, weight in zip(self.__solution["paths"], self.__solution["weights"]):
-                if len(path) > 1:
-                    non_empty_paths.append(path)
-                    non_empty_weights.append(weight)
-            self.__solution = {
-                "paths": non_empty_paths,
-                "weights": non_empty_weights,
-            }
-
-        return self.__solution
+        return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
