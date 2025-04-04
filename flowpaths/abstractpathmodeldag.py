@@ -1,6 +1,7 @@
 import flowpaths.stdigraph as stdigraph
 from flowpaths.utils import safetypathcovers
 from flowpaths.utils import solverwrapper as sw
+import flowpaths.utils as utils
 import time
 from abc import ABC, abstractmethod
 
@@ -547,8 +548,11 @@ class AbstractPathModelDAG(ABC):
         (either 'kOptimal' (highs) or status code 2 (gurobi)), it sets the solved attribute to True and returns True.
         Otherwise, it sets the solved attribute to False and returns False.
         """
+        utils.logger.info(f"{__name__}: solving...")
+
         # If we already received an external solution, we don't need to solve the model
         if self.external_solution_paths is not None:
+            utils.logger.info(f"{__name__}: no need to solve, we have an external solution.")
             self.__is_solved = True
             return True
 
@@ -568,6 +572,7 @@ class AbstractPathModelDAG(ABC):
             or self.solver.get_model_status() == 2
         ):
             self.__is_solved = True
+            utils.logger.info(f"{__name__}: solved successfully. Objective value: {self.get_objective_value()}")
             return True
 
         self.__is_solved = False

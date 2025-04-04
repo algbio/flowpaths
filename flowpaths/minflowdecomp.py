@@ -5,6 +5,7 @@ import flowpaths.kflowdecomp as kflowdecomp
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.graphutils as gu
 import flowpaths.mingenset as mgs
+import flowpaths.utils as utils
 import copy
 import math
 
@@ -129,6 +130,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.__all_subgraph_weights = None
         self.__given_weights_model = None
 
+        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}")
+
     def solve(self) -> bool:
         """
         Attempts to solve the flow distribution problem using a model with varying number of paths.
@@ -148,7 +151,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         if self.optimization_options.get("optimize_with_given_weights", MinFlowDecomp.optimize_with_given_weights):            
             self.__solve_with_given_weights()
 
-        for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):            
+        for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
+            utils.logger.info(f"{__name__}: iteration with k = {i}")
             fd_model = None
             # Checking if we have already found a solution with the same number of paths
             # via the min gen set and given weights approach
@@ -229,6 +233,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         if given_weights_kfd_solver.is_solved():
             self.__given_weights_model = given_weights_kfd_solver
+            utils.logger.info(f"{__name__}: found an MFD solution with given weights")
 
     def __get_partition_constraints_for_min_gen_set(
             self, 
@@ -291,7 +296,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         if limit_num_constraints is not None:
             partition_constraints_list = partition_constraints_list[:limit_num_constraints]
 
-        print("partition_constraints", partition_constraints_list)
+        utils.logger.debug(f"{__name__}: partition_constraints = {partition_constraints_list}")
 
         return partition_constraints_list
     
@@ -324,6 +329,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         if mingenset_model.is_solved():        
             self.__generating_set = mingenset_model.get_solution()
             min_gen_set_lowerbound = len(self.__generating_set)
+            utils.logger.info(f"{__name__}: found a min gen set solution with {min_gen_set_lowerbound} elements ({self.__generating_set})")
         
         self.solve_statistics["min_gen_set_solve_time"] = time.time() - start_time
         

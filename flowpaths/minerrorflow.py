@@ -1,5 +1,6 @@
 import flowpaths.utils.solverwrapper as sw
 import flowpaths.stdigraph as stdigraph
+import flowpaths.utils as utils
 import networkx as nx
 from copy import deepcopy
 import time
@@ -99,7 +100,9 @@ class MinErrorFlow():
 
         self.__encode_flow()
 
-        self.__encode_objective()    
+        self.__encode_objective()  
+
+        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}")  
 
     def __create_solver(self):
         

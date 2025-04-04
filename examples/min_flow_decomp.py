@@ -2,6 +2,13 @@ import flowpaths as fp
 import networkx as nx
 
 def main():
+    # Configure logging
+    fp.utils.configure_logging(
+        level=fp.utils.logging.DEBUG,
+        log_to_console=True,
+        log_file="log_mfd_example.log",
+    )
+    
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"
@@ -17,6 +24,7 @@ def main():
     # We create a Minimum Flow Decomposition solver with default settings,
     # by specifying that the flow value of each edge is in the attribute `flow` of the edges.
     mfd_model = fp.MinFlowDecomp(graph, flow_attr="flow")
+    fp.utils.logger.info("Created the Minimum Flow Decomposition solver")
 
     # We solve it
     mfd_model.solve()

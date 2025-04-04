@@ -1,13 +1,14 @@
 import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.abstractpathmodeldag as pathmodel
+import flowpaths.utils as utils
 
 
 class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
     """
     This class implements the k-LeastAbsoluteErrors, namely it looks for a decomposition of a weighted DAG into 
     k weighted paths (specified by `num_paths`), minimizing the absolute errors on the edges. The error on an edge 
-    is defiened as the absolute value of the difference between the weight of the edge and the sum of the weights of 
+    is defined as the absolute value of the difference between the weight of the edge and the sum of the weights of 
     the paths that go through it.
     """
     def __init__(
@@ -184,6 +185,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         # This method is called from the current class to add the objective function
         self.__encode_objective()
+
+        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}, k = {self.k}")
 
     def __encode_leastabserrors_decomposition(self):
 

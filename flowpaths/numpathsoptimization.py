@@ -1,5 +1,6 @@
 import time
 import flowpaths.abstractpathmodeldag as pathmodel
+import flowpaths.utils as utils
 
 class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
     
@@ -106,6 +107,8 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         self.__solution = None
         self.solve_statistics = None
 
+        utils.logger.info(f"{__name__}: created NumPathsOptimization with model_type = {model_type}")
+
     def solve(self) -> bool:
         """
         Attempts to solve the optimization problem by iterating over a range of path counts, creating and
@@ -151,29 +154,35 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
         for k in range(max(self.min_num_paths,self.get_lowerbound_k()), self.max_num_paths+1):
             # Create the model
+            utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}")
             model = self.model_type(**self.kwargs, k=k)
             model.solve()
             if model.is_solved():
                 found_feasible = True
+                current_solution_objective_value = model.get_objective_value()
+                utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, current_solution_objective_value = {current_solution_objective_value}")
                 if self.stop_on_first_feasible:
                     solve_status = NumPathsOptimization.solved_status_name
                     break
                 if self.stop_on_delta_abs:
                     if previous_solution_objective_value is None:
-                        previous_solution_objective_value = model.get_objective_value()
+                        previous_solution_objective_value = current_solution_objective_value
                     else:
-                        if abs(previous_solution_objective_value - model.get_objective_value()) <= self.stop_on_delta_abs:
+                        if abs(previous_solution_objective_value - current_solution_objective_value) <= self.stop_on_delta_abs:
                             solve_status = NumPathsOptimization.solved_status_name
                             break
                 if self.stop_on_delta_rel:
                     if previous_solution_objective_value is None:
-                        previous_solution_objective_value = model.get_objective_value()
+                        previous_solution_objective_value = current_solution_objective_value
                     else:
-                        if abs(previous_solution_objective_value - model.get_objective_value()) / previous_solution_objective_value <= self.stop_on_delta_rel:
+                        if abs(previous_solution_objective_value - current_solution_objective_value) / previous_solution_objective_value <= self.stop_on_delta_rel:
                             solve_status = NumPathsOptimization.solved_status_name
                             break
+            else:
+                utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, model is not solved")
             if time.time() - start_time > self.time_limit:
                 solve_status = NumPathsOptimization.timeout_status_name
+                utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, time out")
                 break
             
         if solve_status != NumPathsOptimization.timeout_status_name:

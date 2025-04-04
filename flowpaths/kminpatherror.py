@@ -1,6 +1,7 @@
 import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.abstractpathmodeldag as pathmodel
+import flowpaths.utils as utils
 
 
 class kMinPathError(pathmodel.AbstractPathModelDAG):
@@ -220,6 +221,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         # This method is called from the current class to add the objective function
         self.__encode_objective()
+
+        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}, k = {self.k}")
 
     def __encode_minpatherror_decomposition(self):
 

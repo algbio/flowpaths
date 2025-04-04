@@ -4,6 +4,7 @@ import flowpaths.stdigraph as stdigraph
 import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.safetyflowdecomp as sfd
+import flowpaths.utils as utils
 
 class kFlowDecomp(pathmodel.AbstractPathModelDAG):
     """
@@ -186,6 +187,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         # The given weights optimization
         self.__encode_given_weights()
+
+        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}, k = {self.k}")
 
     def __encode_flow_decomposition(self):
         
