@@ -3,35 +3,37 @@ from flowpaths.utils import graphutils
 import flowpaths.utils as utils
 
 class stDiGraph(nx.DiGraph):
-    # Cache for storing processed graphs keyed by id(G)
-    _cached_graphs = {}
-    _use_cache = True
+    # # Cache for storing processed graphs keyed by id(G)
+    # _cached_graphs = {}
+    # _use_cache = False
 
-    def __new__(cls, G, *args, **kwargs):
-        # If a processed instance for this graph id already exists, return it        
-        if kwargs.get("use_cache", cls._use_cache):
-            obj = cls._cached_graphs.get(id(G))
-            if obj is not None:
-                utils.logger.debug(f"{cls.__name__}.__new__(): found cached instance for graph id {id(G)}")
-                return obj
+    # def __new__(cls, G, *args, **kwargs):
+    #     # If a processed instance for this graph id already exists, return it        
+    #     if kwargs.get("use_cache", cls._use_cache):
+    #         obj = cls._cached_graphs.get(id(G))
+    #         if obj is not None:
+    #             utils.logger.debug(f"{cls.__name__}.__new__(): found cached instance for graph id {id(G)}")
+    #             return obj
             
-        # Otherwise, create a new instance
-        obj = super().__new__(cls)
-        cls._cached_graphs[id(G)] = obj
-        utils.logger.debug(f"{cls.__name__}.__new__(): cached the instance of graph id {id(G)}")
-        return obj
+    #     # Otherwise, create a new instance
+    #     obj = super().__new__(cls)
+        
+    #     if kwargs.get("use_cache", cls._use_cache):
+    #         cls._cached_graphs[id(G)] = obj
+    #         utils.logger.debug(f"{cls.__name__}.__new__(): cached the instance of graph id {id(G)}")
+    #     return obj
 
     def __init__(
         self,
         base_graph: nx.DiGraph,
         additional_starts: list = [],
         additional_ends: list = [],
-        use_cache: bool = _use_cache,
+        # use_cache: bool = _use_cache,
     ):
-        # Optionally, check if already initialized to avoid reprocessing:
-        if use_cache and hasattr(self, "_initialized") and self._initialized:
-            utils.logger.debug(f"{__name__}.__init__(): skipping init since we found a cached instance for graph id {id(base_graph)}")
-            return
+        # # Optionally, check if already initialized to avoid reprocessing:
+        # if use_cache and hasattr(self, "_initialized") and self._initialized:
+        #     utils.logger.debug(f"{__name__}.__init__(): skipping init since we found a cached instance for graph id {id(base_graph)}")
+        #     return
 
         if not all(isinstance(node, str) for node in base_graph.nodes()):
             raise ValueError("Every node of the graph must be a string.")
@@ -51,8 +53,8 @@ class stDiGraph(nx.DiGraph):
 
         nx.freeze(self)
 
-        self._initialized = True
-        utils.logger.debug(f"{__name__}.__init__(): initialized for graph id {id(base_graph)}")
+        # self._initialized = True
+        # utils.logger.debug(f"{__name__}.__init__(): initialized for graph id {id(base_graph)}")
 
     def __build_graph__(self):
         """
