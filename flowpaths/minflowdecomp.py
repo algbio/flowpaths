@@ -129,8 +129,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.__generating_set = None
         self.__all_subgraph_weights = None
         self.__given_weights_model = None
+        self.__source_flow = None
 
-        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}")
+        utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}")
 
     def solve(self) -> bool:
         """
@@ -236,6 +237,21 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             self.__given_weights_model = given_weights_kfd_solver
             sol = self.__given_weights_model.get_solution(remove_empty_paths=True)
             utils.logger.info(f"{__name__}: found an MFD solution with given weights in {len(sol['paths'])} paths weights {sol['weights']}")
+        else:
+            utils.logger.info(f"{__name__}: did NOT found an MFD solution with given weights")
+
+    def __get_source_flow(self):
+        if self.__source_flow is None:
+            self.__source_flow = 0
+            for v in self.G.nodes():
+                if self.G.in_degree(v) == 0:
+                    for _, _, data in self.G.out_edges(v, data=True):
+                        if self.flow_attr in data:
+                            self.__source_flow += data[self.flow_attr]
+            utils.logger.debug(f"{__name__}: source_flow = {self.__source_flow}")
+            return self.__source_flow
+        else:
+            return self.__source_flow
 
     def __get_partition_constraints_for_min_gen_set(
             self, 
@@ -271,7 +287,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             for i in range(level[u], level[v]):
                 level_edges[i].append((u, v))
 
-        source_flow = sum(self.G.nodes[n].get(self.flow_attr, 0) for n in self.G.nodes() if self.G.in_degree(n) == 0)
+        source_flow = self.__get_source_flow()
 
         # Now we create the partition constraints
         for i in range(max_level):
@@ -306,7 +322,10 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         start_time = time.time()
         all_weights = list(set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]}))
-        source_flow = sum(self.G.nodes[n].get(self.flow_attr, 0) for n in self.G.nodes() if self.G.in_degree(n) == 0)
+        # Get the source_flow as the sum of the flow values on all the edges exiting the source nodes
+        # (i.e., nodes with in-degree 0)
+        source_flow = self.__get_source_flow()
+        # source_flow = sum(self.G.nodes[n].get(self.flow_attr, 0) for n in self.G.nodes() if self.G.in_degree(n) == 0)
         current_lowerbound_k = self.__lowerbound_k if self.__lowerbound_k is not None else 1
         min_gen_set_lowerbound = None
 
@@ -332,6 +351,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             self.__generating_set = mingenset_model.get_solution()
             min_gen_set_lowerbound = len(self.__generating_set)
             utils.logger.info(f"{__name__}: found a min gen set solution with {min_gen_set_lowerbound} elements ({self.__generating_set})")
+        else:
+            utils.logger.info(f"{__name__}: did NOT find a min gen set solution")
+            exit(0)
         
         self.solve_statistics["min_gen_set_solve_time"] = time.time() - start_time
         

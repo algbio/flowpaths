@@ -102,7 +102,7 @@ class MinErrorFlow():
 
         self.__encode_objective()  
 
-        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}")  
+        utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}")  
 
     def __create_solver(self):
         

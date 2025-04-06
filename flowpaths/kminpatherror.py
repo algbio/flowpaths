@@ -222,7 +222,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         # This method is called from the current class to add the objective function
         self.__encode_objective()
 
-        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}, k = {self.k}")
+        utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
     def __encode_minpatherror_decomposition(self):
 

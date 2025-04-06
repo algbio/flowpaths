@@ -3,6 +3,16 @@ import networkx as nx
 
 bigNumber = 1 << 32
 
+def fpid(G) -> str:
+    """
+    Returns a unique identifier for the given graph.
+    """
+    if isinstance(G, nx.DiGraph):
+        if "id" in G.graph:
+            return G.graph["id"]
+
+    return str(id(G))
+
 def read_graph(graph_raw) -> nx.DiGraph:
     # Input format is: ['#Graph id\n', 'n\n', 'u_1 v_1 w_1\n', ..., 'u_k v_k w_k\n']
     id = graph_raw[0].strip("# ").strip()
@@ -22,7 +32,7 @@ def read_graph(graph_raw) -> nx.DiGraph:
         # print(elements)
         u = elements[0].strip()
         v = elements[1].strip()
-        w = int(elements[2].strip(" \n"))
+        w = float(elements[2].strip(" \n"))
         # print(u, v, w)
         G.add_edge(u, v, flow=w)
 

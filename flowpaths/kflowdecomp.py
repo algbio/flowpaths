@@ -164,8 +164,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
-            self.G, 
-            self.k,
+            G=self.G, 
+            k=self.k,
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
@@ -188,7 +188,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # The given weights optimization
         self.__encode_given_weights()
 
-        utils.logger.info(f"{__name__}: initialized with graph id = {id(G)}, k = {self.k}")
+        utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
     def __encode_flow_decomposition(self):
         

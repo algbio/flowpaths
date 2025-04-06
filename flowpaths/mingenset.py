@@ -1,4 +1,5 @@
 import flowpaths.utils.solverwrapper as sw
+import flowpaths.utils as utils
 import time
 
 class MinGenSet():
@@ -65,8 +66,10 @@ class MinGenSet():
         """
         
         self.numbers = list(numbers) # Make a copy of the list
+        utils.logger.debug(f"{__name__}: Initial numbers: {self.numbers}")
         self.initial_numbers = numbers
         self.total = total
+        utils.logger.debug(f"Total: {self.total}")
         self.weight_type = weight_type
         self.lowerbound = lowerbound
         self.partition_constraints = partition_constraints
@@ -97,6 +100,8 @@ class MinGenSet():
                     elements_to_remove.add(val)
 
             self.numbers = list(set(self.numbers) - elements_to_remove)
+
+        utils.logger.debug(f"{__name__}: Numbers after removing values: {self.numbers}")
 
     def __create_solver(self, k):
 
