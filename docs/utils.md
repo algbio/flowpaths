@@ -46,12 +46,4 @@ if mpe_model.is_solved():
 
 This produces a file with extension `.pdf` storing the PDF image of the graph.
 
-!!! warning "Graphviz dependency"
-    Drawing graphs as above requires the Python package `graphviz`. Install via: 
-    ``` bash
-    pip install graphviz
-    ```
-
-
-
 ::: flowpaths.utils.graphutils
