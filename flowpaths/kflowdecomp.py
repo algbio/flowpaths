@@ -26,7 +26,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
         optimization_options: dict = {},
-        solver_options: dict = None,
+        solver_options: dict = {},
     ):
         """
         Initialize the Flow Decomposition model for a given number of paths `num_paths`.

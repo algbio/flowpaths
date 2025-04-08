@@ -39,7 +39,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         edge_length_attr: str = None,
         edges_to_ignore: list = [],
         optimization_options: dict = {},
-        solver_options: dict = None,
+        solver_options: dict = {},
     ):
         """
         Initialize the Minimum Flow Decomposition model, minimizing the number of paths.
@@ -97,7 +97,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         - `solver_options : dict`, optional
             
-            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
+            Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
 
         Raises
         ------

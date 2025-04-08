@@ -67,7 +67,7 @@ class AbstractPathModelDAG(ABC):
         encode_path_length: bool = False,
         edge_length_attr: str = None,
         optimization_options: dict = None,
-        solver_options: dict = None,
+        solver_options: dict = {},
         solve_statistics: dict = {},
     ):
         """
@@ -140,7 +140,7 @@ class AbstractPathModelDAG(ABC):
 
         - `solver_options: dict`, optional
             
-            Dictionary of solver options. Defaults to `None`, in which case the default values are used. 
+            Dictionary of solver options. Defaults to `{}`, in which case the default values are used. 
             See the [available solver options](solver-options-optimizations.md).
 
         - `solve_statistics: dict`, optional

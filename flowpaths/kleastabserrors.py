@@ -26,7 +26,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         additional_starts: list = [],
         additional_ends: list = [],
         optimization_options: dict = None,
-        solver_options: dict = None,
+        solver_options: dict = {},
         trusted_edges_for_safety: list = None,
     ):
         """
@@ -94,7 +94,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         - `solver_options: dict`, optional
 
-            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
+            Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
 
         - `trusted_edges_for_safety: list`, optional
 

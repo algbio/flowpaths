@@ -7,7 +7,7 @@ class MinSetCover():
         universe: list,
         subsets: list,
         subset_weights: list = None,
-        solver_options: dict = None,
+        solver_options: dict = {},
         ):
         """
         This class solves the minimum set cover problem. Given a universe `universe` and a list of subsets `subsets`,
@@ -34,7 +34,7 @@ class MinSetCover():
 
         - `solver_options : dict`, optional
             
-            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
+            Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
         """
         
         self.universe = universe
@@ -43,6 +43,7 @@ class MinSetCover():
         self.set_cover = []
         self.set_cover_indices = []
         self.set_cover_weights = []
+        self.solver_options = solver_options
 
         self.__is_solved = None
         self.__solution = None

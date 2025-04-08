@@ -92,6 +92,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         self.min_num_paths = min_num_paths
         self.max_num_paths = max_num_paths
         self.time_limit = time_limit
+        self.solve_time_start = None
         self.kwargs = kwargs
 
         # We allow only one of the stopping criteria to be set
@@ -147,7 +148,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             
         """
         
-        start_time = time.perf_counter()
+        self.solve_time_start = time.perf_counter()
         previous_solution_objective_value = None
         solve_status = None
         found_feasible = False
@@ -180,7 +181,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
                             break
             else:
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, model is not solved")
-            if time.perf_counter() - start_time > self.time_limit:
+            if self.solve_time_elapsed > self.time_limit:
                 solve_status = NumPathsOptimization.timeout_status_name
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, time out")
                 break
@@ -193,7 +194,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         
         self.solve_statistics = {
                 "solve_status": solve_status,
-                "solve_time": time.perf_counter() - start_time,
+                "solve_time": self.solve_time_elapsed,
             }
 
         if solve_status == NumPathsOptimization.solved_status_name:
@@ -251,6 +252,19 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         self.lowerbound_k = tmp_model.get_lowerbound_k()
 
         return self.lowerbound_k
+    
+    @property
+    def solve_time_elapsed(self):
+        """
+        Returns the elapsed time since the start of the solve process.
+
+        Returns
+        -------
+        - `float`
+        
+            The elapsed time in seconds.
+        """
+        return time.perf_counter() - self.solve_time_start if self.solve_time_start is not None else None
             
 
         

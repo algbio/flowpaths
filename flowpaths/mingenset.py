@@ -12,7 +12,7 @@ class MinGenSet():
             partition_constraints: list = None,
             remove_complement_values: bool = True,
             remove_sums_of_two: bool = False,
-            solver_options: dict = None
+            solver_options: dict = {}
             ):
         """
         This class solves the minimum generating set problem. Given a list of numbers `a` and a total value `total`, 
@@ -67,7 +67,7 @@ class MinGenSet():
 
         - `solver_options : dict`, optional
             
-            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
+            Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
         """
         
         self.numbers = list(numbers) # Make a copy of the list
