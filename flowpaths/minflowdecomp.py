@@ -3,6 +3,7 @@ import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.kflowdecomp as kflowdecomp
 import flowpaths.abstractpathmodeldag as pathmodel
+import flowpaths.utils.solverwrapper as sw
 import flowpaths.utils.graphutils as gu
 import flowpaths.mingenset as mgs
 import flowpaths.utils as utils
@@ -119,6 +120,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.edges_to_ignore = edges_to_ignore
         self.optimization_options = optimization_options
         self.solver_options = solver_options
+        self.time_limit = self.solver_options.get("time_limit", sw.SolverWrapper.time_limit)
+        self.solve_time_start = None
 
         self.solve_statistics = {}
         self.__solution = None
@@ -147,7 +150,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         Note:
             This overloads the `solve()` method from `AbstractPathModelDAG` class.
         """
-        start_time = time.time()
+        self.solve_time_start = time.perf_counter()
 
         if self.optimization_options.get("optimize_with_given_weights", MinFlowDecomp.optimize_with_given_weights):            
             self.__solve_with_given_weights()
@@ -160,6 +163,10 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             if self.__given_weights_model is not None and self.__given_weights_model.is_solved():
                 if len(self.__given_weights_model.get_solution(remove_empty_paths=True)["paths"]) == i:
                     fd_model = self.__given_weights_model
+
+            fd_solver_options = copy.deepcopy(self.solver_options)
+            if "time_limit" in fd_solver_options:
+                fd_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
 
             if fd_model is None:
                 fd_model = kflowdecomp.kFlowDecomp(
@@ -181,10 +188,16 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 self.__solution = fd_model.get_solution(remove_empty_paths=True)
                 self.set_solved()
                 self.solve_statistics = fd_model.solve_statistics
-                self.solve_statistics["mfd_solve_time"] = time.time() - start_time
+                self.solve_statistics["mfd_solve_time"] = time.perf_counter() - self.solve_time_start
                 self.fd_model = fd_model
                 return True
-            
+            elif fd_model.solver.get_model_status() != sw.SolverWrapper.infeasible_status:
+                # If the model is not solved and the status is not infeasible,
+                # it means that the solver stopped because of an unexpected termination,
+                # thus we cannot conclude that the model is infeasible.
+                # In this case, we stop the search.
+                return False
+
         return False
 
     def __solve_with_given_weights(self) -> bool:
@@ -218,6 +231,10 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         given_weights_optimization_options["given_weights"] = all_weights_list
         utils.logger.info(f"{__name__}: Solving with given weights = {given_weights_optimization_options['given_weights']}")
 
+        given_weights_kfd_solver_options = copy.deepcopy(self.solver_options)
+        if "time_limit" in given_weights_kfd_solver_options:
+            given_weights_kfd_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
+
         given_weights_kfd_solver = kflowdecomp.kFlowDecomp(
             G=self.G,
             k = len(given_weights_optimization_options["given_weights"]) + self.optimization_options.get("optimize_with_given_weights_num_free_paths", MinFlowDecomp.optimize_with_given_weights_num_free_paths),
@@ -229,7 +246,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             edge_length_attr=self.edge_length_attr,
             edges_to_ignore=self.edges_to_ignore,
             optimization_options=given_weights_optimization_options,
-            solver_options=self.solver_options,
+            solver_options=given_weights_kfd_solver_options,
             )
         given_weights_kfd_solver.solve()
 
@@ -320,7 +337,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     
     def __get_lowerbound_with_min_gen_set(self) -> int:
 
-        start_time = time.time()
+        min_gen_set_start_time = time.perf_counter()
         all_weights = list(set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]}))
         # Get the source_flow as the sum of the flow values on all the edges exiting the source nodes
         # (i.e., nodes with in-degree 0)
@@ -335,6 +352,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 min_constraint_len = self.optimization_options.get("use_min_gen_set_lowerbound_partition_constraints_min_constraint_len", MinFlowDecomp.use_min_gen_set_lowerbound_partition_constraints_min_constraint_len),
                 limit_num_constraints = self.optimization_options.get("use_min_gen_set_lowerbound_partition_constraints_limit_num_constraints", MinFlowDecomp.use_min_gen_set_lowerbound_partition_constraints_limit_num_constraints),
                 )
+        mingenset_solver_options = copy.deepcopy(self.solver_options)
+        if "time_limit" in mingenset_solver_options:
+            mingenset_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
 
         mingenset_model = mgs.MinGenSet(
             numbers = all_weights, 
@@ -343,6 +363,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             lowerbound = current_lowerbound_k,
             partition_constraints=partition_constraints,
             remove_sums_of_two = self.optimization_options.get("min_gen_set_remove_sums_of_two", MinFlowDecomp.min_gen_set_remove_sums_of_two),
+            solver_options = mingenset_solver_options,
             )
         mingenset_model.solve()
     
@@ -355,13 +376,13 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             utils.logger.info(f"{__name__}: did NOT find a min gen set solution")
             exit(0)
         
-        self.solve_statistics["min_gen_set_solve_time"] = time.time() - start_time
+        self.solve_statistics["min_gen_set_solve_time"] = time.perf_counter() - min_gen_set_start_time
         
         return min_gen_set_lowerbound
     
     def __get_lowerbound_with_subgraph_scanning(self) -> int:
 
-        start_time = time.time()
+        start_time = time.perf_counter()
         topo_order = list(nx.topological_sort(self.G))
         right_node_index = 0
         subgraph_subpath_constraints = []    
@@ -387,6 +408,10 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             subgraph_optimization_options["use_subgraph_scanning_lowerbound"] = False
             subgraph_optimization_options["lowerbound_k"] = current_lowerbound_k
 
+            subgraph_solver_options = copy.deepcopy(self.solver_options)
+            if "time_limit" in subgraph_solver_options:
+                subgraph_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
+
             subgraph_mfd_solver = MinFlowDecomp(
                     G=subgraph,
                     flow_attr=self.flow_attr,
@@ -397,7 +422,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                     edge_length_attr=self.edge_length_attr,
                     edges_to_ignore=subgraph_edges_to_ignore,
                     optimization_options=subgraph_optimization_options,
-                    solver_options=self.solver_options,
+                    solver_options=subgraph_solver_options,
                 )
             subgraph_mfd_solver.solve()
             if subgraph_mfd_solver.is_solved():
@@ -413,9 +438,22 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         self.__all_subgraph_weights = all_subgraph_weights
 
-        self.solve_statistics["subgraph_scanning_time"] = time.time() - start_time
+        self.solve_statistics["subgraph_scanning_time"] = time.perf_counter() - start_time
         
         return subgraph_scanning_lowerbound if subgraph_scanning_lowerbound > 0 else None
+
+    @property
+    def solve_time_elapsed(self):
+        """
+        Returns the elapsed time since the start of the solve process.
+
+        Returns
+        -------
+        - `float`
+        
+            The elapsed time in seconds.
+        """
+        return time.perf_counter() - self.solve_time_start if self.solve_time_start is not None else None
 
     def get_solution(self):
         """

@@ -151,9 +151,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths
         
         if self.optimize_with_flow_safe_paths and satisfies_flow_conservation:
-            start_time = time.time()
+            start_time = time.perf_counter()
             self.optimization_options["external_safe_paths"] = sfd.compute_flow_decomp_safe_paths(G=G, flow_attr=self.flow_attr)
-            self.solve_statistics["flow_safe_paths_time"] = time.time() - start_time
+            self.solve_statistics["flow_safe_paths_time"] = time.perf_counter() - start_time
             # If we optimize with flow safe paths, we need to disable optimizing with safe paths and sequences
             if self.optimization_options.get("optimize_with_safe_paths", False):
                 raise ValueError("Cannot optimize with both flow safe paths and safe paths")
@@ -281,7 +281,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # - bool: True if a solution is found using the greedy algorithm, False otherwise.
         
 
-        start_time = time.time()
+        start_time = time.perf_counter()
         (paths, weights) = self.G.decompose_using_max_bottleneck(self.flow_attr)
 
         # Check if the greedy decomposition satisfies the subpath constraints
@@ -310,7 +310,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             }
             self.set_solved()
             self.solve_statistics = {}
-            self.solve_statistics["greedy_solve_time"] = time.time() - start_time
+            self.solve_statistics["greedy_solve_time"] = time.perf_counter() - start_time
             return True
 
         return False

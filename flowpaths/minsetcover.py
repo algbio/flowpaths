@@ -6,7 +6,8 @@ class MinSetCover():
         self,
         universe: list,
         subsets: list,
-        subset_weights: list = None
+        subset_weights: list = None,
+        solver_options: dict = None,
         ):
         """
         This class solves the minimum set cover problem. Given a universe `universe` and a list of subsets `subsets`,
@@ -31,6 +32,9 @@ class MinSetCover():
             The weight of each subset, as a list in the same order that the subsets appear in the list `subsets`. 
             If not provided, each subset is assumed to have a weight of 1.
 
+        - `solver_options : dict`, optional
+            
+            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
         """
         
         self.universe = universe
@@ -49,7 +53,7 @@ class MinSetCover():
         """
         This function encodes the set cover problem as an integer linear program.
         """
-        self.solver = sw.SolverWrapper()
+        self.solver = sw.SolverWrapper(**self.solver_options)
 
         self.subset_indexes = [(i)   for i in range(len(self.subsets))]
 
@@ -90,7 +94,7 @@ class MinSetCover():
             
             `True` if the model was solved, `False` otherwise.
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
 
         self.solver.optimize()
         if self.solver.get_model_status() == "kOptimal":
@@ -98,14 +102,14 @@ class MinSetCover():
             self.__solution = [i for i in range(len(self.subsets)) if subset_cover_sol[i] == 1]
             self.__is_solved = True
             self.solve_statistics = {
-                "solve_time": time.time() - start_time,
+                "solve_time": time.perf_counter() - start_time,
                 "num_elements": len(self.__solution),
                 "status": self.solver.get_model_status(),
             }
             return True
         else:
             self.solve_statistics = {
-                "solve_time": time.time() - start_time,
+                "solve_time": time.perf_counter() - start_time,
                 "status": self.solver.get_model_status(),
             }
             return False

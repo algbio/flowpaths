@@ -147,7 +147,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             
         """
         
-        start_time = time.time()
+        start_time = time.perf_counter()
         previous_solution_objective_value = None
         solve_status = None
         found_feasible = False
@@ -180,7 +180,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
                             break
             else:
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, model is not solved")
-            if time.time() - start_time > self.time_limit:
+            if time.perf_counter() - start_time > self.time_limit:
                 solve_status = NumPathsOptimization.timeout_status_name
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, time out")
                 break
@@ -193,7 +193,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         
         self.solve_statistics = {
                 "solve_status": solve_status,
-                "solve_time": time.time() - start_time,
+                "solve_time": time.perf_counter() - start_time,
             }
 
         if solve_status == NumPathsOptimization.solved_status_name:

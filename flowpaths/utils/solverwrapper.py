@@ -2,6 +2,7 @@ from math import log2
 from math import ceil
 import highspy
 import re
+import multiprocessing
 
 class SolverWrapper:
     """
@@ -30,6 +31,7 @@ class SolverWrapper:
     external_solver = "highs"
     tolerance = 1e-9
     optimization_sense = "minimize"
+    infeasible_status = "kInfeasible"
 
     # We try to map gurobi status codes to HiGHS status codes when there is a clear correspondence
     gurobi_status_to_highs = {
@@ -58,6 +60,8 @@ class SolverWrapper:
             raise ValueError(f"Optimization sense {self.optimization_sense} is not supported. Only [\"minimize\", \"maximize\"] are supported.")
 
         self.variable_name_prefixes = []
+
+        self.did_timeout = False
 
         if self.external_solver == "highs":
             self.solver = highspy.Highs()
@@ -264,11 +268,17 @@ class SolverWrapper:
             )
 
     def optimize(self):
-        if self.external_solver == "highs":
-            self.solver.optimize()
-        elif self.external_solver == "gurobi":
-            self.solver.optimize()
+        # Resetting the timeout flag
+        self.did_timeout = False
 
+        # For both solvers, we have the same function to call
+        # If the time limit is infinite, we call the optimize function directly
+        # Otherwise, we call the function with a timeout
+        if self.time_limit == float('inf'):
+            self.solver.optimize()
+        else:
+            self.__run_with_timeout(self.time_limit, self.solver.optimize)
+    
     def write_model(self, filename):
         if self.external_solver == "highs":
             self.solver.writeModel(filename)
@@ -276,6 +286,13 @@ class SolverWrapper:
             self.solver.write(filename)
 
     def get_model_status(self, raw = False):
+        
+        # If the solver has timed out with our custom time limit, we return the timeout status
+        # This is set in the __run_with_timeout function
+        if self.did_timeout:
+            return "kTimeLimit"
+        
+        # If the solver has not timed out, we return the model status
         if self.external_solver == "highs":
             return self.solver.getModelStatus().name
         elif self.external_solver == "gurobi":
@@ -477,3 +494,15 @@ class SolverWrapper:
             self.add_constraint(x <= U + M * (1 - z[i]), name=f"{name_prefix}_U_{i}")
             self.add_constraint(y <= c + M * (1 - z[i]), name=f"{name_prefix}_yU_{i}")
             self.add_constraint(y >= c - M * (1 - z[i]), name=f"{name_prefix}_yL_{i}")
+
+    def __run_with_timeout(self, timeout, func):
+        process = multiprocessing.Process(target=func)
+        process.start()
+        process.join(timeout)
+
+        if process.is_alive():
+            process.terminate()  # Kill the function if timeout exceeded
+            process.join()
+            self.did_timeout = True
+        
+        process.close()  # Clean up the process

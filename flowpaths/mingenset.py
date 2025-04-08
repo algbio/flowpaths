@@ -12,6 +12,7 @@ class MinGenSet():
             partition_constraints: list = None,
             remove_complement_values: bool = True,
             remove_sums_of_two: bool = False,
+            solver_options: dict = None
             ):
         """
         This class solves the minimum generating set problem. Given a list of numbers `a` and a total value `total`, 
@@ -62,14 +63,18 @@ class MinGenSet():
             
             !!! note "Note"
                 Setting this to `True` always gives a generating set smaller or of the same size (i.e., not larger) as setting it to `False`. 
-                Thus, the size of the fomer generating set can be used as a lower bound for the size of the latter generating set.
+                Thus, the size of the former generating set can be used as a lower bound for the size of the latter generating set.
+
+        - `solver_options : dict`, optional
+            
+            Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
         """
         
         self.numbers = list(numbers) # Make a copy of the list
         utils.logger.debug(f"{__name__}: Initial numbers: {self.numbers}")
         self.initial_numbers = numbers
         self.total = total
-        utils.logger.debug(f"Total: {self.total}")
+        utils.logger.debug(f"{__name__}: Generating set sum = {self.total}")
         self.weight_type = weight_type
         self.lowerbound = lowerbound
         self.partition_constraints = partition_constraints
@@ -78,6 +83,7 @@ class MinGenSet():
         self.__solution = None
         self.solver = None
         self.solve_statistics = {}
+        self.solver_options = solver_options
 
         if self.weight_type not in [int, float]:
             raise ValueError("weight_type must be either `int` or `float`.")
@@ -105,7 +111,7 @@ class MinGenSet():
 
     def __create_solver(self, k):
 
-        self.solver = sw.SolverWrapper()
+        self.solver = sw.SolverWrapper(**self.solver_options)
 
         self.genset_indexes = [(i)   for i in range(k)]
         self.x_indexes = [(i,j) for i in range(k) for j in range(len(self.numbers))]
@@ -259,7 +265,7 @@ class MinGenSet():
         """
         Solves the minimum generating set problem. Returns `True` if the model was solved, `False` otherwise.
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
 
         # Solve for increasing numbers of elements in the generating set
         for k in range(self.lowerbound, max(self.lowerbound+1, len(self.initial_numbers))):
@@ -271,14 +277,14 @@ class MinGenSet():
                 self.__solution = sorted(self.weight_type(genset_sol[i]) for i in range(k))
                 self.__is_solved = True
                 self.solve_statistics = {
-                    "solve_time": time.time() - start_time,
+                    "solve_time": time.perf_counter() - start_time,
                     "num_elements": k,
                     "status": self.solver.get_model_status(),
                 }
                 return True
             else:
                 self.solve_statistics = {
-                    "solve_time": time.time() - start_time,
+                    "solve_time": time.perf_counter() - start_time,
                     "status": self.solver.get_model_status(),
                 }
         return False

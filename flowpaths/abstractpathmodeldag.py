@@ -220,35 +220,35 @@ class AbstractPathModelDAG(ABC):
         if self.external_safe_paths is not None:
             self.safe_lists = self.external_safe_paths
         elif self.optimize_with_safe_paths and not self.is_solved() and self.trusted_edges_for_safety is not None:
-            start_time = time.time()
+            start_time = time.perf_counter()
             self.safe_lists += safetypathcovers.safe_paths(
                 self.G,
                 self.trusted_edges_for_safety,
                 no_duplicates=False,
                 threads=self.threads,
             )
-            self.solve_statistics["safe_paths_time"] = time.time() - start_time
+            self.solve_statistics["safe_paths_time"] = time.perf_counter() - start_time
 
         if self.optimize_with_safe_sequences and not self.is_solved():
-            start_time = time.time()
+            start_time = time.perf_counter()
             self.safe_lists += safetypathcovers.safe_sequences(
                 self.G,
                 self.trusted_edges_for_safety,
                 no_duplicates=False,
                 threads=self.threads,
             )
-            self.solve_statistics["safe_sequences_time"] = time.time() - start_time
+            self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
 
         if self.optimize_with_subpath_constraints_as_safe_sequences and self.subpath_constraints is not None and not self.is_solved():
             if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
-                start_time = time.time()
+                start_time = time.perf_counter()
                 self.safe_lists += safetypathcovers.safe_sequences(
                     G=self.G,
                     edges_or_subpath_constraints_to_cover=self.subpath_constraints,
                     no_duplicates=False,
                     threads=self.threads,
                 )
-                self.solve_statistics["subpath_constraints_as_safe_sequences_time"] = time.time() - start_time
+                self.solve_statistics["subpath_constraints_as_safe_sequences_time"] = time.perf_counter() - start_time
 
     def create_solver_and_paths(self):
         """
@@ -557,10 +557,10 @@ class AbstractPathModelDAG(ABC):
             return True
 
         # self.write_model(f"model-{self.id}.lp")
-        start_time = time.time()
+        start_time = time.perf_counter()
         self.solver.optimize()
         self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = (
-            time.time() - start_time
+            time.perf_counter() - start_time
         )
 
         self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = (
