@@ -12,6 +12,7 @@ class MinErrorFlow():
             flow_attr: str,
             weight_type: type = float,
             sparsity_lambda: float = 0,
+            few_flow_values_epsilon: float = None,
             edges_to_ignore: list = [],
             edge_error_scaling: dict = {},
             additional_starts: list = [],
@@ -44,6 +45,17 @@ class MinErrorFlow():
             The sparsity parameter. It is used to control the trade-off between the sparsity of the solution and the closeness to the original weights. Default is `0`.
             If `sparsity_lambda` is set to `0`, then the solution will be as close as possible to the original weights. If `sparsity_lambda` is set to a positive value, then the solution will be sparser, i.e. it will have less flow going out of the source.
             The higher the value of `sparsity_lambda`, the sparser the solution will be.
+
+        - `few_flow_values_epsilon: float`, optional
+            
+            The epsilon value (at least zero) used to control the number of distinct values in the corrected flow. If `few_flow_values_epsilon` is set to `None`, then the solution will be as close as possible to the original weights,
+            and there is no bound on the number of distinct values in the corrected flow.
+            If `few_flow_values_epsilon` is set to a positive value, then the solution will have fewer distinct flow values in the corrected flow, while ensuring that the objective value of the resulting problem is within $(1+\varepsilon)$ of the optimal solution (with this parameter set to `None`).
+            The higher the value of `few_flow_values_epsilon`, the smaller the number of flow values in the corrected flow, but possibly higher the sum of edge errors in the corrected flow. Default is `None`.
+
+            !!! warning "Warning"
+
+                Setting this can be slow on larger graphs.
 
         - `edges_to_ignore: list`, optional
 
@@ -85,7 +97,12 @@ class MinErrorFlow():
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
             if value == 0:
                 self.edges_to_ignore.add(key)
-        
+        self.different_flow_values_epsilon = few_flow_values_epsilon
+        if few_flow_values_epsilon is not None:
+            if few_flow_values_epsilon < 0:
+                raise ValueError(f"different_flow_values_epsilon must be greater than or equal to 0, not {few_flow_values_epsilon}")
+            if few_flow_values_epsilon == 0:
+                self.different_flow_values_epsilon = None        
 
         self.__solution = None
         self.__is_solved = None
@@ -95,12 +112,19 @@ class MinErrorFlow():
         self.edge_error_vars = {}
         self.edge_sol = {}
 
+        self.w_max = max(
+            [
+                self.G[u][v].get(self.flow_attr, 0)
+                for (u, v) in self.G.edges() 
+            ]
+        )
+        self.ub = self.w_max * self.G.number_of_edges()
 
         self.__create_solver()
 
         self.__encode_flow()
 
-        self.__encode_objective()  
+        self.__encode_min_sum_errors_objective()  
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}")  
 
@@ -109,17 +133,6 @@ class MinErrorFlow():
         self.solver = sw.SolverWrapper(**self.solver_options)
 
     def __encode_flow(self):
-        
-        self.solver = sw.SolverWrapper()
-
-        w_max = max(
-            [
-                self.G[u][v].get(self.flow_attr, 0)
-                for (u, v) in self.G.edges() 
-                if (u, v) not in self.edges_to_ignore
-            ]
-        )
-        ub = w_max * self.G.number_of_edges()
 
         # Creating the edge variables
         self.edge_indexes = [(u, v) for (u, v) in self.G.edges()]
@@ -127,14 +140,14 @@ class MinErrorFlow():
             self.edge_indexes, 
             name_prefix="edge_vars", 
             lb=0, 
-            ub=ub, 
+            ub=self.ub, 
             var_type="integer" if self.weight_type == int else "continuous",
         )
         self.edge_error_vars = self.solver.add_variables(
             self.edge_indexes, 
             name_prefix="edge_error_vars", 
             lb=0, 
-            ub=ub, 
+            ub=self.ub, 
             var_type="integer" if self.weight_type == int else "continuous",
         )
 
@@ -186,7 +199,7 @@ class MinErrorFlow():
                 name=f"edge_error_u={u}_v={v}",
             )
 
-    def __encode_objective(self):
+    def __encode_min_sum_errors_objective(self):
         
         # Objective function: minimize the sum of the edge error variables
         # plus the sparsity of the solution (i.e. sparsity_lambda * sum of the corrected flow going out of the source)
@@ -202,20 +215,148 @@ class MinErrorFlow():
             sense="minimize",
         )
 
+    def __encode_different_flow_values_and_objective(
+            self, 
+            edge_subset: list,
+            objective_value: float, 
+            ub_different_flow_values: int):
+
+        utils.logger.debug(f"{__name__}: ub_diff_flow_values = {ub_different_flow_values}")
+        utils.logger.debug(f"{__name__}: objective_value = {objective_value}, ub_diff_flow_values = {ub_different_flow_values}")
+
+        self.all_flow_values_indexes = [i for i in range(ub_different_flow_values)]
+        self.flow_value_map_indexes = [(u, v, i) for (u,v) in edge_subset for i in range(ub_different_flow_values)]
+
+        self.all_flow_values_vars = self.solver.add_variables(
+            self.all_flow_values_indexes, 
+            name_prefix="all_flow_values_vars", 
+            lb=0, 
+            ub=self.ub, 
+            var_type="integer" if self.weight_type == int else "continuous",
+        )
+        self.all_flow_values_used_indicator_vars = self.solver.add_variables(
+            self.all_flow_values_indexes, 
+            name_prefix="all_flow_values_used_indicator_vars",
+            lb=0, 
+            ub=1, 
+            var_type="integer",
+        )
+        # flow_value_map_vars[(u, v, i)] = 1 if the flow value of edge (u, v) is equal to all_flow_values_vars[i], 0 otherwise
+        self.flow_value_map_vars = self.solver.add_variables(
+            self.flow_value_map_indexes, 
+            name_prefix="flow_values_map_vars", 
+            lb=0, 
+            ub=1, 
+            var_type="integer",
+        )
+        
+        for (u, v) in edge_subset:
+            # flow_value_map_vars[(u, v, i)] is 1 for exactly one i, for all (u, v) in G.edges()
+            self.solver.add_constraint(
+                self.solver.quicksum(
+                    self.flow_value_map_vars[(u, v, i)]
+                    for i in self.all_flow_values_indexes
+                ) == 1,
+                name=f"flow_value_map_sum_equal_1_{u}_{v}",
+            )
+            for i in self.all_flow_values_indexes:
+                # self.edge_vars[(u, v)] = sum(flow_value_product_vars[(u, v, i)] for i in all_flow_values_indexes)
+                self.solver.add_constraint(
+                    self.edge_vars[(u, v)] <= self.all_flow_values_vars[i] + self.ub * (1 - self.flow_value_map_vars[(u, v, i)]),
+                    name=f"flow_value_product_sum_{u}_{v}_{i}_a",
+                )
+                self.solver.add_constraint(
+                    self.edge_vars[(u, v)] >= self.all_flow_values_vars[i] - self.ub * (1 - self.flow_value_map_vars[(u, v, i)]),
+                    name=f"flow_value_product_sum_{u}_{v}_{i}_b",
+                )
+                # all_flow_values_used_indicator_vars[i] = 1 if flow_value_map_vars[(u, v, i)] is 1 for some edge (u, v)
+                self.solver.add_constraint(
+                    self.all_flow_values_used_indicator_vars[i] >= self.flow_value_map_vars[(u, v, i)],
+                    name=f"all_flow_values_used_indicator_{u}_{v}_{i}",
+                )
+
+        utils.logger.debug(f"{__name__}: adding epsilon constraint, with bound = {(1 + self.different_flow_values_epsilon) * objective_value}")
+        # The sum of errors is at most 1+epsilon times the objective value
+        self.solver.add_constraint(
+            self.solver.quicksum(
+                self.edge_error_vars[(u, v)] * self.edge_error_scaling.get((u, v), 1)
+                for (u, v) in self.G.edges()
+                if (u, v) not in self.edges_to_ignore
+            ) + self.sparsity_lambda * self.solver.quicksum(
+                self.edge_vars[(u, v)]
+                for (u, v) in self.G.out_edges(self.G.source)
+            ) <= (1 + self.different_flow_values_epsilon) * objective_value,
+            name="epsilon_constraint",
+        )
+
+        # We minimize the number of used flow values
+        self.solver.set_objective(
+            self.solver.quicksum(
+                self.all_flow_values_used_indicator_vars[i]
+                for i in self.all_flow_values_indexes),
+            sense="minimize",
+        )
+
     def solve(self):
         """
         Solves the problem. Returns `True` if the model was solved, `False` otherwise.
         """
-        start_time = time.time()
+        utils.logger.info(f"{__name__}: solving with graph id = {utils.fpid(self.G)}")
+        start_time = time.perf_counter()
         self.solver.optimize()
-        self.solve_statistics[f"milp_solve_time"] = (time.time() - start_time)
+        self.solve_statistics[f"milp_solve_time"] = (time.perf_counter() - start_time)
 
         self.solve_statistics[f"milp_solver_status"] = self.solver.get_model_status()
 
         if self.solver.get_model_status() == "kOptimal":
-            self.__is_solved = True
-            return True
+            if self.different_flow_values_epsilon is None:
+                self.__is_solved = True
+                utils.logger.info(f"{__name__}: model solved with objective value = {self.solver.get_objective_value()}")
+                return True
+            else:
+                # We need to encode the different flow values variant
+                objective_value = self.solver.get_objective_value()
+                
+                # If the objective value is 0, then we can stop here
+                # because we cannot get a different solution
+                if objective_value == 0:
+                    self.__is_solved = True
+                    utils.logger.info(f"{__name__}: model solved with objective value = {objective_value}. We could not find change the flow values because the objective function was 0.")
+                    return True
 
+                self.__is_solved = True # START hack to get the corrected graph                
+                corrected_graph = self.get_corrected_graph()
+                self.__is_solved = False # END hack to get the corrected graph
+
+                # Pick 30 random edges of G.edges()
+                edge_subset = [e for e in self.original_graph_copy.edges()]
+                # edge_subset = edge_subset[:30]        
+
+                # Getting all the different 'flow_attr' values in the corrected graph
+                ub_different_flow_values = len(set(
+                    corrected_graph[u][v].get(self.flow_attr, 0)
+                    for (u, v) in edge_subset
+                ))
+
+                utils.logger.info(f"{__name__}: re-solving now by minimizing the number of different flow values within 1 + epsilon tolerance to the objective value, i.e. <=(1+{self.different_flow_values_epsilon})*{objective_value}")
+                self.__create_solver()
+                self.__encode_flow()
+                self.__encode_different_flow_values_and_objective(
+                    edge_subset=edge_subset,
+                    objective_value=objective_value,
+                    ub_different_flow_values=ub_different_flow_values,
+                )
+                self.solver.optimize()
+                self.solve_statistics[f"milp_solve_time"] += (time.perf_counter() - start_time)
+                self.solve_statistics[f"milp_solver_status"] = self.solver.get_model_status()
+                
+                if self.solver.get_model_status() == "kOptimal":
+                    self.__is_solved = True
+                    utils.logger.info(f"{__name__}: model solved with objective value = {objective_value}")
+                    return True
+                else:
+                    utils.logger.warning(f"{__name__}: model not solved, status = {self.solver.get_model_status()}")
+                
         self.__is_solved = False
         return False
 
