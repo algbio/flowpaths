@@ -3,6 +3,9 @@ from math import ceil
 import highspy
 import re
 import multiprocessing
+import os
+import signal
+import flowpaths.utils as utils
 
 class SolverWrapper:
     """
@@ -53,10 +56,12 @@ class SolverWrapper:
         self.external_solver = kwargs.get("external_solver", SolverWrapper.external_solver)  # Default solver
         self.tolerance = kwargs.get("tolerance", SolverWrapper.tolerance)  # Default tolerance value
         if self.tolerance < 1e-9:
+            utils.logger.error(f"{__name__}: The tolerance value must be >=1e-9.")
             raise ValueError("The tolerance value must be >=1e-9.")
         
         self.optimization_sense = kwargs.get("optimization_sense", SolverWrapper.optimization_sense)  # Default optimization sense
         if self.optimization_sense not in ["minimize", "maximize"]:
+            utils.logger.error(f"{__name__}: The optimization sense must be either `minimize` or `maximize`.")
             raise ValueError(f"Optimization sense {self.optimization_sense} is not supported. Only [\"minimize\", \"maximize\"] are supported.")
 
         self.variable_name_prefixes = []
@@ -91,6 +96,7 @@ class SolverWrapper:
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
         else:
+            utils.logger.error(f"{__name__}: Unsupported solver type `{self.external_solver}`. Supported solvers are `highs` and `gurobi`.")
             raise ValueError(
                 f"Unsupported solver type `{self.external_solver}`, supported solvers are `highs` and `gurobi`."
             )
@@ -101,6 +107,7 @@ class SolverWrapper:
         # of if the current one has as prefix an existing one
         for prefix in self.variable_name_prefixes:
             if prefix.startswith(name_prefix) or name_prefix.startswith(prefix):
+                utils.logger.error(f"{__name__}: Variable name prefix {name_prefix} conflicts with existing variable name prefix {prefix}. Use a different name prefix.")
                 raise ValueError(
                     f"Variable name prefix {name_prefix} conflicts with existing variable name prefix {prefix}. Use a different name prefix."
                 )
@@ -251,6 +258,7 @@ class SolverWrapper:
     def set_objective(self, expr, sense="minimize"):
 
         if sense not in ["minimize", "min", "maximize", "max"]:
+            utils.logger.error(f"{__name__}: The objective sense must be either `minimize` or `maximize`.")
             raise ValueError(f"Objective sense {sense} is not supported. Only [\"minimize\", \"min\", \"maximize\", \"max\"] are supported.")
         self.optimization_sense = sense
 
@@ -329,6 +337,7 @@ class SolverWrapper:
         match = re.match(pattern, string)
 
         if not match:
+            utils.logger.error(f"{__name__}: Invalid format for variable name: {string}")
             raise ValueError(f"Invalid format: {string}")
 
         # Extract the component list inside parentheses
@@ -376,11 +385,13 @@ class SolverWrapper:
             # print(f"Checking variable {var} against prefix {name_prefix}")
             if var == name_prefix:
                 if len(index_types) > 0:
+                    utils.logger.error(f"{__name__}: We are getting the value of variable `{var}`, but the provided list of var_types is not empty `{index_types}`.")
                     raise Exception(
                         f"We are getting the value of variable `{var}`, but the provided list of var_types is not empty `{index_types}`."
                     )
                 values[0] = varValues[index]
                 if binary_values and round(values[0]) not in [0,1]:
+                    utils.logger.error(f"{__name__}: Variable {var} has value {values[0]}, which is not binary.")
                     raise Exception(f"Variable {var} has value {values[0]}, which is not binary.")
                 # We return already, because we are supposed to match only one variable name
                 # print("Returning values", values)
@@ -401,12 +412,14 @@ class SolverWrapper:
 
                     values[tuple_index] = varValues[index]
                     if binary_values and round(values[tuple_index]) not in [0,1]:
+                        utils.logger.error(f"{__name__}: Variable {var} has value {values[tuple_index]}, which is not binary.")
                         raise Exception(f"Variable {var} has value {values[tuple_index]}, which is not binary.")
                 
                 # If there are no parentheses in the variable name, we assume that the variable is indexed as var0, var1, ...
                 else:
                     element = var.replace(name_prefix, "", 1)
                     if len(index_types) > 1:
+                        utils.logger.error(f"{__name__}: We are getting the value of variable `{var}` for name_prefix `{name_prefix}`, with only one index `{element}`, but the provided list of var_types is not of length one `{index_types}`.")
                         raise Exception(f"We are getting the value of variable `{var}` for name_prefix `{name_prefix}`, with only one index `{element}`, but the provided list of var_types is not of length one `{index_types}`.")
 
                     elem_index = index_types[0](element)
@@ -415,9 +428,8 @@ class SolverWrapper:
                         binary_values 
                         and round(values[elem_index]) not in [0,1]
                     ):
-                        raise Exception(
-                            f"Variable {var} has value {values[elem_index]}, which is not binary."
-                        )
+                        utils.logger.error(f"{__name__}: Variable {var} has value {values[elem_index]}, which is not binary.")
+                        raise Exception(f"Variable {var} has value {values[elem_index]}, which is not binary.")
 
         if binary_values:
             for key in values.keys():
@@ -465,6 +477,7 @@ class SolverWrapper:
         y: The created piecewise output variable.
         """
         if len(ranges) != len(constants):
+            utils.logger.error(f"{__name__}: The length of `ranges` and `constants` must be the same.")
             raise ValueError("`ranges` and `constants` must have the same length.")
 
         pieces = len(ranges)
@@ -495,7 +508,7 @@ class SolverWrapper:
             self.add_constraint(y <= c + M * (1 - z[i]), name=f"{name_prefix}_yU_{i}")
             self.add_constraint(y >= c - M * (1 - z[i]), name=f"{name_prefix}_yL_{i}")
 
-    def __run_with_timeout(self, timeout, func):
+    def __run_with_timeout_basic(self, timeout, func):
         process = multiprocessing.Process(target=func)
         process.start()
         process.join(timeout)
@@ -506,3 +519,35 @@ class SolverWrapper:
             self.did_timeout = True
         
         process.close()  # Clean up the process
+
+    def __timeout_handler(self, signum, frame):
+        # raise TimeoutException("Function timed out!")
+        self.did_timeout = True
+
+    def __run_with_timeout(self, timeout, func):
+        # Use signal-based timeout on Unix-like systems
+        if os.name == 'posix':
+            signal.signal(signal.SIGALRM, self.__timeout_handler)
+            signal.alarm(timeout)  # Schedule the timeout alarm
+            try:
+                func()
+                signal.alarm(0)  # Cancel alarm if function completed in time
+            except Exception as e:
+                signal.alarm(0)
+                raise e
+        else:
+            # Fallback: use multiprocessing with a Queue to capture the result
+            process = multiprocessing.Process(target=func)
+            process.start()
+            process.join(timeout)
+
+            if process.is_alive():
+                process.terminate()  # Kill the function if timeout exceeded
+                process.join()
+                self.did_timeout = True
+            
+            process.close()  # Clean up the process
+
+class TimeoutException(Exception):
+    pass
+

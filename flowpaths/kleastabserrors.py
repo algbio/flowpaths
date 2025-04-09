@@ -115,9 +115,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
 
         if weight_type not in [int, float]:
-            raise ValueError(
-                f"weight_type must be either int or float, not {weight_type}"
-            )
+            utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
+            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
         self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
@@ -125,6 +124,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.edge_error_scaling = edge_error_scaling
         for key, value in self.edge_error_scaling.items():
             if value < 0 or value > 1:
+                utils.logger.error(f"{__name__}: Edge error scaling factor for edge {key} must be between 0 and 1.")
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
 
         self.flow_attr = flow_attr

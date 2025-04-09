@@ -86,6 +86,7 @@ class MinGenSet():
         self.solver_options = solver_options
 
         if self.weight_type not in [int, float]:
+            utils.logger.error(f"{__name__}: weight_type must be either `int` or `float`.")
             raise ValueError("weight_type must be either `int` or `float`.")
 
         if remove_sums_of_two:
@@ -195,9 +196,11 @@ class MinGenSet():
             return
 
         if not all(isinstance(constraint, list) for constraint in self.partition_constraints):
+            utils.logger.error(f"{__name__}: partition_constraints must be a list of lists.")
             raise ValueError("partition_constraints must be a list of lists.")
         
         if not all(sum(constraint) == self.total for constraint in self.partition_constraints):
+            utils.logger.error(f"{__name__}: The sum of the numbers inside each subset constraint must equal the total value.")
             raise ValueError("The sum of the numbers inside each subset constraint must equal the total value.")
 
         if len(self.partition_constraints) == 0:
@@ -294,6 +297,7 @@ class MinGenSet():
         Returns `True` if the model was solved, `False` otherwise.
         """
         if self.__is_solved is None:
+            utils.logger.error(f"{__name__}: Model not yet solved. If you want to solve it, call the `solve` method first.")
             raise Exception("Model not yet solved. If you want to solve it, call the `solve` method first.")
         
         return self.__is_solved

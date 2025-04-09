@@ -1,6 +1,7 @@
 import flowpaths.stdigraph as stdigraph
 import networkx as nx
 from collections import deque 
+import flowpaths.utils as utils
 
 def compute_inexact_flow_decomp_safe_paths(
     G: nx.DiGraph, 
@@ -63,18 +64,30 @@ def compute_inexact_flow_decomp_safe_paths(
         for u, v in zip(path, path[1:]):
             for flow_attr in [lowerbound_attr, upperbound_attr]:
                 if flow_attr not in G.edges[u, v]:
+                    utils.logger.error(
+                        f"{__name__}: Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
+                    )
                     raise ValueError(
                         f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
                     )
             if G.edges[u, v][lowerbound_attr] < 0:
+                utils.logger.error(
+                    f"{__name__}: Edge ({u},{v}) has negative lower bound flow value {G.edges[u, v][lowerbound_attr]}. All lower bound flow values must be >=0."
+                )
                 raise ValueError(
                     f"Edge ({u},{v}) has negative lower bound flow value {G.edges[u, v][lowerbound_attr]}. All lower bound flow values must be >=0."
                 )
             if G.edges[u, v][lowerbound_attr] > G.edges[u, v][upperbound_attr]:
+                utils.logger.error(
+                    f"{__name__}: Edge ({u},{v}) has a larger lower bound flow value {G.edges[u, v][lowerbound_attr]} than upper bound flow value {G.edges[u, v][upperbound_attr]}."
+                )
                 raise ValueError(
                     f"Edge ({u},{v}) has a larger lower bound flow value {G.edges[u, v][lowerbound_attr]} than upper bound flow value {G.edges[u, v][upperbound_attr]}."
                 )
             if G.edges[u, v][upperbound_attr] == 0:
+                utils.logger.error(
+                    f"{__name__}: Edge ({u},{v}) has a flow upper bound of zero."
+                )
                 raise ValueError(
                     f"Edge ({u},{v}) has a flow upper bound of zero."
                 )

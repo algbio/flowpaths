@@ -1,5 +1,6 @@
 import networkx as nx
 from flowpaths.utils import graphutils as gu
+import flowpaths.utils as utils
 
 class NodeExpandedDiGraph(nx.DiGraph):
     
@@ -89,6 +90,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         super().__init__()
 
         if not all(isinstance(node, str) for node in G.nodes()):
+            utils.logger.error(f"{__name__}: Graph id {utils.fpid(G)}: every node of the graph must be a string.")
             raise ValueError("Every node of the graph must be a string.")
         # # if not all nodes have the flow attribute, raise an error
         # if not all(node_flow_attr in G.nodes[node] for node in G.nodes()):
@@ -225,8 +227,10 @@ class NodeExpandedDiGraph(nx.DiGraph):
         # and expand them accordingly, using the two functions already implemented.
         
         if not isinstance(subpath_constraints, list):
+            utils.logger.error(f"{__name__}: Subpath constraints must be a list.")
             raise ValueError("Subpath constraints must be a list.")
         if not all(isinstance(constraint, list) for constraint in subpath_constraints):
+            utils.logger.error(f"{__name__}: Subpath constraints must be a list of lists.")
             raise ValueError("Subpath constraints must be a list of lists.")
         
         if len(subpath_constraints) == 0:
@@ -237,6 +241,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         elif isinstance(subpath_constraints[0][0], tuple):
             return self.__get_expanded_subpath_constraints_edges(subpath_constraints)
         else:
+            utils.logger.error(f"{__name__}: Subpath constraints must be a list of lists of nodes or edges.")
             raise ValueError("Subpath constraints must be a list of lists of nodes or edges.")
 
     def __get_expanded_subpath_constraints_nodes(self, subpath_constraints):
@@ -264,6 +269,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             expanded_constraint = []
             for node in constraint:
                 if node not in self.original_G.nodes:
+                    utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
                     raise ValueError(f"Node {node} not in the original graph.")
                 expanded_constraint.append((node + '.0', node + '.1'))
             expanded_constraints.append(expanded_constraint)
@@ -295,6 +301,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             expanded_constraint = []
             for edge in constraint:
                 if edge not in self.original_G.edges:
+                    utils.logger.error(f"{__name__}: Edge {edge} not in the original graph.")
                     raise ValueError(f"Edge {edge} not in the original graph.")
                 expanded_constraint.append((edge[0] + '.1', edge[1] + '.0'))
             expanded_constraints.append(expanded_constraint)
@@ -307,6 +314,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         """
 
         if node not in self.original_G.nodes:
+            utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
             raise ValueError(f"Node {node} not in the original graph.")
 
         return (node + '.0', node + '.1')
@@ -348,9 +356,11 @@ class NodeExpandedDiGraph(nx.DiGraph):
             for i in range(0, len(path) - 1, 2):
                 # Raise an error if the last two symbols of path[i] are not '.0'
                 if path[i][-2:] != '.0':
+                    utils.logger.error(f"{__name__}: Invalid node name in path: {path[i]}")
                     raise ValueError(f"Invalid node name in path: {path[i]}")
                 node = path[i][:-2]
                 if node not in self.original_G.nodes:
+                    utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
                     raise ValueError(f"Node {node} not in the original graph.")
                 condensed_path.append(node)
             condensed_paths.append(condensed_path)

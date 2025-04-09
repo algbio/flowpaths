@@ -167,13 +167,18 @@ class AbstractPathModelDAG(ABC):
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         if subpath_constraints is not None:
             if self.subpath_constraints_coverage <= 0 or self.subpath_constraints_coverage > 1:
+                utils.logger.error(f"{__name__}: subpath_constraints_coverage must be in the range (0, 1]")
                 raise ValueError("subpath_constraints_coverage must be in the range (0, 1]")
+                
             if self.subpath_constraints_coverage_length is not None:
                 if self.subpath_constraints_coverage_length <= 0 or self.subpath_constraints_coverage_length > 1:
+                    utils.logger.error(f"{__name__}: subpath_constraints_coverage_length must be in the range (0, 1]")
                     raise ValueError("If set, subpath_constraints_coverage_length must be in the range (0, 1]")
                 if self.edge_length_attr is None:
+                    utils.logger.error(f"{__name__}: If subpath_constraints_coverage_length is set, edge_length_attr must be provided.")
                     raise ValueError("If subpath_constraints_coverage_length is set, edge_length_attr must be provided.")
                 if self.subpath_constraints_coverage < 1:
+                    utils.logger.error(f"{__name__}: If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
                     raise ValueError("If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
 
         self.solve_statistics = solve_statistics
@@ -207,13 +212,14 @@ class AbstractPathModelDAG(ABC):
 
         # some checks
         if self.optimize_with_safe_paths and self.external_safe_paths is None and self.trusted_edges_for_safety is None:
-            raise ValueError(
-                "trusted_edges_for_safety must be provided when optimizing with safe lists"
-            )        
+            utils.logger.error(f"{__name__}: trusted_edges_for_safety must be provided when optimizing with safe paths")
+            raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")        
         if self.optimize_with_safe_sequences and self.external_safe_paths is not None:
+            utils.logger.error(f"{__name__}: Cannot optimize with both external safe paths and safe sequences")
             raise ValueError("Cannot optimize with both external safe paths and safe sequences")
 
         if self.optimize_with_safe_paths and self.optimize_with_safe_sequences:
+            utils.logger.error(f"{__name__}: Cannot optimize with both safe paths and safe sequences")
             raise ValueError("Cannot optimize with both safe paths and safe sequences")        
                 
         self.safe_lists = []
@@ -524,11 +530,13 @@ class AbstractPathModelDAG(ABC):
 
         # Check that self.subpath_constraints is a list of lists of edges
         if not all(isinstance(subpath, list) for subpath in self.subpath_constraints):
+            utils.logger.error(f"{__name__}: subpath_constraints must be a list of lists of edges.")
             raise ValueError("subpath_constraints must be a list of lists of edges.")
 
         for subpath in self.subpath_constraints:
             for e in subpath:
                 if not self.G.has_edge(e[0], e[1]):
+                    utils.logger.error(f"{__name__}: subpath {subpath} contains the edge {e} which is not in the graph.")
                     raise ValueError(f"Subpath {subpath} contains the edge {e} which is not in the graph.")
 
 
@@ -580,10 +588,10 @@ class AbstractPathModelDAG(ABC):
 
     def check_is_solved(self):
         if not self.is_solved():
+            utils.logger.error(f"{__name__}: Model not solved. If you want to solve it, call the `solve` method first.")
             raise Exception(
                 "Model not solved. If you want to solve it, call the `solve` method first. \
-                  If you already ran the `solve` method, then the model is infeasible, or you need to increase parameter time_limit."
-            )
+                  If you already ran the `solve` method, then the model is infeasible, or you need to increase parameter time_limit.")
         
     def is_solved(self):
         return self.__is_solved
@@ -650,7 +658,8 @@ class AbstractPathModelDAG(ABC):
                             break
                     path.append(vertex)
                 if len(path) < 2:
-                    raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. this should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
+                    utils.logger.error(f"{__name__}: Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
+                    raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
                 
                 paths.append(path[1:-1])
 

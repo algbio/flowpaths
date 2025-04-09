@@ -84,6 +84,7 @@ class MinErrorFlow():
         self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
         self.flow_attr = flow_attr
         if weight_type not in [int, float]:
+            utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
         self.solver_options = solver_options
@@ -94,12 +95,14 @@ class MinErrorFlow():
         # Checking that every entry in self.edge_error_scaling is between 0 and 1
         for key, value in self.edge_error_scaling.items():
             if value < 0 or value > 1:
+                utils.logger.error(f"{__name__}: Edge error scaling factor for edge {key} must be between 0 and 1.")
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
             if value == 0:
                 self.edges_to_ignore.add(key)
         self.different_flow_values_epsilon = few_flow_values_epsilon
         if few_flow_values_epsilon is not None:
             if few_flow_values_epsilon < 0:
+                utils.logger.error(f"{__name__}: different_flow_values_epsilon must be greater than or equal to 0, not {few_flow_values_epsilon}")
                 raise ValueError(f"different_flow_values_epsilon must be greater than or equal to 0, not {few_flow_values_epsilon}")
             if few_flow_values_epsilon == 0:
                 self.different_flow_values_epsilon = None        
@@ -181,6 +184,7 @@ class MinErrorFlow():
             
             # If the edge is not in the edges_to_ignore list, we need to check if it has a flow attribute
             if self.flow_attr not in data:
+                utils.logger.error(f"{__name__}: Flow attribute '{self.flow_attr}' not found in edge data for edge {str((u, v))}, and this edge is not in the edges_to_ignore list.")
                 raise ValueError(f"Flow attribute '{self.flow_attr}' not found in edge data for edge {str((u, v))}, and this edge is not in the edges_to_ignore list.")
             
             # Getting the flow value of the edge            
@@ -365,6 +369,7 @@ class MinErrorFlow():
         Returns `True` if the model was solved, `False` otherwise.
         """
         if self.__is_solved is None:
+            utils.logger.error(f"{__name__}: model not yet solved. If you want to solve it, call the `solve` method first.")
             raise Exception("Model not yet solved. If you want to solve it, call the `solve` method first.")
         
         return self.__is_solved

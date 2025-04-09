@@ -1,5 +1,6 @@
 from itertools import count
 import networkx as nx
+import flowpaths.utils as utils
 
 bigNumber = 1 << 32
 
@@ -28,6 +29,7 @@ def read_graph(graph_raw) -> nx.DiGraph:
     for edge in graph_raw[2:]:
         elements = edge.split(" ")
         if len(elements) != 3:
+            utils.logger.error(f"{__name__}: Invalid edge format: %s", edge)
             raise ValueError("Invalid edge format: %s", edge)
         # print(elements)
         u = elements[0].strip()
@@ -317,6 +319,7 @@ def draw_solution(
         """
 
         if len(paths) != len(weights):
+            raise ValueError(f"{__name__}: Paths and weights must have the same length.")
             raise ValueError("Paths and weights must have the same length, if provided.")
 
         try:
@@ -416,6 +419,7 @@ def draw_solution(
                 pathColor = colors[index % len(colors)]
                 for i in range(len(path)):
                     if len(path[i]) != 2:
+                        utils.logger.error(f"{__name__}: Subpaths must be lists of edges.")
                         raise ValueError("Subpaths must be lists of edges.")
                     dot.edge(
                         str(path[i][0]),
@@ -431,6 +435,7 @@ def draw_solution(
             dot.render(outfile=filename, view=False, cleanup=True)
         
         except ImportError:
+            utils.logger.error(f"{__name__}: graphviz module not found. Please install it via pip (pip install graphviz).")
             raise ImportError("graphviz module not found. Please install it via pip (pip install graphviz).")
 
 def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, left: int, right: int) -> nx.DiGraph:
@@ -440,8 +445,10 @@ def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, 
     """
 
     if left < 0 or right >= len(topo_order):
+        utils.logger.error(f"{__name__}: Invalid range for topological order: {left}, {right}.")
         raise ValueError("Invalid range for topological order")
     if left > right:
+        utils.logger.error(f"{__name__}: Invalid range for topological order: {left}, {right}.")
         raise ValueError("Invalid range for topological order")
 
     # Create a subgraph with the nodes between left and right in the topological order

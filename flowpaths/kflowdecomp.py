@@ -102,15 +102,15 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.G = stdigraph.stDiGraph(G)
 
         if weight_type not in [int, float]:
-            raise ValueError(
-                f"weight_type must be either int or float, not {weight_type}"
-            )
+            utils.logger.error(f"weight_type must be either int or float, not {weight_type}")
+            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
         # Check requirements on input graph:
         # Check flow conservation only if there are no edges to ignore
         satisfies_flow_conservation = gu.check_flow_conservation(G, flow_attr)
         if len(edges_to_ignore) == 0 and not satisfies_flow_conservation:
+            utils.logger.error(f"{__name__}: The graph G does not satisfy flow conservation or some edges have missing `flow_attr`. This is an error, unless you passed `edges_to_ignore` to include at least those edges with missing `flow_attr`.")
             raise ValueError("The graph G does not satisfy flow conservation or some edges have missing `flow_attr`. This is an error, unless you passed `edges_to_ignore` to include at least those edges with missing `flow_attr`.")
 
         # Check that the flow is positive and get max flow value
@@ -156,8 +156,10 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             self.solve_statistics["flow_safe_paths_time"] = time.perf_counter() - start_time
             # If we optimize with flow safe paths, we need to disable optimizing with safe paths and sequences
             if self.optimization_options.get("optimize_with_safe_paths", False):
+                utils.logger.error(f"{__name__}: Cannot optimize with both flow safe paths and safe paths")
                 raise ValueError("Cannot optimize with both flow safe paths and safe paths")
             if self.optimization_options.get("optimize_with_safe_sequences", False):
+                utils.logger.error(f"{__name__}: Cannot optimize with both flow safe paths and safe sequences")
                 raise ValueError("Cannot optimize with both flow safe paths and safe sequences")
         
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
@@ -246,15 +248,20 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             return
         
         if self.optimization_options.get("optimize_with_safe_paths", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safe paths")
             raise ValueError("Cannot optimize with both given weights and safe paths")
         if self.optimization_options.get("optimize_with_safe_sequences", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safe sequences")
             raise ValueError("Cannot optimize with both given weights and safe sequences")
         if self.optimization_options.get("optimize_with_safe_zero_edges", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safe zero edges")
             raise ValueError("Cannot optimize with both given weights and safe zero edges")
         if self.optimization_options.get("optimize_with_flow_safe_paths", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and flow safe paths")
             raise ValueError("Cannot optimize with both given weights and flow safe paths")
             
         if len(weights) > self.k:
+            utils.logger.error(f"Length of given weights ({len(weights)}) is greater than k ({self.k})")
             raise ValueError(f"Length of given weights ({len(weights)}) is greater than k ({self.k})")
 
         for i, weight in enumerate(weights):
@@ -409,6 +416,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         """
 
         if self.__solution is None:
+            utils.logger.error(f"{__name__}: Solution is not available. Call get_solution() first.")
             raise ValueError("Solution is not available. Call get_solution() first.")
 
         solution_paths = self.__solution["paths"]

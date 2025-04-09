@@ -144,6 +144,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
 
         if weight_type not in [int, float]:
+            utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
@@ -157,6 +158,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         # Checking that every entry in self.edge_error_scaling is between 0 and 1
         for key, value in self.edge_error_scaling.items():
             if value < 0 or value > 1:
+                utils.logger.error(f"{__name__}: Edge error scaling factor for edge {key} must be between 0 and 1.")
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
             if value == 0:
                 self.edges_to_ignore.add(key)
@@ -177,8 +179,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.path_length_ranges = path_length_ranges
         self.path_length_factors = path_length_factors
         if len(self.path_length_ranges) != len(self.path_length_factors):
+            utils.logger.error(f"{__name__}: The number of path length ranges must be equal to the number of error scale factors.")
             raise ValueError("The number of path length ranges must be equal to the number of error scale factors.")
         if len(self.path_length_factors) > 0 and self.weight_type == float:
+            utils.logger.error(f"{__name__}: Error scale factors are only allowed for integer weights.")
             raise ValueError("Error scale factors are only allowed for integer weights.")
 
         self.pi_vars = {}

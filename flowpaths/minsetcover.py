@@ -120,12 +120,14 @@ class MinSetCover():
         Returns `True` if the model was solved, `False` otherwise.
         """
         if self.__is_solved is None:
+            self.solver.logger.error(f"{__name__}: Model not yet solved. If you want to solve it, call the `solve` method first.")
             raise Exception("Model not yet solved. If you want to solve it, call the `solve` method first.")
         
         return self.__is_solved
     
     def check_is_solved(self):
         if not self.is_solved():
+            self.solver.logger.error(f"{__name__}: Model not solved. If you want to solve it, call the `solve` method first.")
             raise Exception(
                 "Model not solved. If you want to solve it, call the solve method first. \
                   If you already ran the solve method, then the model is infeasible, or you need to increase parameter time_limit."

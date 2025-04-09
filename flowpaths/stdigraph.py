@@ -36,6 +36,7 @@ class stDiGraph(nx.DiGraph):
         #     return
 
         if not all(isinstance(node, str) for node in base_graph.nodes()):
+            utils.logger.error(f"{__name__}: Every node of the graph must be a string.")
             raise ValueError("Every node of the graph must be a string.")
 
         super().__init__()
@@ -78,6 +79,7 @@ class stDiGraph(nx.DiGraph):
         """
 
         if not nx.is_directed_acyclic_graph(self.base_graph):
+            utils.logger.error(f"{__name__}: The base graph must be a directed acyclic graph.")
             raise ValueError("The base graph must be a directed acyclic graph.")
 
         self.add_nodes_from(self.base_graph.nodes(data=True))
@@ -391,10 +393,16 @@ class stDiGraph(nx.DiGraph):
             if (u, v) in edges_to_ignore:
                 continue
             if not flow_attr in data:
+                utils.logger.error(
+                    f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
+                )
                 raise ValueError(
                     f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
                 )
             if data[flow_attr] < 0:
+                utils.logger.error(
+                    f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0."
+                )
                 raise ValueError(
                     f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0."
                 )
