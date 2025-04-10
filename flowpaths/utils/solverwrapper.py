@@ -2,9 +2,9 @@ from math import log2
 from math import ceil
 import highspy
 import re
-import multiprocessing
 import os
 import signal
+import math
 import flowpaths.utils as utils
 
 class SolverWrapper:
@@ -35,6 +35,7 @@ class SolverWrapper:
     tolerance = 1e-9
     optimization_sense = "minimize"
     infeasible_status = "kInfeasible"
+    use_also_custom_timeout = False
 
     # We try to map gurobi status codes to HiGHS status codes when there is a clear correspondence
     gurobi_status_to_highs = {
@@ -54,6 +55,8 @@ class SolverWrapper:
         ):
 
         self.external_solver = kwargs.get("external_solver", SolverWrapper.external_solver)  # Default solver
+        self.time_limit = kwargs.get("time_limit", SolverWrapper.time_limit)
+        self.use_also_custom_timeout = kwargs.get("use_also_custom_timeout", SolverWrapper.use_also_custom_timeout)
         self.tolerance = kwargs.get("tolerance", SolverWrapper.tolerance)  # Default tolerance value
         if self.tolerance < 1e-9:
             utils.logger.error(f"{__name__}: The tolerance value must be >=1e-9.")
@@ -100,6 +103,8 @@ class SolverWrapper:
             raise ValueError(
                 f"Unsupported solver type `{self.external_solver}`, supported solvers are `highs` and `gurobi`."
             )
+        
+        utils.logger.debug(f"{__name__}: solver_options (kwargs) = {kwargs}")
 
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
         
@@ -282,9 +287,10 @@ class SolverWrapper:
         # For both solvers, we have the same function to call
         # If the time limit is infinite, we call the optimize function directly
         # Otherwise, we call the function with a timeout
-        if self.time_limit == float('inf'):
+        if self.time_limit == float('inf') or (not self.use_also_custom_timeout):
             self.solver.optimize()
         else:
+            utils.logger.debug(f"{__name__}: Running also with use_also_custom_timeout ({self.time_limit} sec)")
             self.__run_with_timeout(self.time_limit, self.solver.optimize)
     
     def write_model(self, filename):
@@ -508,46 +514,19 @@ class SolverWrapper:
             self.add_constraint(y <= c + M * (1 - z[i]), name=f"{name_prefix}_yU_{i}")
             self.add_constraint(y >= c - M * (1 - z[i]), name=f"{name_prefix}_yL_{i}")
 
-    def __run_with_timeout_basic(self, timeout, func):
-        process = multiprocessing.Process(target=func)
-        process.start()
-        process.join(timeout)
-
-        if process.is_alive():
-            process.terminate()  # Kill the function if timeout exceeded
-            process.join()
-            self.did_timeout = True
-        
-        process.close()  # Clean up the process
-
     def __timeout_handler(self, signum, frame):
-        # raise TimeoutException("Function timed out!")
         self.did_timeout = True
+        # raise TimeoutException("Function timed out!")
 
     def __run_with_timeout(self, timeout, func):
         # Use signal-based timeout on Unix-like systems
         if os.name == 'posix':
             signal.signal(signal.SIGALRM, self.__timeout_handler)
-            signal.alarm(timeout)  # Schedule the timeout alarm
+            signal.alarm(math.ceil(timeout))  # Schedule the timeout alarm
             try:
+                utils.logger.debug(f"{__name__}: Running the solver with integer timeout from the signal module (timeout {math.ceil(timeout)} sec)")
                 func()
-                signal.alarm(0)  # Cancel alarm if function completed in time
             except Exception as e:
-                signal.alarm(0)
-                raise e
-        else:
-            # Fallback: use multiprocessing with a Queue to capture the result
-            process = multiprocessing.Process(target=func)
-            process.start()
-            process.join(timeout)
-
-            if process.is_alive():
-                process.terminate()  # Kill the function if timeout exceeded
-                process.join()
-                self.did_timeout = True
-            
-            process.close()  # Clean up the process
-
-class TimeoutException(Exception):
-    pass
-
+                pass
+            finally:
+                signal.alarm(0)  # Disable alarm after execution

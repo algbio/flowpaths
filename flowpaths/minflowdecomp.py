@@ -180,7 +180,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                     edge_length_attr=self.edge_length_attr,
                     edges_to_ignore=self.edges_to_ignore,
                     optimization_options=self.optimization_options,
-                    solver_options=self.solver_options,
+                    solver_options=fd_solver_options,
                 )
                 fd_model.solve()
 
