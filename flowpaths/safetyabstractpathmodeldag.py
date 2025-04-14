@@ -7,39 +7,55 @@ import flowpaths.utils as utils
 import time
 
 class SafetyAbstractPathModelDAG():
-    """
-    A class computing the safe paths of any model that inherits from AbstractPathModelDAG.
-    """
+
+    allowed_optimization_options = [
+        "optimize_with_safe_paths",
+        "optimize_with_safe_sequences",
+        "optimize_with_safe_zero_edges",
+        "optimize_with_subpath_constraints_as_safe_sequences",
+        "optimize_with_flow_safe_paths",
+    ]
 
     def __init__(
         self, 
         model_type: abstractpathmodeldag.AbstractPathModelDAG,
-        time_limit: float = float("inf"),
+        time_limit: float = float('inf'),
+        delta_in_objective_value: float = 0.0,
         **kwargs,
     ):
         """
-        Initialize the SafetyAbstractPathModelDAG with the given arguments.
+        This class computes all the maximal safe paths of any model with a given number of paths, that inherits from `AbstractPathModelDAG`.
+
+        A path is *safe* if it belongs to all solutions of the model with `k` paths, for a given `k`. 
+        A path is *maximal safe* if it is not a proper subpath of any other safe path.
+        The class uses a group testing approach to find the safe paths, in addition to setting suitable constraints on the model, from [https://doi.org/10.1093/bioinformatics/btad640](https://doi.org/10.1093/bioinformatics/btad640).
 
         Parameters
         ----------
         
         - `model_type: AbstractPathModelDAG`
         
-            The type of the model to be used. It should be a subclass of AbstractPathModelDAG.
+            The type of the model to be used. It should be a subclass of `AbstractPathModelDAG`.
 
-        - `time_limit: float`
+        - `time_limit: float`, optional
         
-            The time limit for the solver, in seconds. Default is infinity.
+            The time limit for the solver, in seconds. Default is Infinity.
+
+        - `delta_in_objective_value: float`, optional
+            
+            This parameter to be used for the safety check. Default is 0.0.
+            That is, we can generalize safety and say that a path is *safe* if it belongs to all solutions of the model with `k` paths, 
+            but with an objective value different from the original one by a factor of at most `delta_in_objective_value`. 
 
         - `**kwargs`
         
-            Additional arguments to be passed to the model. Include all that are required for the model whose safe paths you are computing.
+            Additional arguments to be passed to the model. Include the number `k` of paths, and all other that are required for the model whose safe paths you are computing.
         """
         self.model_type = model_type
         self.time_limit = time_limit
+        self.delta_in_objective_value = delta_in_objective_value
         self.kwargs = kwargs
 
-        
         if not issubclass(self.model_type, abstractpathmodeldag.AbstractPathModelDAG):
             utils.logger.error(f"{__name__}: The model_type parameter must be a subclass of AbstractPathModelDAG. You passed {self.model_type}.")
             raise TypeError(f"{__name__}: The model_type parameter must be a subclass of AbstractPathModelDAG. You passed {self.model_type}.")
@@ -48,6 +64,17 @@ class SafetyAbstractPathModelDAG():
         if issubclass(self.model_type, minflowdecomp.MinFlowDecomp) or issubclass(self.model_type, numpathsoptimization.NumPathsOptimization):
             utils.logger.error(f"{__name__}: The model_types MinFlowDecomp and NumPathsOptimization are not supported (you passed {self.model_type}). First find a feasible solution, and pass the k-version of the model, e.g. kFlowDecomp.")
             raise TypeError(f"{__name__}: The model_types MinFlowDecomp and NumPathsOptimization are not supported (you passed {self.model_type}). First find a feasible solution, and pass the k-version of the model, e.g. kFlowDecomp.")
+        
+        if 'k' not in self.kwargs:
+            utils.logger.error(f"{__name__}: The model must have a parameter 'k' in kwargs. This is the number of paths.")
+            raise ValueError("The model must have a parameter 'k' in kwargs. This is the number of paths.")
+        
+        if 'optimization_options' in self.kwargs:
+            # Raise an error if some of the optimization options are not allowed
+            for opt in self.kwargs["optimization_options"]:
+                if opt not in SafetyAbstractPathModelDAG.allowed_optimization_options:
+                    utils.logger.error(f"{__name__}: The optimization option {opt} is not allowed. Allowed options are {self.allowed_optimization_options}.")
+                    raise ValueError(f"The optimization option {opt} is not allowed. Allowed options are {self.allowed_optimization_options}.")
 
         self.safe_paths = []
         self.__is_solved = False
@@ -60,13 +87,14 @@ class SafetyAbstractPathModelDAG():
         
         self.solve_time_start = time.perf_counter()
 
-        # We make a copy of the kwargs since the models may modify them
+        # We make a copy of kwargs since the models may modify them
         kwargs_initial_deepcopy = deepcopy(self.kwargs)
         # We create the model and solve it once to get an initial solution
         initial_model: abstractpathmodeldag.AbstractPathModelDAG = self.model_type(**kwargs_initial_deepcopy)
         initial_model.solve()
 
-        # Handling time limit
+        # Handling time limit. 
+        # TODO: In the group testing method, this should be placed in the proper places.
         if self.__solve_time_elapsed > self.time_limit:
             self.solve_statistics = {
                 "solve_status": sw.SolverWrapper.timelimit_status,
@@ -79,9 +107,10 @@ class SafetyAbstractPathModelDAG():
             raise Exception(f"{__name__}: The model of type {self.model_type} with parameters {self.kwargs} cannot solved. We cannot compute the safe paths.")
         
         # We get the initial solution
-        initial_solution = initial_model.get_solution()
-        initial_paths = initial_solution["paths"]
+        initial_paths = initial_model.get_solution()["paths"]
         k = len(initial_paths)
+        utils.logger.info(f"{__name__}: The model of type {self.model_type} with parameters {self.kwargs} has {k} solution paths.")
+        initial_objective_value = initial_model.get_objective_value()
 
         if k == 0:
             raise Exception(f"{__name__}: The model of type {self.model_type} with parameters {self.kwargs} has no solution paths. We cannot compute the safe paths.")
@@ -90,9 +119,10 @@ class SafetyAbstractPathModelDAG():
         # Here is an example of testing whether the entire first solution path is safe
         ########### BEGIN ###########
         candidate_path = initial_paths[0]
-        utils.logger.info(f"{__name__}: Testing the candidate path {candidate_path}.")
-        utils.logger.info(f"{__name__}: The candidate path has edges {list(zip(candidate_path[:-1], candidate_path[1:]))}.")
-        utils.logger.info(f"{__name__}: The candidate path has {len(candidate_path)} nodes and {len(candidate_path) - 1} edges.")
+        # Example of logging
+        utils.logger.debug(f"{__name__}: Testing the candidate path {candidate_path}.")
+        utils.logger.debug(f"{__name__}: The candidate path has edges {list(zip(candidate_path[:-1], candidate_path[1:]))}.")
+        utils.logger.debug(f"{__name__}: The candidate path has {len(candidate_path)} nodes and {len(candidate_path) - 1} edges.")
 
         
         # We again take the original kwargs to create the model, since the model may modify them
@@ -115,7 +145,8 @@ class SafetyAbstractPathModelDAG():
             )
         tmp_model.solve()
 
-        # Handling time limit. In the group testing method, this should be placed in the proper place
+        # Handling time limit. 
+        # TODO: In the group testing method, this should be placed in the proper places.
         if self.__solve_time_elapsed > self.time_limit:
             self.solve_statistics = {
                 "solve_status": SafetyAbstractPathModelDAG.timeout_status_name,
@@ -123,31 +154,39 @@ class SafetyAbstractPathModelDAG():
             }
             return
 
+        # TODO: In the group testing methods, `self.__is_solved = True` should be set only if 
+        # we managed to check all possible paths for safety. 
+        # The meaning of True is that we successfully checked all possible candidate paths for safety 
+        # (within the given time_limit, with the model always solving or returning unfeasible, and not strange statuses)
+        tmp_status = tmp_model.solver.get_model_status()
         is_safe = False
-        if tmp_model.is_solved():
-            self.__is_solved = True
-            utils.logger.debug(f"{__name__}: The objective value of tmp_model is {tmp_model.get_objective_value()}.")
-            if tmp_model.get_objective_value() > k:
-                is_safe = True
-        elif tmp_model.solver.get_model_status() == 'kInfeasible':
+        if tmp_model.is_solved(): 
+            # If the model is solved, the the path is afe iff there is a change in objective value
+            self.__is_solved = True # See above TODO
+            current_obj = tmp_model.get_objective_value()
+            is_safe = abs(current_obj - initial_objective_value) / initial_objective_value > self.delta_in_objective_value
+        elif tmp_status == 'kInfeasible': 
+            # If the mode is infeasible, then the path is safe
+            self.__is_solved = True # See above TODO
             is_safe = True
-            self.__is_solved = True
-        elif tmp_model.solver.get_model_status() not in ['kOptimal', 'kInfeasible']:
-            utils.logger.debug(f"{__name__}: The model has status {tmp_model.solver.get_model_status()}, thus we report it as unsolved.")
-            # TODO: if the status is not optimal, we cannot say anything about the safety of the path, so we mark the instance as unsolved
-            self.__is_solved = False
+        else: 
+            # If the model is not solved and not infeasible, then we cannot say anything about the path.
+            # We set the is_solved to False, and we need to stop computing other safe paths.
+            self.__is_solved = False # See above TODO
 
         if is_safe:
-            utils.logger.debug(f"{__name__}: The candidate path {candidate_path} is safe.")
             self.safe_paths.append(candidate_path)
-        
+
         self.solve_statistics = {
-                "solve_status": tmp_model.solver.get_model_status(),
                 "solve_time": self.__solve_time_elapsed,
             }
         ########### END ###########
 
     def is_solved(self):
+        """
+        Returns True if all possible safety checks have been performed, and the safe paths we can reporting as solution are all the maximal safe paths.
+        """
+        
         return self.__is_solved
     
     def check_is_solved(self):
@@ -158,6 +197,12 @@ class SafetyAbstractPathModelDAG():
                   If you already ran the `solve` method, then the model is infeasible, or you need to increase parameter time_limit.")
 
     def get_solution(self):
+        """
+        Returns a list containing all the maximal safe paths. Each path is a list of nodes. 
+        
+        If the model is not solved, it raises an exception.
+        """
+
         self.check_is_solved()
 
         return self.safe_paths
@@ -174,9 +219,3 @@ class SafetyAbstractPathModelDAG():
             The elapsed time in seconds.
         """
         return time.perf_counter() - self.solve_time_start if self.solve_time_start is not None else None
-
-
-            
-
-
-
