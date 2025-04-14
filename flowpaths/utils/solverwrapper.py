@@ -35,6 +35,7 @@ class SolverWrapper:
     tolerance = 1e-9
     optimization_sense = "minimize"
     infeasible_status = "kInfeasible"
+    timelimit_status = "kTimeLimit"
     use_also_custom_timeout = False
 
     # We try to map gurobi status codes to HiGHS status codes when there is a clear correspondence
@@ -104,7 +105,7 @@ class SolverWrapper:
                 f"Unsupported solver type `{self.external_solver}`, supported solvers are `highs` and `gurobi`."
             )
         
-        utils.logger.debug(f"{__name__}: solver_options (kwargs) = {kwargs}")
+        utils.logger.debug(f"{__name__}: kwargs = {kwargs}")
 
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
         

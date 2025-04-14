@@ -12,6 +12,7 @@ nav:
       - $k$-Least Absolute Errors: k-least-absolute-errors.md
       - $k$-Minimum Path Error: k-min-path-error.md
       - Optimizing $k$: numpathsoptimization.md
+      - Safe Path of a Decomposition Model: safe-paths-path-model.md
     - Additional features:
       - Flows/weights on nodes: node-expanded-digraph.md
       - Subpath constraints: subpath-constraints.md

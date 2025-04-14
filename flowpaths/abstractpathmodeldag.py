@@ -4,6 +4,7 @@ from flowpaths.utils import solverwrapper as sw
 import flowpaths.utils as utils
 import time
 from abc import ABC, abstractmethod
+from copy import deepcopy
 
 class AbstractPathModelDAG(ABC):
     """

@@ -1,0 +1,8 @@
+black
+mkdocs-material
+mkdocs-material-extensions
+mkdocs-macros-plugin
+mkdocstrings-python
+mkdocs-autorefs
+mkdocs-get-deps
+pymdown-extensions

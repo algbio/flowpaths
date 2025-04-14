@@ -179,6 +179,9 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         # If already solved with a previous method, we don't create solver, not add paths
         if self.is_solved():
+            utils.logger.debug(f"{__name__}: already solved with a previous method, no need to create solver or add paths")
+            utils.logger.debug(f"{__name__}: solver_options = {self.solver_options}")
+            utils.logger.debug(f"{__name__}: optimization_options = {self.optimization_options}")
             return
 
         # This method is called from the super class AbstractPathModelDAG
