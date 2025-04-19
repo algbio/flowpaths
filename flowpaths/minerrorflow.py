@@ -81,16 +81,27 @@ class MinErrorFlow():
         """
         
         self.original_graph_copy = deepcopy(G)
-        self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
+        self.sparsity_lambda = sparsity_lambda
+        
+        if nx.is_directed_acyclic_graph(G):
+            self.is_acyclic = True
+            self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
+            self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
+        else:
+            self.G = G
+            self.is_acyclic = False
+            self.edges_to_ignore = set(edges_to_ignore)
+            if self.sparsity_lambda != 0:
+                utils.logger.error(f"{__name__}: You cannot set sparsity_lambda != 0 for a graph with cycles.")
+                raise ValueError(f"You cannot set sparsity_lambda != 0 for a graph with cycles.")
+
         self.flow_attr = flow_attr
         if weight_type not in [int, float]:
             utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
         self.solver_options = solver_options
-
-        self.sparsity_lambda = sparsity_lambda
-        self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
+        
         self.edge_error_scaling = edge_error_scaling
         # Checking that every entry in self.edge_error_scaling is between 0 and 1
         for key, value in self.edge_error_scaling.items():
@@ -156,7 +167,7 @@ class MinErrorFlow():
 
         # Adding flow conservation constraints
         for node in self.G.nodes():
-            if node in [self.G.source, self.G.sink]:
+            if self.G.in_degree(node) == 0 or self.G.out_degree(node) == 0:
                 continue
             # Flow conservation constraint
             self.solver.add_constraint(
@@ -212,9 +223,9 @@ class MinErrorFlow():
                 self.edge_error_vars[(u, v)] * self.edge_error_scaling.get((u, v), 1)
                 for (u, v) in self.G.edges()
                 if (u, v) not in self.edges_to_ignore
-            ) + self.sparsity_lambda * self.solver.quicksum(
+            ) + (self.sparsity_lambda * self.solver.quicksum(
                 self.edge_vars[(u, v)]
-                for (u, v) in self.G.out_edges(self.G.source)
+                for (u, v) in self.G.out_edges(self.G.source)) if self.sparsity_lambda > 0 else 0
             ),
             sense="minimize",
         )
@@ -286,9 +297,9 @@ class MinErrorFlow():
                 self.edge_error_vars[(u, v)] * self.edge_error_scaling.get((u, v), 1)
                 for (u, v) in self.G.edges()
                 if (u, v) not in self.edges_to_ignore
-            ) + self.sparsity_lambda * self.solver.quicksum(
+            ) + (self.sparsity_lambda * self.solver.quicksum(
                 self.edge_vars[(u, v)]
-                for (u, v) in self.G.out_edges(self.G.source)
+                for (u, v) in self.G.out_edges(self.G.source)) if self.sparsity_lambda > 0 else 0
             ) <= (1 + self.different_flow_values_epsilon) * objective_value,
             name="epsilon_constraint",
         )

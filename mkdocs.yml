@@ -39,7 +39,7 @@ theme:
     - media: "(prefers-color-scheme)"
       primary: black
       toggle:
-        icon: material/brightness-auto
+        icon: material/lightbulb-auto
         name: Switch to light mode
 
     # Palette toggle for light mode
@@ -47,7 +47,7 @@ theme:
       primary: black
       scheme: default 
       toggle:
-        icon: material/brightness-7
+        icon: material/lightbulb
         name: Switch to dark mode
 
     # Palette toggle for dark mode
@@ -55,7 +55,7 @@ theme:
       primary: black
       scheme: slate
       toggle:
-        icon: material/brightness-4
+        icon: material/lightbulb-outline
         name: Switch to system preference
 
   features:
