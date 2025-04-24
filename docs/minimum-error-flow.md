@@ -8,11 +8,11 @@ This is faster in practice, because the Minimum Flow Decomposition solver is fas
 
 This class solves the following problem.
 
-- **INPUT**: A directed graph $G = (V,E)$ with unique source $s$ and unique sink $t$, and a weight $w(u,v)$ for every edge $(u,v)$ of $G$. Weights do not necessarily satisfy flow conservation. 
+- **INPUT**: A directed graph $G = (V,E)$ and a weight $w(u,v)$ for every edge $(u,v)$ of $G$. Weights do not necessarily satisfy flow conservation. 
 
-- **OUTPUT**: A flow value $f(u,v)$ for every edge $(u,v) \in E$ satisfying the flow conservation property for all non- source/sink nodes:
+- **OUTPUT**: A flow value $f(u,v)$ for every edge $(u,v) \in E$, satisfying the flow conservation property for all non-source and non-sink nodes $v$:
 $$
-\sum_{(u,v) \in E} f(u,v) = \sum_{(v,u) \in E} f(v,u),~~\forall v \in (V \setminus \{ s,t\}),
+\sum_{(u,v) \in E} f(u,v) = \sum_{(v,u) \in E} f(v,u),
 $$
 minimizing the sum of absolute errors:
 $$
@@ -134,10 +134,10 @@ flowchart LR
 
 This class implements a more general version, as follows:
 
-1. The corrected flow can start/end not only in source/sink nodes, but also in given sets of start/end nodes (set parameters `additional_starts` and `additional_ends`). See also [Additional start/end nodes](additional-start-end-nodes.md).
+1. For acyclic graphs, the corrected flow can start/end not only in source/sink nodes, but also in given sets of start/end nodes (set parameters `additional_starts` and `additional_ends`). See also [Additional start/end nodes](additional-start-end-nodes.md).
 2. The error can count only for a given subset $E' \subseteq E$ of the edges (set parameter `edges_to_ignore` to be $E \setminus E'$). See also [ignoring edges documentation](ignoring-edges.md).
 3. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `edge_error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ will add the edge $(u,v)$ to `edges_to_ignore`, because the constraint for $(u,v)$ becomes always true. See also [ignoring edges documentation](ignoring-edges.md).
-4. One can also ensure some "sparsity" in the solution, meaning the total corrected flow exiting the source node is counts also in the minimization function, with a given multiplier $\lambda$ (see ref. [2]). If $\lambda = 0$, this has no effect.
+4. For acyclic graphs, one can also ensure some "sparsity" in the solution, meaning the total corrected flow exiting the source node is counts also in the minimization function, with a given multiplier $\lambda$ (see ref. [2]). If $\lambda = 0$, this has no effect.
 
 !!! info "Generalized objective function"
     Formally, the objective function generalized as in 2., 3. and 4. above is:

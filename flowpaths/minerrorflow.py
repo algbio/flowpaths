@@ -30,7 +30,7 @@ class MinErrorFlow():
 
         - `G: networkx.DiGraph`
 
-            The directed acyclic graph to be corrected.
+            The directed graph to be corrected (which does not need to be acyclic).
 
         - `flow_attr: str`
 
@@ -42,9 +42,9 @@ class MinErrorFlow():
 
         - `sparsity_lambda: float`, optional
 
-            The sparsity parameter. It is used to control the trade-off between the sparsity of the solution and the closeness to the original weights. Default is `0`.
+            The sparsity parameter, used to control the trade-off between the sparsity of the solution and the closeness to the original weights. Default is `0`.
             If `sparsity_lambda` is set to `0`, then the solution will be as close as possible to the original weights. If `sparsity_lambda` is set to a positive value, then the solution will be sparser, i.e. it will have less flow going out of the source.
-            The higher the value of `sparsity_lambda`, the sparser the solution will be.
+            The higher the value of `sparsity_lambda`, the sparser the solution will be. **You can use a value different than `0` only for acyclic graphs.** If you set it to a value different than `0` for a cyclic graph, the class will raise an error.**
 
         - `few_flow_values_epsilon: float`, optional
             
@@ -69,11 +69,11 @@ class MinErrorFlow():
 
         - `additional_starts: list`, optional
 
-            A list of nodes to be added as additional sources. Flow is allowed to start start at these nodes, meaning that their out going flow can be greater than their incoming flow. Default is `[]`. See also [additional start/end nodes documentation](additional-start-end-nodes.md).
+            A list of nodes to be added as additional sources. **This applies only to acyclic graphs.** Flow is allowed to start start at these nodes, meaning that their out going flow can be greater than their incoming flow. Default is `[]`. See also [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `additional_ends: list`, optional
 
-            A list of nodes to be added as additional sinks. Flow is allowed to end at these nodes, meaning that their incoming flow can be greater than their outgoing flow. Default is `[]`. See also [additional start/end nodes documentation](additional-start-end-nodes.md).
+            A list of nodes to be added as additional sinks. **This applies only to acyclic graphs.** Flow is allowed to end at these nodes, meaning that their incoming flow can be greater than their outgoing flow. Default is `[]`. See also [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `solver_options: dict`, optional
 
