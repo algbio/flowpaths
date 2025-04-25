@@ -3,6 +3,7 @@ from flowpaths.utils import safetypathcovers
 from flowpaths.utils import solverwrapper as sw
 import flowpaths.utils as utils
 import time
+import copy
 from abc import ABC, abstractmethod
 
 class AbstractPathModelDAG(ABC):
@@ -55,7 +56,7 @@ class AbstractPathModelDAG(ABC):
     optimize_with_safe_sequences = False
     optimize_with_safe_zero_edges = True
     optimize_with_subpath_constraints_as_safe_sequences = True
-    optimize_with_safety_as_subpath_constraints = True
+    optimize_with_safety_as_subpath_constraints = False
 
     def __init__(
         self,
@@ -160,7 +161,7 @@ class AbstractPathModelDAG(ABC):
         self.k = k
         self.edge_length_attr = edge_length_attr
         
-        self.subpath_constraints = subpath_constraints
+        self.subpath_constraints = copy.deepcopy(subpath_constraints)
         if self.subpath_constraints is not None:
             self.__check_valid_subpath_constraints()
 
