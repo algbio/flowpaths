@@ -2,6 +2,7 @@ import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils as utils
+import copy
 
 
 class kMinPathError(pathmodel.AbstractPathModelDAG):
@@ -32,6 +33,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         path_length_factors: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
+        solution_weights_superset: list = None,
         optimization_options: dict = None,
         solver_options: dict = None,
     ):
@@ -121,6 +123,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             
             List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
+        - `solution_weights_superset: list`, optional
+
+            List of allowed weights for the paths. Default is `None`. 
+            If set, the model will use the solution path weights only from this set, with the property that **every weight in the superset
+            appears at most once in the solution weight**.
+
         - `optimization_options: dict`, optional
 
             Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
@@ -169,6 +177,18 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         # If k is not specified, we set k to the edge width of the graph
         if self.k is None:
             self.k = self.G.get_width(self.edges_to_ignore)
+        self.original_k = self.k
+        self.solution_weights_superset = solution_weights_superset
+        self.optimization_options = optimization_options or {}        
+
+        if self.solution_weights_superset is not None:
+            self.k = len(self.solution_weights_superset)
+            self.optimization_options["allow_empty_paths"] = True
+            self.optimization_options["optimize_with_safe_paths"] = False
+            self.optimization_options["optimize_with_safe_sequences"] = False
+            self.optimization_options["optimize_with_safe_zero_edges"] = False
+            self.optimization_options["optimize_with_subpath_constraints_as_safe_sequences"] = True
+            self.optimization_options["optimize_with_safety_as_subpath_constraints"] = True
 
         self.w_max = self.k * self.weight_type(
             self.G.get_max_flow_value_and_check_non_negative_flow(
@@ -197,7 +217,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.solve_statistics = {}
 
-        self.optimization_options = optimization_options or {}
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
             flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
         ).difference(self.edges_to_ignore)
@@ -222,6 +241,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         # This method is called from the current class 
         self.__encode_minpatherror_decomposition()
+
+        # This method is called from the current class    
+        self.__encode_solution_weights_superset()
 
         # This method is called from the current class to add the objective function
         self.__encode_objective()
@@ -363,13 +385,79 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
 
+    def __encode_solution_weights_superset(self):
+
+        if self.solution_weights_superset is not None:
+
+            if len(self.solution_weights_superset) != self.k:
+                utils.logger.error(f"{__name__}: solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+                raise ValueError(f"solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+            if not self.allow_empty_paths:
+                utils.logger.error(f"{__name__}: solution_weights_superset is not allowed when allow_empty_paths is False")
+                raise ValueError(f"solution_weights_superset is not allowed when allow_empty_paths is False")
+            
+            # We state that the weight of the i-th path equals the i-th entry of the solution_weights_superset
+            for i in range(self.k):
+                self.solver.add_constraint(
+                    self.path_weights_vars[i] == self.solution_weights_superset[i],
+                    name=f"solution_weights_superset_{i}",
+                )
+
+            # We state that at most self.original_k paths can be used
+            self.solver.add_constraint(            
+                self.solver.quicksum(
+                    self.solver.quicksum(
+                            self.edge_vars[(self.G.source, v, i)]
+                            for v in self.G.successors(self.G.source)
+                    ) for i in range(self.k)
+                ) <= self.original_k,
+                name="max_paths_original_k_paths",
+            )
+
     def __encode_objective(self):
 
         self.solver.set_objective(
             self.solver.quicksum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
         )
 
-    def get_solution(self):
+    def __remove_empty_paths(self, solution):
+        """
+        Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
+
+        Parameters
+        ----------
+        - `solution: dict`
+            
+            The solution dictionary containing paths and weights.
+
+        Returns
+        -------
+        - `solution: dict`
+            
+            The solution dictionary with empty paths removed.
+
+        """
+        solution_copy = copy.deepcopy(solution)
+        non_empty_paths = []
+        non_empty_weights = []
+        non_empty_slacks = []
+        non_empty_scaled_slacks = []
+        for path, weight, slack, scaled_slack in zip(solution["paths"], solution["weights"], solution["slacks"], solution.get("scaled_slacks", solution["slacks"])):
+            if len(path) > 1:
+                non_empty_paths.append(path)
+                non_empty_weights.append(weight)
+                non_empty_slacks.append(slack)
+                non_empty_scaled_slacks.append(scaled_slack)
+
+        solution_copy["paths"] = non_empty_paths
+        solution_copy["weights"] = non_empty_weights
+        solution_copy["slacks"] = non_empty_slacks
+        if "scaled_slacks" in solution_copy:
+            solution_copy["scaled_slacks"] = non_empty_scaled_slacks
+
+        return solution_copy
+
+    def get_solution(self, remove_empty_paths=True):
         """
         Retrieves the solution for the flow decomposition problem.
 
@@ -393,7 +481,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         """
 
         if self.__solution is not None:
-            return self.__solution
+            return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
 
         self.check_is_solved()
 
@@ -428,7 +516,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
             self.__solution["scaled_slacks"] = self.path_slacks_scaled_sol
 
-        return self.__solution
+        return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -496,8 +584,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                     pass
 
         if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
-            print("self.get_objective_value()", self.get_objective_value())
-            print("self.solver.get_objective_value()", self.solver.get_objective_value())
+            utils.logger.info(f"{__name__}: self.get_objective_value() = {self.get_objective_value()} self.solver.get_objective_value() = {self.solver.get_objective_value()}")
             return False
         
         # Checking that the error scale factor is correctly encoded

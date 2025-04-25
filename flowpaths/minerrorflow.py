@@ -379,10 +379,6 @@ class MinErrorFlow():
         """
         Returns `True` if the model was solved, `False` otherwise.
         """
-        if self.__is_solved is None:
-            utils.logger.error(f"{__name__}: model not yet solved. If you want to solve it, call the `solve` method first.")
-            raise Exception("Model not yet solved. If you want to solve it, call the `solve` method first.")
-        
         return self.__is_solved
     
     def __check_is_solved(self):

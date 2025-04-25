@@ -26,10 +26,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         edge_error_scaling: dict = {},
         additional_starts: list = [],
         additional_ends: list = [],
+        solution_weights_superset: list = None,
         optimization_options: dict = None,
         solver_options: dict = {},
         trusted_edges_for_safety: list = None,
-        solution_weights_superset: list = None,
     ):
         """
         Initialize the Least Absolute Errors model for a given number of paths.
@@ -90,6 +90,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             
             List of additional end nodes of the paths. Default is an empty list.
 
+        - `solution_weights_superset: list`, optional
+
+            List of allowed weights for the paths. Default is `None`. 
+            If set, the model will use the solution path weights only from this set, with the property that **every weight in the superset
+            appears at most once in the solution weight**.
+
         - `optimization_options: dict`, optional
 
             Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
@@ -103,12 +109,6 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             List of edges that are trusted to appear in an optimal solution. Default is `None`. 
             If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
             See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
-
-        - `solution_weights_superset: list`, optional
-
-            List of allowed weights for the paths. Default is `None`. 
-            If set, the model will use the solution path weights only from this set, with the property that **every weight in the superset
-            appears at most once in the solution weight**.
 
         Raises
         ------
@@ -150,6 +150,11 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         if self.solution_weights_superset is not None:
             self.k = len(self.solution_weights_superset)
             self.optimization_options["allow_empty_paths"] = True
+            self.optimization_options["optimize_with_safe_paths"] = False
+            self.optimization_options["optimize_with_safe_sequences"] = False
+            self.optimization_options["optimize_with_safe_zero_edges"] = False
+            self.optimization_options["optimize_with_subpath_constraints_as_safe_sequences"] = True
+            self.optimization_options["optimize_with_safety_as_subpath_constraints"] = True
 
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
@@ -365,7 +370,6 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             for i in range(self.k)
         ]
         self.edge_errors_sol = self.solver.get_variable_values("ee", [str, str])
-        print("self.edge_errors_sol", self.edge_errors_sol)
         for (u,v) in self.edge_indexes_basic:
             self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
 

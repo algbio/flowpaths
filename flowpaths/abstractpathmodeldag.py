@@ -55,6 +55,7 @@ class AbstractPathModelDAG(ABC):
     optimize_with_safe_sequences = False
     optimize_with_safe_zero_edges = True
     optimize_with_subpath_constraints_as_safe_sequences = True
+    optimize_with_safety_as_subpath_constraints = True
 
     def __init__(
         self,
@@ -205,6 +206,7 @@ class AbstractPathModelDAG(ABC):
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
         self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
+        self.optimize_with_safety_as_subpath_constraints = optimization_options.get("optimize_with_safety_as_subpath_constraints", AbstractPathModelDAG.optimize_with_safety_as_subpath_constraints)
         
         self.__is_solved = None
         if self.external_solution_paths is not None:
@@ -255,6 +257,9 @@ class AbstractPathModelDAG(ABC):
                     threads=self.threads,
                 )
                 self.solve_statistics["subpath_constraints_as_safe_sequences_time"] = time.perf_counter() - start_time
+
+        if self.optimize_with_safety_as_subpath_constraints:
+            self.subpath_constraints += self.safe_lists
 
     def create_solver_and_paths(self):
         """
@@ -446,39 +451,41 @@ class AbstractPathModelDAG(ABC):
         if self.safe_lists is not None:
             paths_to_fix = self.__get_paths_to_fix_from_safe_lists()
 
-            # iterating over safe lists
-            for i in range(min(len(paths_to_fix), self.k)):
-                # print("Fixing variables for safe list #", i)
-                # iterate over the edges in the safe list to fix variables to 1
-                for u, v in paths_to_fix[i]:
-                    self.solver.add_constraint(
-                        self.edge_vars[(u, v, i)] == 1,
-                        name=f"safe_list_u={u}_v={v}_i={i}",
-                    )
+            if not self.optimize_with_safety_as_subpath_constraints:
+                # iterating over safe lists
+                for i in range(min(len(paths_to_fix), self.k)):
+                    # print("Fixing variables for safe list #", i)
+                    # iterate over the edges in the safe list to fix variables to 1
+                    for u, v in paths_to_fix[i]:
+                        self.solver.add_constraint(
+                            self.edge_vars[(u, v, i)] == 1,
+                            name=f"safe_list_u={u}_v={v}_i={i}",
+                        )
 
-                if self.optimize_with_safe_zero_edges:
-                    # get the endpoints of the longest safe path in the sequence
-                    first_node, last_node = (
-                        safetypathcovers.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
-                    )
-                    # get the reachable nodes from the last node
-                    reachable_nodes = self.G.reachable_nodes_from[last_node]
-                    # get the backwards reachable nodes from the first node
-                    reachable_nodes_reverse = self.G.reachable_nodes_rev_from[first_node]
-                    # get the edges in the path
-                    path_edges = set((u, v) for (u, v) in paths_to_fix[i])
+                    if self.optimize_with_safe_zero_edges:
+                        # get the endpoints of the longest safe path in the sequence
+                        first_node, last_node = (
+                            safetypathcovers.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
+                        )
+                        # get the reachable nodes from the last node
+                        reachable_nodes = self.G.reachable_nodes_from[last_node]
+                        # get the backwards reachable nodes from the first node
+                        reachable_nodes_reverse = self.G.reachable_nodes_rev_from[first_node]
+                        # get the edges in the path
+                        path_edges = set((u, v) for (u, v) in paths_to_fix[i])
 
-                    for u, v in self.G.base_graph.edges():
-                        if (
-                            (u, v) not in path_edges
-                            and u not in reachable_nodes
-                            and v not in reachable_nodes_reverse
-                        ):
-                            # print(f"Adding zero constraint for edge ({u}, {v}) in path {i}")
-                            self.solver.add_constraint(
-                                self.edge_vars[(u, v, i)] == 0,
-                                name=f"safe_list_zero_edge_u={u}_v={v}_i={i}",
-                            )
+                        for u, v in self.G.base_graph.edges():
+                            if (
+                                (u, v) not in path_edges
+                                and u not in reachable_nodes
+                                and v not in reachable_nodes_reverse
+                            ):
+                                # print(f"Adding zero constraint for edge ({u}, {v}) in path {i}")
+                                self.solver.add_constraint(
+                                    self.edge_vars[(u, v, i)] == 0,
+                                    name=f"safe_list_zero_edge_u={u}_v={v}_i={i}",
+                                )
+
 
     def __get_paths_to_fix_from_safe_lists(self) -> list:
         
@@ -706,13 +713,14 @@ class AbstractPathModelDAG(ABC):
         path_length_sol = self.solver.get_variable_values("path_length", [int])
 
         for path_index, path in enumerate(paths):
-            path_temp = [self.G.source] + path + [self.G.sink]            
-            path_length = 0
-            for (u,v) in zip(path_temp[:-1], path_temp[1:]):
-                path_length += self.G[u][v].get(self.edge_length_attr, 1)   
+            if len(path) > 0:
+                path_temp = [self.G.source] + path + [self.G.sink]            
+                path_length = 0
+                for (u,v) in zip(path_temp[:-1], path_temp[1:]):
+                    path_length += self.G[u][v].get(self.edge_length_attr, 1)   
 
-            if round(path_length_sol[(path_index)]) != path_length:
-                return False
+                if round(path_length_sol[(path_index)]) != path_length:
+                    return False
     
     
         return True
