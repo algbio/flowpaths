@@ -74,7 +74,6 @@ class SolverWrapper:
 
         if self.external_solver == "highs":
             self.solver = HighsCustom()
-            self.solver.setMinimize() # minimization by default
             self.solver.setOptionValue("solver", "choose")
             self.solver.setOptionValue("threads", kwargs.get("threads", SolverWrapper.threads))
             self.solver.setOptionValue("time_limit", kwargs.get("time_limit", SolverWrapper.time_limit))
@@ -97,7 +96,6 @@ class SolverWrapper:
             self.env.setParam("MIPGap", self.tolerance)
             self.env.setParam("IntFeasTol", self.tolerance)
             self.env.setParam("FeasibilityTol", self.tolerance)
-            self.env.setParam("ModelSense", 1) # minimization by default
             
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
