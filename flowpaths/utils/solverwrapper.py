@@ -6,6 +6,7 @@ import os
 import signal
 import math
 import flowpaths.utils as utils
+import numpy as np
 
 class SolverWrapper:
     """
@@ -72,7 +73,8 @@ class SolverWrapper:
         self.did_timeout = False
 
         if self.external_solver == "highs":
-            self.solver = highspy.Highs()
+            self.solver = HighsCustom()
+            self.solver.setMinimize() # minimization by default
             self.solver.setOptionValue("solver", "choose")
             self.solver.setOptionValue("threads", kwargs.get("threads", SolverWrapper.threads))
             self.solver.setOptionValue("time_limit", kwargs.get("time_limit", SolverWrapper.time_limit))
@@ -95,9 +97,11 @@ class SolverWrapper:
             self.env.setParam("MIPGap", self.tolerance)
             self.env.setParam("IntFeasTol", self.tolerance)
             self.env.setParam("FeasibilityTol", self.tolerance)
+            self.env.setParam("ModelSense", 1) # minimization by default
             
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
+            
         else:
             utils.logger.error(f"{__name__}: Unsupported solver type `{self.external_solver}`. Supported solvers are `highs` and `gurobi`.")
             raise ValueError(
@@ -268,10 +272,7 @@ class SolverWrapper:
         self.optimization_sense = sense
 
         if self.external_solver == "highs":
-            if sense in ["minimize", "min"]:
-                self.solver.minimize(expr)
-            else:
-                self.solver.maximize(expr)
+            self.solver.set_objective_without_solving(expr, sense=sense)
         elif self.external_solver == "gurobi":
             import gurobipy
 
@@ -530,3 +531,47 @@ class SolverWrapper:
                 pass
             finally:
                 signal.alarm(0)  # Disable alarm after execution
+
+
+
+class HighsCustom(highspy.Highs):
+    def __init__(self):
+        super().__init__()
+    
+    def set_objective_without_solving(self, obj, sense: str = "minimize") -> None:
+        """
+        This method is implemented is the same was as the [minimize()](https://github.com/ERGO-Code/HiGHS/blob/master/src/highspy/highs.py#L182) or 
+        [maximize()](https://github.com/ERGO-Code/HiGHS/blob/master/src/highspy/highs.py#L218) methods of the [Highs](https://github.com/ERGO-Code/HiGHS/blob/master/src/highspy/highs.py) class,
+        only that it does not call the solve() method. 
+        
+        That is, you can use it to set the objective value, without also running the solver.
+
+        **`obj` cannot be a single variable, but a linear expression.**
+        """
+
+        if obj is not None:
+            # if we have a single variable, wrap it in a linear expression
+            # expr = highspy.highs_linear_expression(obj) if isinstance(obj, highspy.highs_var) else obj
+            expr = obj
+
+            if expr.bounds is not None:
+                raise Exception("Objective cannot be an inequality")
+
+            # reset objective
+            super().changeColsCost(
+                self.numVariables,
+                np.arange(self.numVariables, dtype=np.int32),
+                np.full(self.numVariables, 0, dtype=np.float64),
+            )
+
+            # if we have duplicate variables, add the vals
+            idxs, vals = expr.unique_elements()
+            super().changeColsCost(len(idxs), idxs, vals)
+            super().changeObjectiveOffset(expr.constant or 0.0)
+
+        if sense in ["minimize", "min"]:
+            super().changeObjectiveSense(highspy.ObjSense.kMinimize)
+        elif sense in ["maximize", "max"]:
+            super().changeObjectiveSense(highspy.ObjSense.kMaximize)
+        else:
+            raise ValueError(f"Invalid objective sense: {sense}. Use 'minimize' or 'maximize'.")

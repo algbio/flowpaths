@@ -2,12 +2,13 @@ import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils as utils
+import copy
 
 
 class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
     """
-    This class implements the k-LeastAbsoluteErrors, namely it looks for a decomposition of a weighted DAG into 
-    k weighted paths (specified by `num_paths`), minimizing the absolute errors on the edges. The error on an edge 
+    This class implements the k-LeastAbsoluteErrors problem, namely it looks for a decomposition of a weighted DAG into 
+    $k$ weighted paths, minimizing the absolute errors on the edges. The error on an edge 
     is defined as the absolute value of the difference between the weight of the edge and the sum of the weights of 
     the paths that go through it.
     """
@@ -28,6 +29,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         optimization_options: dict = None,
         solver_options: dict = {},
         trusted_edges_for_safety: list = None,
+        solution_weights_superset: list = None,
     ):
         """
         Initialize the Least Absolute Errors model for a given number of paths.
@@ -102,6 +104,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
             See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
 
+        - `solution_weights_superset: list`, optional
+
+            List of allowed weights for the paths. Default is `None`. 
+            If set, the model will use the solution path weights only from this set, with the property that **every weight in the superset
+            appears at most once in the solution weight**.
+
         Raises
         ------
         - `ValueError`
@@ -135,12 +143,19 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         )
 
         self.k = k
+        self.original_k = k
+        self.solution_weights_superset = solution_weights_superset
+        self.optimization_options = optimization_options or {}        
+
+        if self.solution_weights_superset is not None:
+            self.k = len(self.solution_weights_superset)
+            self.optimization_options["allow_empty_paths"] = True
+
         self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.edge_length_attr = edge_length_attr
         
-
         self.pi_vars = {}
         self.path_weights_vars = {}
         self.edge_errors_vars = {}
@@ -151,8 +166,6 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.__lowerbound_k = None
 
         self.solve_statistics = {}
-
-        self.optimization_options = optimization_options or {}        
         
         # If we get subpath constraints, and the coverage fraction is 1
         # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
@@ -163,11 +176,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 for constraint in self.subpath_constraints:
                     self.optimization_options["trusted_edges_for_safety"].update(constraint)
 
-
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
             self.G, 
-            k, 
+            self.k,
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
@@ -182,6 +194,9 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         # This method is called from the current class 
         self.__encode_leastabserrors_decomposition()
+
+        # This method is called from the current class    
+        self.__encode_solution_weights_superset()
 
         # This method is called from the current class to add the objective function
         self.__encode_objective()
@@ -210,7 +225,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         
         self.edge_errors_vars = self.solver.add_variables(
             self.edge_indexes_basic,
-            name_prefix="errorofedge",
+            name_prefix="ee",
             lb=0,
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
@@ -248,17 +263,74 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 name=f"9aa_u={u}_v={v}_i={i}",
             )
 
+    def __encode_solution_weights_superset(self):
+
+        if self.solution_weights_superset is not None:
+
+            if len(self.solution_weights_superset) != self.k:
+                utils.logger.error(f"{__name__}: solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+                raise ValueError(f"solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+            if not self.allow_empty_paths:
+                utils.logger.error(f"{__name__}: solution_weights_superset is not allowed when allow_empty_paths is False")
+                raise ValueError(f"solution_weights_superset is not allowed when allow_empty_paths is False")
+            
+            # We state that the weight of the i-th path equals the i-th entry of the solution_weights_superset
+            for i in range(self.k):
+                self.solver.add_constraint(
+                    self.path_weights_vars[i] == self.solution_weights_superset[i],
+                    name=f"solution_weights_superset_{i}",
+                )
+
+            # We state that at most self.original_k paths can be used
+            self.solver.add_constraint(            
+                self.solver.quicksum(
+                    self.solver.quicksum(
+                            self.edge_vars[(self.G.source, v, i)]
+                            for v in self.G.successors(self.G.source)
+                    ) for i in range(self.k)
+                ) <= self.original_k,
+                name="max_paths_original_k_paths",
+            )
+
     def __encode_objective(self):
 
         self.solver.set_objective(
             self.solver.quicksum(
-                self.edge_errors_vars[(u, v)] 
-                * self.edge_error_scaling.get((u, v), 1)
+                self.edge_errors_vars[(u, v)] * self.edge_error_scaling.get((u, v), 1) if self.edge_error_scaling.get((u, v), 1) != 1 else self.edge_errors_vars[(u, v)]
                 for (u,v) in self.edge_indexes_basic), 
             sense="minimize"
         )
 
-    def get_solution(self):
+    def __remove_empty_paths(self, solution):
+        """
+        Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
+
+        Parameters
+        ----------
+        - `solution: dict`
+            
+            The solution dictionary containing paths and weights.
+
+        Returns
+        -------
+        - `solution: dict`
+            
+            The solution dictionary with empty paths removed.
+
+        """
+        solution_copy = copy.deepcopy(solution)
+        non_empty_paths = []
+        non_empty_weights = []
+        for path, weight in zip(solution["paths"], solution["weights"]):
+            if len(path) > 1:
+                non_empty_paths.append(path)
+                non_empty_weights.append(weight)
+
+        solution_copy["paths"] = non_empty_paths
+        solution_copy["weights"] = non_empty_weights
+        return solution_copy
+
+    def get_solution(self, remove_empty_paths=True):
         """
         Retrieves the solution for the flow decomposition problem.
 
@@ -279,7 +351,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         """
 
         if self.__solution is not None:
-            return self.__solution
+            return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
 
         self.check_is_solved()
 
@@ -292,7 +364,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             )
             for i in range(self.k)
         ]
-        self.edge_errors_sol = self.solver.get_variable_values("errorofedge", [str, str])
+        self.edge_errors_sol = self.solver.get_variable_values("ee", [str, str])
         print("self.edge_errors_sol", self.edge_errors_sol)
         for (u,v) in self.edge_indexes_basic:
             self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
@@ -303,7 +375,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             "edge_errors": self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
         }
 
-        return self.__solution
+        return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -350,7 +422,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 ):
                     return False
 
-        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
+        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.original_k:
             return False
 
         return True
