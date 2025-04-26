@@ -43,6 +43,7 @@ jobs:
     #     # flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
+        # -n means how many threads to use to run tests in parallel
         python -m pytest --cov=flowpaths --cov-report=xml tests/ -n 10
 
     - name: Upload coverage to Codecov
