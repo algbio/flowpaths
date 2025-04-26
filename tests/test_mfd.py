@@ -85,7 +85,7 @@ params = list(
     itertools.product(
         weight_type,
         solvers,
-        optimize_with_safe_paths,
+        optimize_with_safe_paths, 
         optimize_with_safe_sequences,
         optimize_with_safe_zero_edges,
         optimize_with_flow_safe_paths,
