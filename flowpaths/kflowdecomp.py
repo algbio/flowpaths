@@ -29,7 +29,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         solver_options: dict = {},
     ):
         """
-        Initialize the Flow Decomposition model for a given number of paths `num_paths`.
+        Initialize the Flow Decomposition model for a given number of paths `k`.
 
         Parameters
         ----------

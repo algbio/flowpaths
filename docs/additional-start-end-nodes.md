@@ -53,7 +53,7 @@ graph.add_edge("c", "d", flow=26) #
 graph.add_edge("d", "t", flow=6)
 graph.add_edge("c", "t", flow=7)
 
-mpe_model = fp.kMinPathError(graph, flow_attr="flow", num_paths=4, weight_type=int)
+mpe_model = fp.kMinPathError(graph, flow_attr="flow", k=4, weight_type=int)
 mpe_model.solve()
 if mpe_model.is_solved():
     print(mpe_model.get_solution())
@@ -72,7 +72,7 @@ If we set `additional_starts=['a']`, and `additional_ends=['d']`, we recover ind
 mpe_model_2 = fp.kMinPathError(
     graph, 
     flow_attr="flow", 
-    num_paths=4, 
+    k=4, 
     weight_type=int,
     additional_starts=['a'],
     additional_ends=['d'])
@@ -137,7 +137,7 @@ graph10.add_edge("c", "t", flow=7)
 mpe_model_10 = fp.kMinPathError(
     graph10, 
     flow_attr="flow", 
-    num_paths=4, 
+    k=4, 
     weight_type=int,
     additional_starts=['a'],
     additional_ends=['d'])

@@ -195,6 +195,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
             )
         )
+        self.w_max = max(self.w_max, max(self.solution_weights_superset or [0]))
 
         self.path_length_ranges = path_length_ranges
         self.path_length_factors = path_length_factors
@@ -398,6 +399,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             
             # We state that the weight of the i-th path equals the i-th entry of the solution_weights_superset
             for i in range(self.k):
+                if self.solution_weights_superset[i] > self.w_max:
+                    utils.logger.error(f"{__name__}: solution_weights_superset[{i}] = {self.solution_weights_superset[i]} > w_max = {self.w_max}")
+                    raise ValueError(f"solution_weights_superset[{i}] = {self.solution_weights_superset[i]} > w_max = {self.w_max}")
                 self.solver.add_constraint(
                     self.path_weights_vars[i] == self.solution_weights_superset[i],
                     name=f"solution_weights_superset_{i}",

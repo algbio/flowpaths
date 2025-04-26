@@ -16,7 +16,7 @@ class AbstractPathModelDAG(ABC):
     - The class uses our custom [SolverWrapper](solver-wrapper.md) class, which is a wrapper around the solvers HiGHS (open source) and 
     Gurobi (free with academic license). In this way, both solvers can be used interchangeably.
 
-    More in detail, this class encodes `num_paths` s-t paths in the DAG G, where s is the global source of the stDiGraph 
+    More in detail, this class encodes `k` s-t paths in the DAG G, where s is the global source of the stDiGraph 
     and t is the global sink. It also allows for subpath constraints that must appear in at least one of the s-t paths.
 
     The class creates the following variables:
@@ -62,7 +62,7 @@ class AbstractPathModelDAG(ABC):
         self,
         G: stdigraph.stDiGraph,
         k: int,
-        subpath_constraints: list = None,
+        subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1,
         subpath_constraints_coverage_length: float = None,
         encode_edge_position: bool = False,
@@ -86,7 +86,7 @@ class AbstractPathModelDAG(ABC):
 
         - `subpath_constraints: list`, optional
             
-            A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to None.
+            A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to an empty list.
             
             Each sequence of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
             then each sequence of edges must appear in at least subpath_constraints_coverage fraction of some solution path, see below.
@@ -167,7 +167,7 @@ class AbstractPathModelDAG(ABC):
 
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        if subpath_constraints is not None:
+        if len(subpath_constraints) > 0:
             if self.subpath_constraints_coverage <= 0 or self.subpath_constraints_coverage > 1:
                 utils.logger.error(f"{__name__}: subpath_constraints_coverage must be in the range (0, 1]")
                 raise ValueError("subpath_constraints_coverage must be in the range (0, 1]")
@@ -248,7 +248,7 @@ class AbstractPathModelDAG(ABC):
             )
             self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
 
-        if self.optimize_with_subpath_constraints_as_safe_sequences and self.subpath_constraints is not None and not self.is_solved():
+        if self.optimize_with_subpath_constraints_as_safe_sequences and len(self.subpath_constraints) > 0 and not self.is_solved():
             if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
                 start_time = time.perf_counter()
                 self.safe_lists += safetypathcovers.safe_sequences(
@@ -257,6 +257,7 @@ class AbstractPathModelDAG(ABC):
                     no_duplicates=False,
                     threads=self.threads,
                 )
+                print("optimize_with_subpath_constraints_as_safe_sequences:", self.safe_lists)
                 self.solve_statistics["subpath_constraints_as_safe_sequences_time"] = time.perf_counter() - start_time
 
         if self.optimize_with_safety_as_subpath_constraints:
@@ -294,7 +295,7 @@ class AbstractPathModelDAG(ABC):
             (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
         ]
         self.path_indexes = [(i) for i in range(self.k)]
-        if self.subpath_constraints:
+        if len(self.subpath_constraints) > 0:
             self.subpath_indexes = [
                 (i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))
             ]
@@ -359,10 +360,9 @@ class AbstractPathModelDAG(ABC):
 
         # Example of a subpath constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 paths to cover, the first one is 1-3-5. the second path is just a single edge 0-1
 
-        if self.subpath_constraints:
+        if len(self.subpath_constraints) > 0:
             self.subpaths_vars = self.solver.add_variables(
-                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer"
-            )
+                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
         
             for i in range(self.k):
                 for j in range(len(self.subpath_constraints)):
@@ -732,7 +732,7 @@ class AbstractPathModelDAG(ABC):
         Implement this class in the child class to return the objective value of the model. This is needed to be able to
         compute the safe paths (i.e. those appearing any optimum solution) for any child class.
 
-        A basic objective value is the num_paths (when we're trying to minimize the number of paths). If your model has a different
+        A basic objective value is `k` (when we're trying to minimize the number of paths). If your model has a different
         objective, you should implement this method to return the objective value of the model. If your model has no objective value,
         you should implement this method to return None.
         """

@@ -20,7 +20,7 @@ params = list(itertools.product(
     *settings_flags.values()
     ))
 
-def is_valid_optimization_setting_lae(opt):
+def is_valid_optimization_setting_mpe(opt):
         safety_opt = (
             opt["optimize_with_safe_paths"]
             + opt["optimize_with_safe_sequences"]
@@ -39,11 +39,13 @@ def run_test(graph, test_index, params):
     print("*******************************************")
 
     first_obj_value = None
+    first_path_weights = None
+    first_weight_type = None
 
     for settings in params:
         print("Testing settings:", settings)
         optimization_options = {key: setting for key, setting in zip(settings_flags.keys(), settings[2:])}
-        if not is_valid_optimization_setting_lae(optimization_options):
+        if not is_valid_optimization_setting_mpe(optimization_options):
             continue
 
         print("-------------------------------------------")
@@ -70,9 +72,29 @@ def run_test(graph, test_index, params):
         obj_value = mpe_model.get_objective_value()
         if first_obj_value is None:
             first_obj_value = mpe_model.get_objective_value()
+            first_path_weights = mpe_model.get_solution()["weights"]
+            first_weight_type = settings[0]
         else:
             assert abs(first_obj_value - obj_value) < tolerance, "The objective value should be the same for all settings."
 
+    # Testing the solution_weights_superset optimization
+    solution_weights_superset = first_path_weights + [first_weight_type(weight * (2 if idx % 2 else 0.5)) for idx, weight in enumerate(first_path_weights)]
+    print("Solution weights superset:", solution_weights_superset)
+
+    mpe_model = fp.kLeastAbsErrors(
+            G=graph,
+            k=width,
+            flow_attr="flow",
+            weight_type=first_weight_type,
+            solution_weights_superset=solution_weights_superset,
+            solver_options={"external_solver": "gurobi"},
+        )
+    mpe_model.solve() 
+    print(mpe_model.solve_statistics)
+    assert mpe_model.is_solved(), "Model should be solved"
+    assert mpe_model.is_valid_solution(), "The solution is not a valid solution, under the default tolerance."
+    obj_value = mpe_model.get_objective_value()
+    assert abs(first_obj_value - obj_value) < tolerance, "The objective value should be the same for all settings."
 
 graphs = fp.graphutils.read_graphs("./tests/test_graphs_errors.graph")
 @pytest.mark.parametrize("graph, idx", [(g, i) for i, g in enumerate(graphs)])

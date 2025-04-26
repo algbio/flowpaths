@@ -135,17 +135,15 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 utils.logger.error(f"{__name__}: Edge error scaling factor for edge {key} must be between 0 and 1.")
                 raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
 
-        self.flow_attr = flow_attr
-        self.w_max = k * self.weight_type(
-            self.G.get_max_flow_value_and_check_non_negative_flow(
-                flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
-            )
-        )
-
         self.k = k
         self.original_k = k
         self.solution_weights_superset = solution_weights_superset
         self.optimization_options = optimization_options or {}        
+
+        self.subpath_constraints = subpath_constraints
+        self.subpath_constraints_coverage = subpath_constraints_coverage
+        self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
+        self.edge_length_attr = edge_length_attr
 
         if self.solution_weights_superset is not None:
             self.k = len(self.solution_weights_superset)
@@ -153,14 +151,18 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             self.optimization_options["optimize_with_safe_paths"] = False
             self.optimization_options["optimize_with_safe_sequences"] = False
             self.optimization_options["optimize_with_safe_zero_edges"] = False
-            self.optimization_options["optimize_with_subpath_constraints_as_safe_sequences"] = True
-            self.optimization_options["optimize_with_safety_as_subpath_constraints"] = True
-
-        self.subpath_constraints = subpath_constraints
-        self.subpath_constraints_coverage = subpath_constraints_coverage
-        self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        self.edge_length_attr = edge_length_attr
+            if len(self.subpath_constraints) > 0:
+                self.optimization_options["optimize_with_subpath_constraints_as_safe_sequences"] = True
+                self.optimization_options["optimize_with_safety_as_subpath_constraints"] = True
         
+        self.flow_attr = flow_attr
+        self.w_max = self.k * self.weight_type(
+            self.G.get_max_flow_value_and_check_non_negative_flow(
+                flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
+            )
+        )
+        self.w_max = max(self.w_max, max(self.solution_weights_superset or [0]))
+
         self.pi_vars = {}
         self.path_weights_vars = {}
         self.edge_errors_vars = {}
@@ -265,7 +267,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
             self.solver.add_constraint(
                 self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) - f_u_v <= self.edge_errors_vars[(u, v)],
-                name=f"9aa_u={u}_v={v}_i={i}",
+                name=f"9ab_u={u}_v={v}_i={i}",
             )
 
     def __encode_solution_weights_superset(self):
@@ -281,6 +283,9 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             
             # We state that the weight of the i-th path equals the i-th entry of the solution_weights_superset
             for i in range(self.k):
+                if self.solution_weights_superset[i] > self.w_max:
+                    utils.logger.error(f"{__name__}: solution_weights_superset[{i}] must be less than or equal to {self.w_max}, not {self.solution_weights_superset[i]}")
+                    raise ValueError(f"solution_weights_superset[{i}] must be less than or equal to {self.w_max}, not {self.solution_weights_superset[i]}")
                 self.solver.add_constraint(
                     self.path_weights_vars[i] == self.solution_weights_superset[i],
                     name=f"solution_weights_superset_{i}",
