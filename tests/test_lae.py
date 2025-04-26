@@ -54,7 +54,7 @@ def run_test(graph, test_index, params):
             optimization_options=optimization_options,
             solver_options={"external_solver": settings[1]},
         )
-        lae_model.solve()
+        lae_model.solve() 
         print(lae_model.solve_statistics)
 
         # Checks
