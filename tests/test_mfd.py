@@ -38,7 +38,7 @@ def is_valid_optimization_setting_mfd(opt):
 
 def run_test(graph, test_index, params):
     print("*******************************************")
-    print(f"Testing graph {test_index}: {fp.utils.fpid(graph)}")
+    print(f"Testing graph {test_index}: {fp.utils.fpid(graph)}") 
     print("*******************************************")
 
     first_solution_size = None
