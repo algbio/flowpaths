@@ -410,7 +410,7 @@ class SolverWrapper:
                     elements = [elem.strip("'") for elem in self.parse_var_name(var, name_prefix)]
 
                     if len(index_types) != len(elements):
-                        raise Exception(f"We are getting the value of variable `{var}`, indexed by `{tuple_index}`, but the provided list of var_types `{index_types}` has different length.")
+                        raise Exception(f"We are getting the value of variable `{var}`, but the provided list of var_types `{index_types}` has different length.")
 
                     # We cast the elements to the appropriate types
                     tuple_index = tuple([index_types[i](elements[i]) for i in range(len(elements))])

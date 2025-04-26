@@ -1,6 +1,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/flowpaths)](https://pypi.org/project/flowpaths/)
 [![License - MIT](https://img.shields.io/pypi/l/flowpaths)](https://github.com/algbio/flowpaths/blob/main/LICENSE)
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/algbio/flowpaths/dx3-tests.yml)](https://github.com/algbio/flowpaths/actions/workflows/dx3-tests.yml)
+[![codecov](https://codecov.io/gh/algbio/flowpaths/branch/main/graph/badge.svg)](https://codecov.io/gh/algbio/flowpaths)
 
 #  The _flowpaths_ Python Package
 
