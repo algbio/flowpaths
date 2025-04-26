@@ -17,7 +17,7 @@ pip install flowpaths
 
 ### Documentation
 
-The documentation of this package is currently being written at [algbio.github.io/flowpaths/](https://algbio.github.io/flowpaths/).
+The documentation is available at [algbio.github.io/flowpaths/](https://algbio.github.io/flowpaths/).
 
 ### Basic usage example:
 
