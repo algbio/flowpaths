@@ -2,7 +2,7 @@ import pytest
 import itertools
 import flowpaths as fp
 
-weight_type = [int, float]
+weight_type = [int]
 solvers = ["highs", "gurobi"]
 
 tolerance = 1

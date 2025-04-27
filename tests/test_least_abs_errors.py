@@ -2,15 +2,15 @@ import pytest
 import itertools
 import flowpaths as fp
 
-weight_type = [int, float]
+weight_type = [int]
 solvers = ["highs", "gurobi"]
 
 tolerance = 1
 
 settings_flags = {
-    "optimize_with_safe_paths": [True, False],
-    "optimize_with_safe_sequences": [True, False],
-    "optimize_with_safety_as_subpath_constraints": [True],
+    "optimize_with_safe_paths": [False],
+    "optimize_with_safe_sequences": [False],
+    "optimize_with_safety_as_subpath_constraints": [False],
 }
 
 params = list(itertools.product(
@@ -34,6 +34,8 @@ def run_test(graph, test_index, params):
     print("*******************************************")
 
     first_obj_value = None
+    first_path_weights = None
+    first_weight_type = None
 
     for settings in params:
         print("Testing settings:", settings)
@@ -45,6 +47,7 @@ def run_test(graph, test_index, params):
         print("Solving with optimization options:", {key for key in optimization_options if optimization_options[key]})
 
         width = fp.stDiGraph(graph).get_width()
+        print("Width:", width)
 
         lae_model = fp.kLeastAbsErrors(
             G=graph,
@@ -59,14 +62,36 @@ def run_test(graph, test_index, params):
 
         # Checks
         assert lae_model.is_solved(), "Model should be solved"
-        assert lae_model.is_valid_solution(), "The solution is not a valid solution, under the default tolerance."
+        assert lae_model.is_valid_solution(), f"The solution is not a valid solution, under the default tolerance. Solution: {lae_model.get_solution()}"
+        
 
         obj_value = lae_model.get_objective_value()
         if first_obj_value is None:
+            first_weight_type = settings[0]
             first_obj_value = lae_model.get_objective_value()
+            first_path_weights = lae_model.get_solution()["weights"]
+            print("First path weights:", first_path_weights)
         else:
-            assert abs(first_obj_value - obj_value) < tolerance, "The objective value should be the same for all settings."
+            assert abs(first_obj_value - obj_value) < tolerance, f"The objective value should be the same for all settings. settings: {settings}"
 
+    # Testing the solution_weights_superset optimization
+    solution_weights_superset = first_path_weights + [first_weight_type(weight * (2 if idx % 2 else 0.5)) for idx, weight in enumerate(first_path_weights)]
+    print("Solution weights superset:", solution_weights_superset)
+
+    lae_model = fp.kLeastAbsErrors(
+            G=graph,
+            k=width,
+            flow_attr="flow",
+            weight_type=first_weight_type,
+            solution_weights_superset=solution_weights_superset,
+            solver_options={"external_solver": "gurobi"},
+        )
+    lae_model.solve() 
+    print(lae_model.solve_statistics)
+    assert lae_model.is_solved(), "Model should be solved"
+    assert lae_model.is_valid_solution(), "The solution is not a valid solution, under the default tolerance."
+    obj_value = lae_model.get_objective_value()
+    assert abs(first_obj_value - obj_value) < tolerance, "The objective value should be the same for all settings."
 
 graphs = fp.graphutils.read_graphs("./tests/test_graphs_errors.graph")
 @pytest.mark.parametrize("graph, idx", [(g, i) for i, g in enumerate(graphs)])

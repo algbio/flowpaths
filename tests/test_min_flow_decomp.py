@@ -73,7 +73,7 @@ def run_test(graph, test_index, params):
             assert first_solution_size == len(current_solution["paths"]), "The size of the solution should be the same for all settings."
 
 
-graphs = fp.graphutils.read_graphs("./tests/test_graphs_mfd.graph")
+graphs = fp.graphutils.read_graphs("./tests/test_graphs_flow_conservation.graph")
 @pytest.mark.parametrize("graph, idx", [(g, i) for i, g in enumerate(graphs)])
 def test(graph, idx):
     run_test(graph, idx, params)
