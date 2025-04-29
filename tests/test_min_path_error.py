@@ -41,6 +41,7 @@ def run_test(graph, test_index, params):
     first_obj_value = None
     first_path_weights = None
     first_weight_type = None
+    first_paths = None
 
     for settings in params:
         print("Testing settings:", settings)
@@ -74,6 +75,7 @@ def run_test(graph, test_index, params):
             first_obj_value = mpe_model.get_objective_value()
             first_path_weights = mpe_model.get_solution()["weights"]
             first_weight_type = settings[0]
+            first_paths = mpe_model.get_solution()["paths"]
         else:
             assert abs(first_obj_value - obj_value) < tolerance, "The objective value should be the same for all settings."
 
@@ -94,6 +96,36 @@ def run_test(graph, test_index, params):
     assert mpe_model.is_solved(), "Model should be solved"
     assert mpe_model.is_valid_solution(), "The solution is not a valid solution, under the default tolerance."
     obj_value = mpe_model.get_objective_value()
+    assert abs(first_obj_value - obj_value) < tolerance, "The objective value should be the same for all settings."
+
+        # Generate some subpath constraints from first_paths and test the model
+    subpath_constraints = []
+    for path in first_paths:
+        # Choose a random interval in path to create a subpath constraint
+        if len(path) > 2:
+            start = int(len(path) * 0.2)
+            end = int(len(path) * 0.8)
+            if start == end - 1:
+                continue
+            subpath_constraints.append(list(zip(path[start:end-1], path[start + 1:end])))
+    print("Subpath constraints:", subpath_constraints)
+
+    mpe_model = fp.kLeastAbsErrors(
+            G=graph,
+            k=width,
+            flow_attr="flow",
+            weight_type=first_weight_type,
+            solution_weights_superset=solution_weights_superset,
+            subpath_constraints=subpath_constraints,
+            solver_options={"external_solver": "gurobi"},
+        )
+    mpe_model.solve() 
+    print(mpe_model.solve_statistics)
+    assert mpe_model.is_solved(), "Model should be solved"
+    assert mpe_model.is_valid_solution(), "The solution is not a valid solution, under the default tolerance."
+    obj_value = mpe_model.get_objective_value()
+    print("Objective value with subpath constraints:", obj_value)
+    print("Objective value without subpath constraints and without solution_weights_superset:", first_obj_value)
     assert abs(first_obj_value - obj_value) < tolerance, "The objective value should be the same for all settings."
 
 graphs = fp.graphutils.read_graphs("./tests/test_graphs_errors.graph")
