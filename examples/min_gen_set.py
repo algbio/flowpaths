@@ -56,7 +56,10 @@ def process_solution(model: fp.MinGenSet):
         print("Model could not be solved.")
     print(model.solve_statistics)
 
-if __name__ == "__main__":
+def main():
     example1()
     example2()
     example3()
+
+if __name__ == "__main__":
+    main()

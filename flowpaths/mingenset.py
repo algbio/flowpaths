@@ -88,6 +88,14 @@ class MinGenSet():
         if self.weight_type not in [int, float]:
             utils.logger.error(f"{__name__}: weight_type must be either `int` or `float`.")
             raise ValueError("weight_type must be either `int` or `float`.")
+        
+        if self.partition_constraints is not None:
+            if not all(isinstance(constraint, list) for constraint in self.partition_constraints):
+                utils.logger.error(f"{__name__}: partition_constraints must be a list of lists.")
+                raise ValueError("partition_constraints must be a list of lists.")        
+            if not all(sum(constraint) == self.total for constraint in self.partition_constraints):
+                utils.logger.error(f"{__name__}: The sum of the numbers inside each subset constraint must equal the total value.")
+                raise ValueError("The sum of the numbers inside each subset constraint must equal the total value.")
 
         if remove_sums_of_two:
             elements_to_remove = set()
@@ -194,14 +202,6 @@ class MinGenSet():
 
         if self.partition_constraints is None:
             return
-
-        if not all(isinstance(constraint, list) for constraint in self.partition_constraints):
-            utils.logger.error(f"{__name__}: partition_constraints must be a list of lists.")
-            raise ValueError("partition_constraints must be a list of lists.")
-        
-        if not all(sum(constraint) == self.total for constraint in self.partition_constraints):
-            utils.logger.error(f"{__name__}: The sum of the numbers inside each subset constraint must equal the total value.")
-            raise ValueError("The sum of the numbers inside each subset constraint must equal the total value.")
 
         if len(self.partition_constraints) == 0:
             return

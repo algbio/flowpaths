@@ -163,7 +163,7 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         weight_function = {(u,v): 1 for u, v, data in self.G.edges(data=True) if data.get(self.lb, 0 ) > 0}
         return self.G.compute_max_edge_antichain(weight_function=weight_function)
 
-if __name__ == "__main__":
+def main():    
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"
@@ -192,3 +192,7 @@ if __name__ == "__main__":
         print("model.is_valid_solution()", kifd_model.is_valid_solution())
     else:
         print("Model could not be solved.")
+
+
+if __name__ == "__main__":
+    main()

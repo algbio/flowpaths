@@ -114,6 +114,9 @@ def process_expanded_solution(neGraph: fp.NodeExpandedDiGraph, model: fp.MinFlow
     else:
         print("Model could not be solved.")
 
-if __name__ == "__main__":
+def main():
     example1()
     example2()
+
+if __name__ == "__main__":
+    main()

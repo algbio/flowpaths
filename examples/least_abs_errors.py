@@ -2,6 +2,7 @@ import flowpaths as fp
 import networkx as nx
 
 def main():
+
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"
