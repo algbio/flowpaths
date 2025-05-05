@@ -116,7 +116,9 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
 
         # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
         for u, v in self.G.edges():
-            if (u, v) in self.edges_to_ignore or (u, v) in subpath_constraint_edges:
+            if (u, v) in self.edges_to_ignore:
+                continue
+            if (u, v) in subpath_constraint_edges and self.subpath_constraints_coverage == 1:
                 continue
             
             # We require that  self.edge_vars[(u, v, i)] is 1 for at least one i
