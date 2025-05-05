@@ -118,7 +118,7 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         for u, v in self.G.edges():
             if (u, v) in self.edges_to_ignore:
                 continue
-            if (u, v) in subpath_constraint_edges and self.subpath_constraints_coverage == 1:
+            if self.subpath_constraints_coverage == 1 and (u, v) in subpath_constraint_edges:
                 continue
             
             # We require that  self.edge_vars[(u, v, i)] is 1 for at least one i
