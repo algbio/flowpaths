@@ -10,6 +10,8 @@ from .utils import graphutils as graphutils
 from .mingenset import MinGenSet
 from .minsetcover import MinSetCover
 from .minerrorflow import MinErrorFlow
+from .kpathcover import kPathCover
+from .minpathcover import MinPathCover
 
 __all__ = [
     "AbstractPathModelDAG",
@@ -24,4 +26,6 @@ __all__ = [
     "MinGenSet",
     "MinSetCover",
     "MinErrorFlow",
+    "kPathCover",
+    "MinPathCover",
 ]

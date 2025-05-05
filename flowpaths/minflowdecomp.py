@@ -10,7 +10,7 @@ import flowpaths.utils as utils
 import copy
 import math
 
-class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
+class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths. 
     """
     A class to decompose a network flow if a directed acyclic graph into a minimum number of weighted paths.
     """
@@ -138,9 +138,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
     def solve(self) -> bool:
         """
-        Attempts to solve the flow distribution problem using a model with varying number of paths.
+        Attempts to solve the flow decomposition problem using a model with varying number of paths.
 
-        This method iterates over a range of possible path counts, creating and solving a flow decomposition model for each count.
+        This method iterates over a range of possible path numbers, creating and solving a flow decomposition model for each count.
         If a solution is found, it stores the solution and relevant statistics, and returns True. If no solution is found after
         iterating through all possible path counts, it returns False.
 

@@ -263,32 +263,81 @@ class stDiGraph(nx.DiGraph):
 
         minFlowCost, minFlow = graphutils.min_cost_flow(G_nx, self.source, self.sink)
 
-        def DFS_find_reachable_from_source(u, visited):
-            if visited[u] != 0:
-                return
-            assert u != self.sink
-            visited[u] = 1
-            for v in self.successors(u):
-                if minFlow[u][v] > demand[(u, v)]:
-                    DFS_find_reachable_from_source(v, visited)
-            for v in self.predecessors(u):
-                DFS_find_reachable_from_source(v, visited)
+        # def DFS_find_reachable_from_source(u, visited):
+        #     if visited[u] != 0:
+        #         return
+        #     assert u != self.sink
+        #     visited[u] = 1
+        #     for v in self.successors(u):
+        #         if minFlow[u][v] > demand[(u, v)]:
+        #             if visited[v] == 0:
+        #                 DFS_find_reachable_from_source(v, visited)
+        #     for v in self.predecessors(u):
+        #         if visited[v] == 0:
+        #             DFS_find_reachable_from_source(v, visited)
+        
+        # The following code was created by Claude 3.7 Sonnet to avoid recursion and uses a stack instead.
+        def DFS_find_reachable_from_source(start_node, visited):
+            stack = [start_node]
+            
+            while stack:
+                u = stack.pop()
+                if visited[u] != 0:
+                    continue
+                    
+                assert u != self.sink
+                visited[u] = 1
+                
+                for v in self.successors(u):
+                    if minFlow[u][v] > demand[(u, v)] and visited[v] == 0:
+                        stack.append(v)
+                        
+                for v in self.predecessors(u):
+                    if visited[v] == 0:
+                        stack.append(v)
 
-        def DFS_find_saturating(u, visited):
-            if visited[u] != 1:
-                return
-            visited[u] = 2
-            for v in self.successors(u):
-                if minFlow[u][v] > demand[(u, v)]:
-                    DFS_find_saturating(v, visited)
-                elif (
-                    minFlow[u][v] == demand[(u, v)]
-                    and demand[(u, v)] >= 1
-                    and visited[v] == 0
-                ):
-                    antichain.append((u, v))
-            for v in self.predecessors(u):
-                DFS_find_saturating(v, visited)
+        # def DFS_find_saturating(u, visited):
+        #     if visited[u] != 1:
+        #         return
+        #     visited[u] = 2
+        #     for v in self.successors(u):
+        #         if minFlow[u][v] > demand[(u, v)]:
+        #             DFS_find_saturating(v, visited)
+        #         elif (
+        #             minFlow[u][v] == demand[(u, v)]
+        #             and demand[(u, v)] >= 1
+        #             and visited[v] == 0
+        #         ):
+        #             antichain.append((u, v))
+        #     for v in self.predecessors(u):
+        #         DFS_find_saturating(v, visited)
+
+        # The following code was created by Claude 3.7 Sonnet to avoid recursion and uses a stack instead.
+        def DFS_find_saturating(start_node, visited):
+            stack = [start_node]
+            
+            while stack:
+                u = stack.pop()
+                
+                if visited[u] != 1:
+                    continue
+                    
+                visited[u] = 2
+                
+                # Process successors
+                for v in self.successors(u):
+                    if minFlow[u][v] > demand[(u, v)]:
+                        if visited[v] == 1:  # Only visit nodes marked as reachable (1)
+                            stack.append(v)
+                    elif (minFlow[u][v] == demand[(u, v)] 
+                        and demand[(u, v)] >= 1 
+                        and visited[v] == 0):
+                        antichain.append((u, v))
+                
+                # Process predecessors
+                for v in self.predecessors(u):
+                    if visited[v] == 1:  # Only visit nodes marked as reachable (1)
+                        stack.append(v)
 
         if get_antichain:
             antichain = []
