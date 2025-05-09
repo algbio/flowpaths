@@ -22,7 +22,7 @@ mpe_model.solve()
 # Draw the solution
 if mpe_model.is_solved():
     solution = mpe_model.get_solution()
-    fp.utils.draw_solution(
+    fp.utils.draw(
         G=graph,
         filename="test_graph_simple_graph.pdf",
         flow_attr="flow",

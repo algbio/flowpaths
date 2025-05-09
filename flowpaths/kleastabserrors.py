@@ -201,8 +201,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         self.path_weights_sol = None
         self.edge_errors_sol = None
-        self.__solution = None
-        self.__lowerbound_k = None
+        self._solution = None
+        self._lowerbound_k = None
 
         self.solve_statistics = {}
         
@@ -232,17 +232,17 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self.__encode_leastabserrors_decomposition()
+        self._encode_leastabserrors_decomposition()
 
         # This method is called from the current class    
-        self.__encode_solution_weights_superset()
+        self._encode_solution_weights_superset()
 
         # This method is called from the current class to add the objective function
-        self.__encode_objective()
+        self._encode_objective()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
-    def __encode_leastabserrors_decomposition(self):
+    def _encode_leastabserrors_decomposition(self):
 
         # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
@@ -302,7 +302,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
 
-    def __encode_solution_weights_superset(self):
+    def _encode_solution_weights_superset(self):
 
         if self.solution_weights_superset is not None:
 
@@ -334,7 +334,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 name="max_paths_original_k_paths",
             )
 
-    def __encode_objective(self):
+    def _encode_objective(self):
 
         self.solver.set_objective(
             self.solver.quicksum(
@@ -343,7 +343,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             sense="minimize"
         )
 
-    def __remove_empty_paths(self, solution):
+    def _remove_empty_paths(self, solution):
         """
         Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
 
@@ -392,8 +392,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         - `exception` If model is not solved.
         """
 
-        if self.__solution is not None:
-            return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
+        if self._solution is not None:
+            return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 
         self.check_is_solved()
 
@@ -411,20 +411,20 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
 
         if self.flow_attr_origin == "edge":
-            self.__solution = {
+            self._solution = {
                 "paths": self.get_solution_paths(),
                 "weights": self.path_weights_sol,
                 "edge_errors": self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
             }
         elif self.flow_attr_origin == "node":
-            self.__solution = {
+            self._solution = {
                 "_paths_internal": self.get_solution_paths(),
                 "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
                 "weights": self.path_weights_sol,
                 "edge_errors": self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
             }
 
-        return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
+        return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -445,12 +445,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
-        if self.__solution is None:
+        if self._solution is None:
             self.get_solution()
 
-        solution_paths = self.__solution.get("_paths_internal", self.__solution["paths"])
-        solution_weights = self.__solution["weights"]
-        solution_errors = self.__solution["edge_errors"]
+        solution_paths = self._solution.get("_paths_internal", self._solution["paths"])
+        solution_weights = self._solution["weights"]
+        solution_errors = self._solution["edge_errors"]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths

@@ -163,7 +163,7 @@ class AbstractPathModelDAG(ABC):
         
         self.subpath_constraints = copy.deepcopy(subpath_constraints)
         if self.subpath_constraints is not None:
-            self.__check_valid_subpath_constraints()
+            self._check_valid_subpath_constraints()
 
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
@@ -209,9 +209,9 @@ class AbstractPathModelDAG(ABC):
         self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
         self.optimize_with_safety_as_subpath_constraints = optimization_options.get("optimize_with_safety_as_subpath_constraints", AbstractPathModelDAG.optimize_with_safety_as_subpath_constraints)
         
-        self.__is_solved = None
+        self._is_solved = None
         if self.external_solution_paths is not None:
-            self.__is_solved = True
+            self._is_solved = True
 
         # some checks
         if self.optimize_with_safe_paths and self.external_safe_paths is None and self.trusted_edges_for_safety is None:
@@ -282,9 +282,9 @@ class AbstractPathModelDAG(ABC):
 
         self.solver = sw.SolverWrapper(**self.solver_options)
 
-        self.__encode_paths()
+        self._encode_paths()
 
-    def __encode_paths(self):
+    def _encode_paths(self):
         
         # Encodes the paths in the graph by creating variables for edges and subpaths.
 
@@ -450,7 +450,7 @@ class AbstractPathModelDAG(ABC):
         ########################################
 
         if self.safe_lists is not None:
-            paths_to_fix = self.__get_paths_to_fix_from_safe_lists()
+            paths_to_fix = self._get_paths_to_fix_from_safe_lists()
 
             if not self.optimize_with_safety_as_subpath_constraints:
                 # iterating over safe lists
@@ -488,7 +488,7 @@ class AbstractPathModelDAG(ABC):
                                 )
 
 
-    def __get_paths_to_fix_from_safe_lists(self) -> list:
+    def _get_paths_to_fix_from_safe_lists(self) -> list:
         
         # Returns the paths to fix based on the safe lists.
         # The method finds the longest safe list for each edge and returns the paths to fix based on the longest safe list.
@@ -520,7 +520,7 @@ class AbstractPathModelDAG(ABC):
 
         return paths_to_fix
     
-    def __check_valid_subpath_constraints(self):
+    def _check_valid_subpath_constraints(self):
         """
         Checks if the subpath constraints are valid.
 
@@ -569,7 +569,7 @@ class AbstractPathModelDAG(ABC):
         # If we already received an external solution, we don't need to solve the model
         if self.external_solution_paths is not None:
             utils.logger.info(f"{__name__}: no need to solve, we have an external solution.")
-            self.__is_solved = True
+            self._is_solved = True
             return True
 
         # self.write_model(f"model-{self.id}.lp")
@@ -587,11 +587,11 @@ class AbstractPathModelDAG(ABC):
             self.solver.get_model_status() == "kOptimal"
             or self.solver.get_model_status() == 2
         ):
-            self.__is_solved = True
+            self._is_solved = True
             utils.logger.info(f"{__name__}: solved successfully. Objective value: {self.get_objective_value()}")
             return True
 
-        self.__is_solved = False
+        self._is_solved = False
         return False
 
     def check_is_solved(self):
@@ -602,10 +602,10 @@ class AbstractPathModelDAG(ABC):
                   If you already ran the `solve` method, then the model is infeasible, or you need to increase parameter time_limit.")
         
     def is_solved(self):
-        return self.__is_solved
+        return self._is_solved
     
     def set_solved(self):
-        self.__is_solved = True
+        self._is_solved = True
 
     @abstractmethod
     def get_solution(self):

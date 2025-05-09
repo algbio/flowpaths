@@ -105,7 +105,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths according to the stopping criteria.")
         
         self.lowerbound_k = None
-        self.__solution = None
+        self._solution = None
         self.solve_statistics = None
 
         utils.logger.info(f"{__name__}: created NumPathsOptimization with model_type = {model_type}")
@@ -198,7 +198,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             }
 
         if solve_status == NumPathsOptimization.solved_status_name:
-            self.__solution = model.get_solution()
+            self._solution = model.get_solution()
             self.set_solved()
             self.solve_statistics.update(model.solve_statistics)
             self.model = model
@@ -224,7 +224,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         """
 
         self.check_is_solved()
-        return self.__solution
+        return self._solution
     
     def get_objective_value(self):
         """

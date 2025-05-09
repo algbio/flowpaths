@@ -3,38 +3,12 @@ from flowpaths.utils import graphutils
 import flowpaths.utils as utils
 
 class stDiGraph(nx.DiGraph):
-    # # Cache for storing processed graphs keyed by id(G)
-    # _cached_graphs = {}
-    # _use_cache = False
-
-    # def __new__(cls, G, *args, **kwargs):
-    #     # If a processed instance for this graph id already exists, return it        
-    #     if kwargs.get("use_cache", cls._use_cache):
-    #         obj = cls._cached_graphs.get(id(G))
-    #         if obj is not None:
-    #             utils.logger.debug(f"{cls.__name__}.__new__(): found cached instance for graph id {id(G)}")
-    #             return obj
-            
-    #     # Otherwise, create a new instance
-    #     obj = super().__new__(cls)
-        
-    #     if kwargs.get("use_cache", cls._use_cache):
-    #         cls._cached_graphs[id(G)] = obj
-    #         utils.logger.debug(f"{cls.__name__}.__new__(): cached the instance of graph id {id(G)}")
-    #     return obj
-
     def __init__(
         self,
         base_graph: nx.DiGraph,
         additional_starts: list = [],
         additional_ends: list = [],
-        # use_cache: bool = _use_cache,
     ):
-        # # Optionally, check if already initialized to avoid reprocessing:
-        # if use_cache and hasattr(self, "_initialized") and self._initialized:
-        #     utils.logger.debug(f"{__name__}.__init__(): skipping init since we found a cached instance for graph id {id(base_graph)}")
-        #     return
-
         if not all(isinstance(node, str) for node in base_graph.nodes()):
             utils.logger.error(f"{__name__}: Every node of the graph must be a string.")
             raise ValueError("Every node of the graph must be a string.")
@@ -50,14 +24,11 @@ class stDiGraph(nx.DiGraph):
         self.source = f"source_{id(self)}"
         self.sink = f"sink_{id(self)}"
 
-        self.__build_graph__()
+        self._build_graph()
 
         nx.freeze(self)
 
-        # self._initialized = True
-        # utils.logger.debug(f"{__name__}.__init__(): initialized for graph id {id(base_graph)}")
-
-    def __build_graph__(self):
+    def _build_graph(self):
         """
         Builds the graph by adding nodes and edges from the base graph, and
         connecting source and sink nodes.
@@ -103,62 +74,62 @@ class stDiGraph(nx.DiGraph):
         self.topological_order_rev = list(reversed(self.topological_order))
 
         # These two dict store the set of node (resp. edges) reachable from each node, including the node itself
-        self.__reachable_nodes_from = None
-        self.__reachable_edges_from = None
+        self._reachable_nodes_from = None
+        self._reachable_edges_from = None
         
         # These two dict store the set of node (resp. edges) reverse reachable from each node
-        self.__reachable_nodes_rev_from = None
-        self.__reachable_edges_rev_from = None
+        self._reachable_nodes_rev_from = None
+        self._reachable_edges_rev_from = None
 
     @property
     def reachable_nodes_from(self):
 
-        if self.__reachable_nodes_from is None:
+        if self._reachable_nodes_from is None:
             # Initialize by traversing the nodes in reverse topological order.
-            self.__reachable_nodes_from = {node:{node} for node in self.nodes()}
+            self._reachable_nodes_from = {node:{node} for node in self.nodes()}
             for node in self.topological_order_rev:
                 for v in self.successors(node):
-                    self.__reachable_nodes_from[node] |= self.__reachable_nodes_from[v]
+                    self._reachable_nodes_from[node] |= self._reachable_nodes_from[v]
         
-        return self.__reachable_nodes_from
+        return self._reachable_nodes_from
     
     @property
     def reachable_edges_from(self):
         
-        if self.__reachable_edges_from is None:
+        if self._reachable_edges_from is None:
             # Initialize by traversing the nodes in reverse topological order.
-            self.__reachable_edges_from = {node:set() for node in self.nodes()}
+            self._reachable_edges_from = {node:set() for node in self.nodes()}
             for node in self.topological_order_rev:
                 for v in self.successors(node):
-                    self.__reachable_edges_from[node] |= self.__reachable_edges_from[v]
-                    self.__reachable_edges_from[node] |= {(node, v)}
+                    self._reachable_edges_from[node] |= self._reachable_edges_from[v]
+                    self._reachable_edges_from[node] |= {(node, v)}
         
-        return self.__reachable_edges_from
+        return self._reachable_edges_from
 
     @property
     def reachable_nodes_rev_from(self):
 
-        if self.__reachable_nodes_rev_from is None:
+        if self._reachable_nodes_rev_from is None:
             # Initialize by traversing the nodes in topological order.
-            self.__reachable_nodes_rev_from = {node:{node} for node in self.nodes()}
+            self._reachable_nodes_rev_from = {node:{node} for node in self.nodes()}
             for node in self.topological_order:
                 for v in self.predecessors(node):
-                    self.__reachable_nodes_rev_from[node] |= self.__reachable_nodes_rev_from[v]
+                    self._reachable_nodes_rev_from[node] |= self._reachable_nodes_rev_from[v]
 
-        return self.__reachable_nodes_rev_from
+        return self._reachable_nodes_rev_from
 
     @property
     def reachable_edges_rev_from(self):
 
-        if self.__reachable_edges_rev_from is None:
+        if self._reachable_edges_rev_from is None:
             # Initialize by traversing the nodes in topological order.
-            self.__reachable_edges_rev_from = {node:set() for node in self.nodes()}
+            self._reachable_edges_rev_from = {node:set() for node in self.nodes()}
             for node in self.topological_order:
                 for v in self.predecessors(node):
-                    self.__reachable_edges_rev_from[node] |= self.__reachable_edges_rev_from[v]
-                    self.__reachable_edges_rev_from[node] |= {(v, node)}
+                    self._reachable_edges_rev_from[node] |= self._reachable_edges_rev_from[v]
+                    self._reachable_edges_rev_from[node] |= {(v, node)}
 
-        return self.__reachable_edges_rev_from
+        return self._reachable_edges_rev_from
 
     def get_width(self, edges_to_ignore: list = None) -> int:
         """

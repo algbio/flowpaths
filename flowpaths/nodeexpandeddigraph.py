@@ -105,7 +105,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         self.node_flow_attr = node_flow_attr
         self.node_length_attr = node_length_attr
 
-        self.__edges_to_ignore = []
+        self._edges_to_ignore = []
 
         for node in G.nodes:
             node0 = node + '.0'
@@ -116,7 +116,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             if self.node_flow_attr in G.nodes[node]:
                 self[node0][node1][self.node_flow_attr] = G.nodes[node][self.node_flow_attr]
             else:
-                self.__edges_to_ignore.append((node0, node1))
+                self._edges_to_ignore.append((node0, node1))
             if self.node_length_attr is not None:
                 if self.node_length_attr in G.nodes[node]:
                     self[node0][node1][self.node_length_attr] = G.nodes[node][self.node_length_attr]
@@ -125,7 +125,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             for pred in G.predecessors(node):
                 pred1 = pred + '.1'
                 self.add_edge(pred1, node0, **G.edges[pred, node])
-                self.__edges_to_ignore.append((pred1, node0))
+                self._edges_to_ignore.append((pred1, node0))
                 
                 # If the edge (pred,node) does not have the length attribute, set it to 0
                 if self.node_length_attr is not None:
@@ -137,14 +137,14 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 succ0 = succ + '.0'
                 self.add_edge(node1, succ0, **G.edges[node, succ])
                 # This is not necessary, as the edge (node1, succ0) has already been added above, for succ
-                # self.__edges_to_ignore.append((node1, succ0))
+                # self._edges_to_ignore.append((node1, succ0))
 
         if try_filling_in_missing_flow_attr:
-            self.__try_filling_in_missing_flow_values()
+            self._try_filling_in_missing_flow_values()
 
         nx.freeze(self)    
 
-    def __try_filling_in_missing_flow_values(self):
+    def _try_filling_in_missing_flow_values(self):
         
         # Fills in missing flow values in the expanded graph, by setting them to the flow values of a maximum flow
         # between the source and the sink of the original graph, with capacity equal to the flow values of the nodes.
@@ -202,7 +202,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         These are the edges of the original graph, since only the new edges that have been introduced 
         for every node must considered in the decomposition model, with flow value from the node attribute `node_flow_attr`.
         """
-        return self.__edges_to_ignore
+        return self._edges_to_ignore
     
     def get_expanded_additional_starts(self, additional_starts):
         
@@ -248,14 +248,14 @@ class NodeExpandedDiGraph(nx.DiGraph):
             return []
         
         if isinstance(subpath_constraints[0][0], str):
-            return self.__get_expanded_subpath_constraints_nodes(subpath_constraints)
+            return self._get_expanded_subpath_constraints_nodes(subpath_constraints)
         elif isinstance(subpath_constraints[0][0], tuple):
-            return self.__get_expanded_subpath_constraints_edges(subpath_constraints)
+            return self._get_expanded_subpath_constraints_edges(subpath_constraints)
         else:
             utils.logger.error(f"{__name__}: Subpath constraints must be a list of lists of nodes or edges.")
             raise ValueError("Subpath constraints must be a list of lists of nodes or edges.")
 
-    def __get_expanded_subpath_constraints_nodes(self, subpath_constraints):
+    def _get_expanded_subpath_constraints_nodes(self, subpath_constraints):
         """
         Expand a list of subpath constraints from the original graph (where every constraint is a list **nodes**
         in the original graph) to a list of subpath constraints in the expanded graph (where every constraint 
@@ -287,7 +287,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
 
         return expanded_constraints
     
-    def __get_expanded_subpath_constraints_edges(self, subpath_constraints):
+    def _get_expanded_subpath_constraints_edges(self, subpath_constraints):
         """
         Expand a list of subpath constraints from the original graph (where every constraint is a list **edges** 
         in the original graph) to a list of subpath constraints in the expanded graph where every constraint 

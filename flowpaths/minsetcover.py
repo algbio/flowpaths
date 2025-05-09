@@ -45,12 +45,12 @@ class MinSetCover():
         self.set_cover_weights = []
         self.solver_options = solver_options
 
-        self.__is_solved = None
-        self.__solution = None
+        self._is_solved = None
+        self._solution = None
 
-        self.__encode_set_cover()
+        self._encode_set_cover()
         
-    def __encode_set_cover(self):
+    def _encode_set_cover(self):
         """
         This function encodes the set cover problem as an integer linear program.
         """
@@ -100,11 +100,11 @@ class MinSetCover():
         self.solver.optimize()
         if self.solver.get_model_status() == "kOptimal":
             subset_cover_sol = self.solver.get_variable_values("subset", [int])
-            self.__solution = [i for i in range(len(self.subsets)) if subset_cover_sol[i] == 1]
-            self.__is_solved = True
+            self._solution = [i for i in range(len(self.subsets)) if subset_cover_sol[i] == 1]
+            self._is_solved = True
             self.solve_statistics = {
                 "solve_time": time.perf_counter() - start_time,
-                "num_elements": len(self.__solution),
+                "num_elements": len(self._solution),
                 "status": self.solver.get_model_status(),
             }
             return True
@@ -119,11 +119,11 @@ class MinSetCover():
         """
         Returns `True` if the model was solved, `False` otherwise.
         """
-        if self.__is_solved is None:
+        if self._is_solved is None:
             self.solver.logger.error(f"{__name__}: Model not yet solved. If you want to solve it, call the `solve` method first.")
             raise Exception("Model not yet solved. If you want to solve it, call the `solve` method first.")
         
-        return self.__is_solved
+        return self._is_solved
     
     def check_is_solved(self):
         if not self.is_solved():
@@ -146,10 +146,10 @@ class MinSetCover():
         !!! warning "Warning"
             Call the `solve` method first.
         """
-        if self.__solution is not None:
+        if self._solution is not None:
             if not as_subsets:
-                return self.__solution
+                return self._solution
             else:
-                return [self.subsets[i] for i in self.__solution]
+                return [self.subsets[i] for i in self._solution]
         
         self.check_is_solved() 

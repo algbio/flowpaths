@@ -232,7 +232,7 @@ def max_occurrence(seq, paths_in_DAG, edge_lengths: dict = {}) -> int:
             
     return max_occurence
 
-def draw_solution(
+def draw(
         G: nx.DiGraph, 
         filename: str,
         flow_attr: str = None,
@@ -471,7 +471,7 @@ def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, 
 
     return subgraph
 
-def draw_solution_WIP(graph: nx.DiGraph, paths: list, weights: list, id:str):
+def draw_WIP(graph: nx.DiGraph, paths: list, weights: list, id:str):
 
     import matplotlib.pyplot as plt
     import pydot

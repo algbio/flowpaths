@@ -24,9 +24,9 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         # self.k = num_paths will be available from the superclass AbstractPathModelDAG, 
         # after calling super().__init__(...), which happens below.
 
-        # We declare the __solution attribute, to be able to cache it.
-        # Note that we make it private to this class, so that we can access it only with get_solution()
-        self.__solution = None      
+        # We declare the _solution attribute, to be able to cache it.
+        # Note that we make it private to this class (with underscore prefix), so that we can access it only with get_solution()
+        self._solution = None      
         
         # To be able to apply the safety optimizations, we get the edges that 
         # must appear in some solution path. For this problem, these are the edges 
@@ -45,12 +45,12 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class
-        self.__encode_inexact_flow_decomposition()
+        self._encode_inexact_flow_decomposition()
 
         # We encode the objective, from the current class
-        self.__encode_objective()
+        self._encode_objective()
             
-    def __encode_inexact_flow_decomposition(self):
+    def _encode_inexact_flow_decomposition(self):
 
         # Get the maximum data in an edge indexed under self.lb.
         # This will be used to set the upper bound of the path weights, since a path weight larger than this
@@ -116,7 +116,7 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
                 name=f"upperbound_u={u}_v={v}",
             )
 
-    def __encode_objective(self):
+    def _encode_objective(self):
 
         # We set the objective to minimize the sum of the path weights
         self.solver.set_objective(
@@ -126,16 +126,16 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
 
     def get_solution(self):
 
-        if self.__solution is not None:
-            return self.__solution
+        if self._solution is not None:
+            return self._solution
     
         solution_weights_dict = self.solver.get_variable_values("w", [int])
-        self.__solution = {
+        self._solution = {
             "paths": self.get_solution_paths(),
             "weights": [solution_weights_dict[i] for i in range(self.k)],
         }
 
-        return self.__solution
+        return self._solution
     
     def is_valid_solution(self):
         # AbstractPathModelDAG requires implementing a basic check that the solution is valid, 

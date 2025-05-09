@@ -134,8 +134,8 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.length_attr = length_attr
 
-        self.__solution = None
-        self.__lowerbound_k = None
+        self._solution = None
+        self._lowerbound_k = None
         
         self.solve_statistics = {}
         self.optimization_options = optimization_options.copy() if optimization_options else {}
@@ -158,11 +158,11 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class to encode the path cover
-        self.__encode_path_cover()
+        self._encode_path_cover()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
-    def __encode_path_cover(self):
+    def _encode_path_cover(self):
         
         subpath_constraint_edges = set()
         for subpath_constraint in self.subpath_constraints:
@@ -200,20 +200,20 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         - `exception` If model is not solved.
         """
 
-        if self.__solution is None:
+        if self._solution is None:
             self.check_is_solved()
             
             if self.cover_type == "edge":
-                self.__solution = {
+                self._solution = {
                     "paths": self.get_solution_paths(),
                 }
             elif self.cover_type == "node":
-                self.__solution = {
+                self._solution = {
                     "_paths_internal": self.get_solution_paths(),
                     "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
                 }
             
-        return self.__solution
+        return self._solution
 
     def is_valid_solution(self):
         """
@@ -232,11 +232,11 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         - get_solution() must be called before this method.
         """
 
-        if self.__solution is None:
+        if self._solution is None:
             utils.logger.error(f"{__name__}: Solution is not available. Call get_solution() first.")
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_paths = self.__solution.get("_paths_internal", self.__solution["paths"])
+        solution_paths = self._solution.get("_paths_internal", self._solution["paths"])
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
@@ -263,7 +263,7 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
     
     def get_lowerbound_k(self):
 
-        if self.__lowerbound_k is None:
-            self.__lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
+        if self._lowerbound_k is None:
+            self._lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
         
-        return self.__lowerbound_k
+        return self._lowerbound_k

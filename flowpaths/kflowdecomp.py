@@ -157,8 +157,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.path_weights_vars = {}
 
         self.path_weights_sol = None
-        self.__solution = None
-        self.__lowerbound_k = None
+        self._solution = None
+        self._lowerbound_k = None
         
         self.solve_statistics = {}
         self.optimization_options = optimization_options.copy() or {}
@@ -171,8 +171,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # - there are no edges to ignore (in the original input graph), and 
         # - the graph satisfies flow conservation
         if self.optimize_with_greedy and len(edges_to_ignore_internal) == 0 and satisfies_flow_conservation:
-            if self.__get_solution_with_greedy():
-                greedy_solution_paths = self.__solution["paths"]
+            if self._get_solution_with_greedy():
+                greedy_solution_paths = self._solution["paths"]
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths
         
         if self.optimize_with_flow_safe_paths and satisfies_flow_conservation:
@@ -210,14 +210,14 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class to encode the flow decomposition
-        self.__encode_flow_decomposition()
+        self._encode_flow_decomposition()
 
         # The given weights optimization
-        self.__encode_given_weights()
+        self._encode_given_weights()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
-    def __encode_flow_decomposition(self):
+    def _encode_flow_decomposition(self):
         
         # Encodes the flow decomposition constraints for the given graph.
         # This method sets up the path weight variables and the edge variables encoding
@@ -266,7 +266,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                 name=f"10d_u={u}_v={v}_i={i}",
             )
 
-    def __encode_given_weights(self):
+    def _encode_given_weights(self):
 
         weights = self.optimization_options.get("given_weights", None)
         if weights is None:
@@ -300,7 +300,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             sense="minimize",
         )
 
-    def __get_solution_with_greedy(self):
+    def _get_solution_with_greedy(self):
         
         # Attempts to find a solution using a greedy algorithm.
         # This method first decomposes the problem using the maximum bottleneck approach.
@@ -336,7 +336,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             # then we add arbitrary paths (i.e. we repeat the first path) with 0 weights to reach self.k paths.
             paths += [paths[0] for _ in range(self.k - len(paths))]
             weights += [0 for _ in range(self.k - len(weights))]
-            self.__solution = {
+            self._solution = {
                 "paths": paths,
                 "weights": weights,
             }
@@ -347,7 +347,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
 
         return False
 
-    def __remove_empty_paths(self, solution):
+    def _remove_empty_paths(self, solution):
         """
         Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
 
@@ -400,8 +400,8 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - `exception` If model is not solved.
         """
 
-        if self.__solution is not None:            
-            return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
+        if self._solution is not None:            
+            return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 
         self.check_is_solved()
         weights_sol_dict = self.solver.get_variable_values("w", [int])
@@ -415,18 +415,18 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         ]
 
         if self.flow_attr_origin == "edge":
-            self.__solution = {
+            self._solution = {
                 "paths": self.get_solution_paths(),
                 "weights": self.path_weights_sol,
             }
         elif self.flow_attr_origin == "node":
-            self.__solution = {
+            self._solution = {
                 "_paths_internal": self.get_solution_paths(),
                 "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
                 "weights": self.path_weights_sol,
             }
 
-        return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
+        return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -447,12 +447,12 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
-        if self.__solution is None:
+        if self._solution is None:
             utils.logger.error(f"{__name__}: Solution is not available. Call get_solution() first.")
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_paths = self.__solution.get("_paths_internal", self.__solution["paths"])
-        solution_weights = self.__solution["weights"]
+        solution_paths = self._solution.get("_paths_internal", self._solution["paths"])
+        solution_weights = self._solution["weights"]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
@@ -480,18 +480,16 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         
         self.check_is_solved()
 
-        if self.__solution is None:
+        if self._solution is None:
             self.get_solution()
 
         return self.k
     
     def get_lowerbound_k(self):
 
-        if self.__lowerbound_k != None:
-            return self.__lowerbound_k
+        if self._lowerbound_k != None:
+            return self._lowerbound_k
 
-        self.__lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
+        self._lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
-        # self.__lowerbound_k = max(self.__lowerbound_k, self.G.get_flow_width(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore))
-
-        return self.__lowerbound_k
+        return self._lowerbound_k

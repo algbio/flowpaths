@@ -133,9 +133,9 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
         self.additional_starts = additional_starts
         self.additional_ends = additional_ends
 
-        self.__solution = None
-        self.__lowerbound_k = None
-        self.__is_solved = None
+        self._solution = None
+        self._lowerbound_k = None
+        self._is_solved = None
         self.model = None
         
         self.solve_statistics = {}
@@ -173,7 +173,7 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
             model.solve()
 
             if model.is_solved():
-                self.__solution = model.get_solution()
+                self._solution = model.get_solution()
                 self.set_solved()
                 self.solve_statistics = model.solve_statistics
                 self.solve_statistics["mpc_solve_time"] = time.perf_counter() - self.solve_time_start
@@ -206,22 +206,22 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
         Get the solution of the Min Path Cover model, as dict with unique key `"paths"`.
         """
         self.check_is_solved()
-        return self.__solution
+        return self._solution
     
     def get_objective_value(self):
 
         self.check_is_solved()
 
         # Number of paths
-        return len(self.__solution["paths"])
+        return len(self._solution["paths"])
 
     def is_valid_solution(self) -> bool:
         return self.model.is_valid_solution()
     
     def get_lowerbound_k(self):
 
-        if self.__lowerbound_k is None:
+        if self._lowerbound_k is None:
             stG = stdigraph.stDiGraph(self.G)
-            self.__lowerbound_k = stG.get_width(edges_to_ignore=self.edges_to_ignore)
+            self._lowerbound_k = stG.get_width(edges_to_ignore=self.edges_to_ignore)
 
-        return self.__lowerbound_k
+        return self._lowerbound_k

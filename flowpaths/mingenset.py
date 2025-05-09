@@ -79,8 +79,8 @@ class MinGenSet():
         self.lowerbound = lowerbound
         self.partition_constraints = partition_constraints
 
-        self.__is_solved = False
-        self.__solution = None
+        self._is_solved = False
+        self._solution = None
         self.solver = None
         self.solve_statistics = {}
         self.solver_options = solver_options
@@ -118,7 +118,7 @@ class MinGenSet():
 
         utils.logger.debug(f"{__name__}: Numbers after removing values: {self.numbers}")
 
-    def __create_solver(self, k):
+    def _create_solver(self, k):
 
         self.solver = sw.SolverWrapper(**self.solver_options)
 
@@ -185,20 +185,20 @@ class MinGenSet():
             )
 
         # Encoding the symmetry breaking constraints
-        self.__encode_symmetry_breaking(k)
+        self._encode_symmetry_breaking(k)
 
         # Encoding the subset constraints
         if self.partition_constraints is not None:
-            self.__encode_partition_constraints(k)
+            self._encode_partition_constraints(k)
 
-    def __encode_symmetry_breaking(self, k):
+    def _encode_symmetry_breaking(self, k):
         for i in range(k - 2):
             self.solver.add_constraint(
                 self.genset_vars[i] <= self.genset_vars[i+1],
                 name=f"b_{i}_leq_b_{i+1}",
             )
 
-    def __encode_partition_constraints(self, k):
+    def _encode_partition_constraints(self, k):
 
         if self.partition_constraints is None:
             return
@@ -272,13 +272,13 @@ class MinGenSet():
 
         # Solve for increasing numbers of elements in the generating set
         for k in range(self.lowerbound, max(self.lowerbound+1, len(self.initial_numbers))):
-            self.__create_solver(k=k)
+            self._create_solver(k=k)
             self.solver.optimize()
 
             if self.solver.get_model_status() == "kOptimal":
                 genset_sol = self.solver.get_variable_values("gen_set", [int])
-                self.__solution = sorted(self.weight_type(genset_sol[i]) for i in range(k))
-                self.__is_solved = True
+                self._solution = sorted(self.weight_type(genset_sol[i]) for i in range(k))
+                self._is_solved = True
                 self.solve_statistics = {
                     "solve_time": time.perf_counter() - start_time,
                     "num_elements": k,
@@ -296,11 +296,11 @@ class MinGenSet():
         """
         Returns `True` if the model was solved, `False` otherwise.
         """
-        if self.__is_solved is None:
+        if self._is_solved is None:
             utils.logger.error(f"{__name__}: Model not yet solved. If you want to solve it, call the `solve` method first.")
             raise Exception("Model not yet solved. If you want to solve it, call the `solve` method first.")
         
-        return self.__is_solved
+        return self._is_solved
     
     def check_is_solved(self):
         if not self.is_solved():
@@ -316,11 +316,11 @@ class MinGenSet():
         !!! warning "Warning"
             Call the `solve` method first.
         """
-        if self.__solution is not None:
-            return self.__solution
+        if self._solution is not None:
+            return self._solution
         
         self.check_is_solved()
 
-        return self.__solution  
+        return self._solution  
 
         

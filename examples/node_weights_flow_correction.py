@@ -9,7 +9,7 @@ def process_expanded_solution(graph: nx.DiGraph, neGraph: fp.NodeExpandedDiGraph
         print("Expanded paths:", expanded_paths)
         print("Original paths:", original_paths)
         print("Weights:", solution["weights"])
-        fp.utils.draw_solution(
+        fp.utils.draw(
             G=graph, 
             filename="test_graph_expanded_graph.pdf", 
             flow_attr="flow", 

@@ -241,8 +241,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.path_weights_sol = None
         self.path_slacks_sol = None
         self.path_slacks_scaled_sol = None
-        self.__solution = None
-        self.__lowerbound_k = None
+        self._solution = None
+        self._lowerbound_k = None
 
         self.solve_statistics = {}
 
@@ -269,17 +269,17 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self.__encode_minpatherror_decomposition()
+        self._encode_minpatherror_decomposition()
 
         # This method is called from the current class    
-        self.__encode_solution_weights_superset()
+        self._encode_solution_weights_superset()
 
         # This method is called from the current class to add the objective function
-        self.__encode_objective()
+        self._encode_objective()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
-    def __encode_minpatherror_decomposition(self):
+    def _encode_minpatherror_decomposition(self):
 
         # path weights 
         self.path_weights_vars = self.solver.add_variables(
@@ -414,7 +414,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
 
-    def __encode_solution_weights_superset(self):
+    def _encode_solution_weights_superset(self):
 
         if self.solution_weights_superset is not None:
 
@@ -446,13 +446,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 name="max_paths_original_k_paths",
             )
 
-    def __encode_objective(self):
+    def _encode_objective(self):
 
         self.solver.set_objective(
             self.solver.quicksum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
         )
 
-    def __remove_empty_paths(self, solution):
+    def _remove_empty_paths(self, solution):
         """
         Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
 
@@ -512,8 +512,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         - `exception` If model is not solved.
         """
 
-        if self.__solution is not None:
-            return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
+        if self._solution is not None:
+            return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 
         self.check_is_solved()
 
@@ -537,13 +537,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         ]
 
         if self.flow_attr_origin == "edge":
-            self.__solution = {
+            self._solution = {
                 "paths": self.get_solution_paths(),
                 "weights": self.path_weights_sol,
                 "slacks": self.path_slacks_sol
                 }
         elif self.flow_attr_origin == "node":
-            self.__solution = {
+            self._solution = {
                 "_paths_internal": self.get_solution_paths(),
                 "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
                 "weights": self.path_weights_sol,
@@ -554,9 +554,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             slacks_scaled_sol_dict = self.solver.get_variable_values("scaled_slack", index_types=[int])
             self.path_slacks_scaled_sol = [slacks_scaled_sol_dict[i] for i in range(self.k)]
 
-            self.__solution["scaled_slacks"] = self.path_slacks_scaled_sol
+            self._solution["scaled_slacks"] = self.path_slacks_scaled_sol
 
-        return self.__remove_empty_paths(self.__solution) if remove_empty_paths else self.__solution
+        return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -580,18 +580,18 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             (up to `tolerance * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
-        if self.__solution is None:
+        if self._solution is None:
             self.get_solution()
 
         if tolerance < 0:
             utils.logger.error(f"{__name__}: tolerance must be non-negative, not {tolerance}")
             raise ValueError(f"tolerance must be non-negative, not {tolerance}")
 
-        solution_paths = self.__solution.get("_paths_internal", self.__solution["paths"])
-        solution_weights = self.__solution["weights"]
-        solution_slacks = self.__solution["slacks"]
+        solution_paths = self._solution.get("_paths_internal", self._solution["paths"])
+        solution_weights = self._solution["weights"]
+        solution_slacks = self._solution["slacks"]
         if len(self.path_length_factors) > 0:
-            solution_slacks = self.__solution["scaled_slacks"]
+            solution_slacks = self._solution["scaled_slacks"]
         for path in solution_paths:
             if len(path) == 1:
                 utils.logger.error(f"{__name__}: Encountered a solution path with length 1, which is not allowed.")
@@ -619,7 +619,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                     abs(data[self.flow_attr] - weight_from_paths[(u, v)])
                     > tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
                 ):
-                    utils.logger.debug(f"{__name__}: Solution: {self.__solution}")
+                    utils.logger.debug(f"{__name__}: Solution: {self._solution}")
                     utils.logger.debug(f"{__name__}: num_paths_on_edges[(u, v)] = {num_paths_on_edges[(u, v)]}")
                     utils.logger.debug(f"{__name__}: slack_from_paths[(u, v)] = {slack_from_paths[(u, v)]}")
                     utils.logger.debug(f"{__name__}: data[self.flow_attr] = {data[self.flow_attr]}")
@@ -677,17 +677,17 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.check_is_solved()
 
-        if self.__solution is None:
+        if self._solution is None:
             self.get_solution()
 
         # sum of slacks
-        return sum(self.__solution["slacks"])
+        return sum(self._solution["slacks"])
     
     def get_lowerbound_k(self):
 
-        if self.__lowerbound_k != None:
-            return self.__lowerbound_k
+        if self._lowerbound_k != None:
+            return self._lowerbound_k
 
-        self.__lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
+        self._lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
-        return self.__lowerbound_k
+        return self._lowerbound_k

@@ -290,7 +290,7 @@ class SolverWrapper:
             self.solver.optimize()
         else:
             utils.logger.debug(f"{__name__}: Running also with use_also_custom_timeout ({self.time_limit} sec)")
-            self.__run_with_timeout(self.time_limit, self.solver.optimize)
+            self._run_with_timeout(self.time_limit, self.solver.optimize)
     
     def write_model(self, filename):
         if self.external_solver == "highs":
@@ -513,14 +513,14 @@ class SolverWrapper:
             self.add_constraint(y <= c + M * (1 - z[i]), name=f"{name_prefix}_yU_{i}")
             self.add_constraint(y >= c - M * (1 - z[i]), name=f"{name_prefix}_yL_{i}")
 
-    def __timeout_handler(self, signum, frame):
+    def _timeout_handler(self, signum, frame):
         self.did_timeout = True
         # raise TimeoutException("Function timed out!")
 
-    def __run_with_timeout(self, timeout, func):
+    def _run_with_timeout(self, timeout, func):
         # Use signal-based timeout on Unix-like systems
         if os.name == 'posix':
-            signal.signal(signal.SIGALRM, self.__timeout_handler)
+            signal.signal(signal.SIGALRM, self._timeout_handler)
             signal.alarm(math.ceil(timeout))  # Schedule the timeout alarm
             try:
                 utils.logger.debug(f"{__name__}: Running the solver with integer timeout from the signal module (timeout {math.ceil(timeout)} sec)")

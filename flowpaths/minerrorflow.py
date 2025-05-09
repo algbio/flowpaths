@@ -143,8 +143,8 @@ class MinErrorFlow():
             if few_flow_values_epsilon == 0:
                 self.different_flow_values_epsilon = None        
 
-        self.__solution = None
-        self.__is_solved = None
+        self._solution = None
+        self._is_solved = None
         self.solve_statistics = dict()
 
         self.edge_vars = {}
@@ -159,19 +159,19 @@ class MinErrorFlow():
         )
         self.ub = self.w_max * self.G.number_of_edges()
 
-        self.__create_solver()
+        self._create_solver()
 
-        self.__encode_flow()
+        self._encode_flow()
 
-        self.__encode_min_sum_errors_objective()  
+        self._encode_min_sum_errors_objective()  
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}")  
 
-    def __create_solver(self):
+    def _create_solver(self):
         
         self.solver = sw.SolverWrapper(**self.solver_options)
 
-    def __encode_flow(self):
+    def _encode_flow(self):
 
         # Creating the edge variables
         self.edge_indexes = [(u, v) for (u, v) in self.G.edges()]
@@ -239,7 +239,7 @@ class MinErrorFlow():
                 name=f"edge_error_u={u}_v={v}",
             )
 
-    def __encode_min_sum_errors_objective(self):
+    def _encode_min_sum_errors_objective(self):
         
         # Objective function: minimize the sum of the edge error variables
         # plus the sparsity of the solution (i.e. sparsity_lambda * sum of the corrected flow going out of the source)
@@ -255,7 +255,7 @@ class MinErrorFlow():
             sense="minimize",
         )
 
-    def __encode_different_flow_values_and_objective(
+    def _encode_different_flow_values_and_objective(
             self, 
             edge_subset: list,
             objective_value: float, 
@@ -350,7 +350,7 @@ class MinErrorFlow():
 
         if self.solver.get_model_status() == "kOptimal":
             if self.different_flow_values_epsilon is None:
-                self.__is_solved = True
+                self._is_solved = True
                 utils.logger.info(f"{__name__}: model solved with objective value = {self.solver.get_objective_value()}")
                 return True
             else:
@@ -360,13 +360,13 @@ class MinErrorFlow():
                 # If the objective value is 0, then we can stop here
                 # because we cannot get a different solution
                 if objective_value == 0:
-                    self.__is_solved = True
+                    self._is_solved = True
                     utils.logger.info(f"{__name__}: model solved with objective value = {objective_value}. We could not find change the flow values because the objective function was 0.")
                     return True
 
-                self.__is_solved = True # START hack to get the corrected graph                
+                self._is_solved = True # START hack to get the corrected graph                
                 corrected_graph = self.get_corrected_graph()
-                self.__is_solved = False # END hack to get the corrected graph
+                self._is_solved = False # END hack to get the corrected graph
 
                 # Pick 30 random edges of G.edges()
                 edge_subset = [e for e in self.original_graph_copy.edges()]
@@ -379,9 +379,9 @@ class MinErrorFlow():
                 ))
 
                 utils.logger.info(f"{__name__}: re-solving now by minimizing the number of different flow values within 1 + epsilon tolerance to the objective value, i.e. <=(1+{self.different_flow_values_epsilon})*{objective_value}")
-                self.__create_solver()
-                self.__encode_flow()
-                self.__encode_different_flow_values_and_objective(
+                self._create_solver()
+                self._encode_flow()
+                self._encode_different_flow_values_and_objective(
                     edge_subset=edge_subset,
                     objective_value=objective_value,
                     ub_different_flow_values=ub_different_flow_values,
@@ -391,22 +391,22 @@ class MinErrorFlow():
                 self.solve_statistics[f"milp_solver_status"] = self.solver.get_model_status()
                 
                 if self.solver.get_model_status() == "kOptimal":
-                    self.__is_solved = True
+                    self._is_solved = True
                     utils.logger.info(f"{__name__}: model solved with objective value = {objective_value}")
                     return True
                 else:
                     utils.logger.warning(f"{__name__}: model not solved, status = {self.solver.get_model_status()}")
                 
-        self.__is_solved = False
+        self._is_solved = False
         return False
 
     def is_solved(self):
         """
         Returns `True` if the model was solved, `False` otherwise.
         """
-        return self.__is_solved
+        return self._is_solved
     
-    def __check_is_solved(self):
+    def _check_is_solved(self):
         if not self.is_solved():
             raise Exception(
                 "Model not solved. If you want to solve it, call the solve method first. \
@@ -424,10 +424,10 @@ class MinErrorFlow():
         !!! warning "Warning"
             Call the `solve` method first.
         """
-        if self.__solution is not None:
-            return self.__solution
+        if self._solution is not None:
+            return self._solution
         
-        self.__check_is_solved()
+        self._check_is_solved()
 
         edge_sol_dict = self.solver.get_variable_values("edge_vars", [str, str])
         for edge in edge_sol_dict.keys():
@@ -446,19 +446,19 @@ class MinErrorFlow():
                 corrected_graph[u][v][self.flow_attr] = self.edge_sol[(u, v)]
 
         if self.flow_attr_origin == "edge":
-            self.__solution = {
+            self._solution = {
                 "graph": corrected_graph,
                 "error": error,
                 "objective_value": self.solver.get_objective_value(),
             }
         elif self.flow_attr_origin == "node":
-            self.__solution = {
+            self._solution = {
                 "graph": corrected_graph.get_condensed_graph(),
                 "error": error,
                 "objective_value": self.solver.get_objective_value(),
             }
         
-        return self.__solution  
+        return self._solution  
     
     def get_corrected_graph(self):
         """
