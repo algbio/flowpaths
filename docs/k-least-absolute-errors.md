@@ -40,3 +40,6 @@ This class implements a more general version, as follows:
 
 
 ::: flowpaths.kleastabserrors
+    options:
+      filters: 
+        - "!^_"

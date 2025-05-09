@@ -1,4 +1,4 @@
 ::: flowpaths.minsetcover
     options:
       filters: 
-        - "!^__"
+        - "!^_"

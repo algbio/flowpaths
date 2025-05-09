@@ -7,4 +7,4 @@ Internally, these are handled via the class `NodeExpandedDiGraph`. See [this exa
 ::: flowpaths.nodeexpandeddigraph
     options:
       filters: 
-        - "!^__"
+        - "!^_"

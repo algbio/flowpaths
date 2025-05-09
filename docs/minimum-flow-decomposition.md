@@ -117,4 +117,4 @@ There are several works on this problem, for example.
 ::: flowpaths.minflowdecomp
     options:
       filters: 
-        - "!^__"
+        - "!^_"

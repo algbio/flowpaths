@@ -16,3 +16,6 @@ The class [MinFlowDecomp](minimum-flow-decomposition.md) uses this class interna
     Suppose that the number of paths of a minimum flow decomposition is $k^*$. If we ask for a decomposition with $k > k^*$ paths, this class will always return a decomposition with $k$ paths, but some paths might have weight 0.
 
 ::: flowpaths.kflowdecomp
+    options:
+      filters: 
+        - "!^_"

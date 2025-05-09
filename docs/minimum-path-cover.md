@@ -60,10 +60,10 @@ mpc_model_sc.solve()
 ::: flowpaths.minpathcover
     options:
       filters: 
-        - "!^__"
+        - "!^_"
         - "!^solve_time_elapsed"
 
 ::: flowpaths.kpathcover
     options:
       filters: 
-        - "!^__"
+        - "!^_"

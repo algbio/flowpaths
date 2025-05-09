@@ -55,4 +55,4 @@ flowchart LR
 ::: flowpaths.abstractpathmodeldag
     options:
       filters: 
-        - "!^__"
+        - "!^_"

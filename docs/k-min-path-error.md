@@ -57,3 +57,6 @@ This class implements a more general version, as follows:
 IEEE/ACM Transactions on Computational Biology and Bioinformatics 21(6), 1955-1964, 2024 [(preprint)](https://researchportal.helsinki.fi/files/325850154/TCBB3433523.pdf)
 
 ::: flowpaths.kminpatherror
+    options:
+      filters: 
+        - "!^_"
