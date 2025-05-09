@@ -15,3 +15,13 @@ def test_example(example_path):
     # Call main() if it exists
     if hasattr(module, "main"):
         module.main()
+
+def teardown_module(module):
+
+    # Look for pdf files in the current working directory.
+    cwd = pathlib.Path.cwd()
+    for pdf_file in cwd.glob("test_graph*.pdf"):
+        try:
+            pdf_file.unlink()
+        except Exception as e:
+            print(f"Failed to remove {pdf_file}: {e}")
