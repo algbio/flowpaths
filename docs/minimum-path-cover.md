@@ -8,8 +8,9 @@ The Minimum Path Cover problem on a directed **acyclic** graph (*DAG*) is define
 
 - **OUTPUT**: A minimum number $k$ of source-to-sink paths, $P_1,\dots,P_k$ such that every edge $e \in E$ appears in at least one $P_i$.
 
-!!! info "Note"
-    The graph may have more than one source or sink nodes. The solution paths are required to start in some source node, and end in some sink node.
+!!! success "Note"
+    - This class support also **covers of nodes**. Set the parameter `cover_type = "node"`. For details on how these are handled internally, see [Handling graphs with flows / weights on nodes](node-expanded-digraph.md).
+    - The graph may have more than one source or sink nodes, in which case the solution paths are just required to start in any source node, and end in any sink node.
 
 ## 2. Solving the problem
 

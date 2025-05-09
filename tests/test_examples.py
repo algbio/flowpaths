@@ -6,7 +6,7 @@ EXAMPLES_DIR = pathlib.Path(__file__).parent.parent / "examples"
 
 example_files = list(EXAMPLES_DIR.glob("**/*.py"))
 
-@pytest.mark.parametrize("example_path", example_files)
+@pytest.mark.parametrize("example_path", example_files, ids=lambda path: path.name)
 def test_example(example_path):
     spec = importlib.util.spec_from_file_location(example_path.stem, example_path)
     module = importlib.util.module_from_spec(spec)

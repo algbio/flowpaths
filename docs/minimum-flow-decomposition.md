@@ -1,7 +1,6 @@
 !!! info inline end "See also"
 
     - [k-Flow Decomposition](k-flow-decomposition.md)
-    - [Handling graphs with flows / weights on nodes](node-expanded-digraph.md)
 
 # Minimum Flow Decomposition
 
@@ -16,8 +15,9 @@ $$
 f(u,v) = \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i, ~~\forall (u,v) \in E.
 $$
 
-!!! info "Note"
-    The graph may have more than one source or sink nodes. The solution paths are required to start in some source node, and end in some sink node.
+!!! success "Note"
+    - This class support also graphs with **flow values on nodes**. Set the parameter `flow_attr_origin = "node"`. For details on how these are handled internally, see [Handling graphs with flows / weights on nodes](node-expanded-digraph.md).
+    - The graph may have more than one source or sink nodes, in which case the solution paths are just required to start in any source node, and end in any sink node.
 
 For example, the directed graph below satisfies the flow conservation property:
 ``` mermaid

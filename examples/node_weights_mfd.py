@@ -59,6 +59,17 @@ def example1():
     ne_mfd_model_edges.solve()
     process_expanded_solution(neGraph, ne_mfd_model_edges)
 
+    # We also use the built-in handling of node-weighted graphs, via the `flow_attr_origin` parameter
+    mfd_model_edges = fp.MinFlowDecomp(
+        graph, 
+        flow_attr="flow",
+        flow_attr_origin="node",
+        subpath_constraints=subpath_constraints_edges,
+        )
+    mfd_model_edges.solve()
+
+    assert(mfd_model_edges.get_objective_value() == ne_mfd_model_edges.get_objective_value())
+
 def example2():
 
     ##############

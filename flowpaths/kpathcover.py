@@ -1,4 +1,3 @@
-import time
 import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.utils.graphutils as gu
@@ -95,11 +94,11 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         self.cover_type = cover_type
         if self.cover_type == "node":
             # NodeExpandedDiGraph needs to have flow_attr on edges, otherwise it will add the edges to edges_to_ignore
-            graph_attr = deepcopy(G)
-            node_flow_attr = id(graph_attr) + "_flow_attr"
-            for node in graph_attr.nodes():
-                graph_attr.nodes[node][node_flow_attr] = 0 # any dummy value
-            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=node_flow_attr)
+            G_with_flow_attr = deepcopy(G)
+            node_flow_attr = id(G_with_flow_attr) + "_flow_attr"
+            for node in G_with_flow_attr.nodes():
+                G_with_flow_attr.nodes[node][node_flow_attr] = 0 # any dummy value
+            self.G_internal = nedg.NodeExpandedDiGraph(G_with_flow_attr, node_flow_attr=node_flow_attr)
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
             # If we have some nodes to ignore (via elements_to_ignore), we need to add them to the edges_to_ignore_internal

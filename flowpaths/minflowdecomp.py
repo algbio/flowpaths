@@ -56,6 +56,13 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             
             The attribute name from where to get the flow values on the edges.
 
+        - `flow_attr_origin : str`, optional
+
+            The origin of the flow attribute. Default is `"edge"`. Options:
+            
+            - `"edge"`: the flow attribute is assumed to be on the edges of the graph.
+            - `"node"`: the flow attribute is assumed to be on the nodes of the graph. See [the documentation](node-expanded-digraph.md) on how node-weighted graphs are handled.
+
         - `weight_type : type`, optional
             
             The type of weights (`int` or `float`). Default is `float`.
@@ -120,14 +127,14 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
         elif self.flow_attr_origin == "edge":
-            G_internal = G
+            self.G_internal = G
             subpath_constraints_internal = subpath_constraints
             edges_to_ignore_internal = edges_to_ignore
         else:
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
 
-        self.G = G_internal
+        self.G = self.G_internal
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = edges_to_ignore_internal
         

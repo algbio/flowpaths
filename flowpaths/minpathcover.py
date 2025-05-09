@@ -29,34 +29,41 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
 
         Parameters
         ----------
-        - `G : nx.DiGraph`
+        - `G: nx.DiGraph`
             
             The input directed acyclic graph, as networkx DiGraph.
 
-        - `subpath_constraints : list`, optional
+        - `cover_type: str`, optional
+
+            The elements of the graph to cover. Default is `"edge"`. Options:
+            
+            - `"edge"`: cover the edges of the graph. This is the default.
+            - `"node"`: cover the nodes of the graph.
+
+        - `subpath_constraints: list`, optional
             
             List of subpath constraints. Default is an empty list. 
             Each subpath constraint is a list of edges that must be covered by some solution path, according 
             to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
 
-        - `subpath_constraints_coverage : float`, optional
+        - `subpath_constraints_coverage: float`, optional
             
             Coverage fraction of the subpath constraints that must be covered by some solution paths. 
             
             Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `subpath_constraints_coverage_length : float`, optional
+        - `subpath_constraints_coverage_length: float`, optional
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
             `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `length_attr : str`, optional
+        - `length_attr: str`, optional
             
             Attribute name for edge lengths. Default is `None`.
 
-        - `elements_to_ignore : list`, optional
+        - `elements_to_ignore: list`, optional
 
             List of graph elements to ignore when adding constrains on flow explanation by the weighted paths.
             These elements are either edges or nodes, depending on the `cover_type` parameter.
@@ -70,11 +77,11 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
             
             List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
-        - `optimization_options : dict`, optional
+        - `optimization_options: dict`, optional
             
             Dictionary with the optimization options. Default is `None`. See [optimization options documentation](solver-options-optimizations.md).
 
-        - `solver_options : dict`, optional
+        - `solver_options: dict`, optional
             
             Dictionary with the solver options. Default is `None`. See [solver options documentation](solver-options-optimizations.md).
 
@@ -84,11 +91,11 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
         self.cover_type = cover_type
         if self.cover_type == "node":
             # NodeExpandedDiGraph needs to have flow_attr on edges, otherwise it will add the edges to edges_to_ignore
-            graph_attr = deepcopy(G)
-            node_flow_attr = id(graph_attr) + "_flow_attr"
-            for node in graph_attr.nodes():
-                graph_attr.nodes[node][node_flow_attr] = 0 # any dummy value
-            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=node_flow_attr)
+            G_with_flow_attr = deepcopy(G)
+            node_flow_attr = str(id(G_with_flow_attr)) + "_flow_attr"
+            for node in G_with_flow_attr.nodes():
+                G_with_flow_attr.nodes[node][node_flow_attr] = 0 # any dummy value
+            self.G_internal = nedg.NodeExpandedDiGraph(G_with_flow_attr, node_flow_attr=node_flow_attr)
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
             # If we have some nodes to ignore (via elements_to_ignore), we need to add them to the edges_to_ignore_internal

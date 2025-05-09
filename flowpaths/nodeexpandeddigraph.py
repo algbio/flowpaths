@@ -97,7 +97,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         # if not all(node_flow_attr in G.nodes[node] for node in G.nodes()):
         #     raise ValueError(f"Every node must have the flow attribute specified as `node_flow_attr` ({node_flow_attr}).")
 
-        self.original_G = nx.DiGraph(G)
+        self.original_G = deepcopy(G)
 
         if "id" in G.graph:
             self.graph["id"] = G.graph["id"]
@@ -388,11 +388,11 @@ class NodeExpandedDiGraph(nx.DiGraph):
         condensed_graph = deepcopy(self.original_G)
         for node in condensed_graph.nodes:
             expanded_edge = self.get_expanded_edge(node)
-            if self.node_flow_attr in self[expanded_edge]:
-                condensed_graph.nodes[node][self.node_flow_attr] = self[expanded_edge][self.node_flow_attr]
+            if self.node_flow_attr in self.edges[expanded_edge]:
+                condensed_graph.nodes[node][self.node_flow_attr] = self.edges[expanded_edge][self.node_flow_attr]
             if self.node_length_attr is not None:
-                if self.node_length_attr in self[expanded_edge]:
-                    condensed_graph.nodes[node][self.node_length_attr] = self[expanded_edge][self.node_length_attr]
+                if self.node_length_attr in self.edges[expanded_edge]:
+                    condensed_graph.nodes[node][self.node_length_attr] = self.edges[expanded_edge][self.node_length_attr]
                 
         return condensed_graph
     

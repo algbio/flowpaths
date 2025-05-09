@@ -19,6 +19,9 @@ $$
 \sum_{(u,v) \in E}\Big|f(u,v) - w(u,v)\Big|.
 $$
 
+!!! success "Note"
+    - This class support also graphs with **flow values on nodes**. Set the parameter `flow_attr_origin = "node"`. For details on how these are handled internally, see [Handling graphs with flows / weights on nodes](node-expanded-digraph.md).
+
 ## 2. Examples
 
 Let's consider the following weighted graph, whose weights do not satisfy flow conservation, because the edges shown in brown are erroneous.

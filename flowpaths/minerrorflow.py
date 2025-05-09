@@ -469,4 +469,16 @@ class MinErrorFlow():
         """
         solution = self.get_solution()
         return solution["graph"]
+    
+
+    def get_objective_value(self):
+        """
+        Returns the sum of the errors of the optimum solution.
+        
+        !!! warning "Warning"
+            Call the `solve` method first.
+        """
+
+        solution = self.get_solution()
+        return solution["error"]
         

@@ -36,12 +36,12 @@ def run_with_timeout(timeout, func):
         process.close()  # Clean up the process
 
 def my_function():
-    time.sleep(5)
+    time.sleep(2)
     print("Sleep completed")
 
 def main():
-    run_with_timeout(3, my_function)  # Expected to timeout on Unix systems
-    run_with_timeout(6, my_function)  # Expected to complete successfully
+    run_with_timeout(1, my_function)  # Expected to timeout on Unix systems
+    run_with_timeout(3, my_function)  # Expected to complete successfully
 
 if __name__ == '__main__':
     main()

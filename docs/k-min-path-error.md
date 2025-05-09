@@ -25,6 +25,10 @@ $$
 \rho_1 + \cdots + \rho_k.
 $$
 
+!!! success "Note"
+    - This class support also graphs with **flow values on nodes**. Set the parameter `flow_attr_origin = "node"`. For details on how these are handled internally, see [Handling graphs with flows / weights on nodes](node-expanded-digraph.md).
+    - The graph may have more than one source or sink nodes, in which case the solution paths are just required to start in any source node, and end in any sink node.
+
 ## 2. Generalizations
 
 This class implements a more general version, as follows:
