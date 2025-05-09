@@ -27,16 +27,16 @@ class AbstractPathModelDAG(ABC):
         - These variables are created only if `encode_edge_position` is set to `True`
         - Note that positions are relative to the globals source `s` of the stDiGraph, thus the first edge in a path is 
         the edge from `s` to the first vertex in the original graph, and this first edge has position 0
-        - If you set `edge_length_attr`, then the positions are relative to the edge lengths, and not the number of edges
+        - If you set `length_attr`, then the positions are relative to the edge lengths, and not the number of edges
         The first edge still gets position 0, and other edges get positions equal to the sum of the lengths of the edges before them in the path
-        - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
+        - If you set `length_attr`, and an edge has missing edge length, then it gets length 1
 
     - **path_length_vars**: `path_length_vars[(i)]` = length of path `i`
 
         - These variables are created only if `encode_path_length` is set to `True`
         - Note that the length of a path is the sum of the lengths of the edges in the path
-        - If you set `edge_length_attr`, then the lengths are the sum of the lengths of the edges in the path
-        - If you set `edge_length_attr`, and an edge has missing edge length, then it gets length 1
+        - If you set `length_attr`, then the lengths are the sum of the lengths of the edges in the path
+        - If you set `length_attr`, and an edge has missing edge length, then it gets length 1
         - **NOTE**: the length also includes the edges from global source to the first vertex, and from the last vertex to the global sink. By default, these do not have a length attached, so each gets length 1.
         
     - **solver**: a solver object to solve the (M)ILP, implemented using our [SolverWrapper](solver-wrapper.md) class.
@@ -67,7 +67,7 @@ class AbstractPathModelDAG(ABC):
         subpath_constraints_coverage_length: float = None,
         encode_edge_position: bool = False,
         encode_path_length: bool = False,
-        edge_length_attr: str = None,
+        length_attr: str = None,
         optimization_options: dict = None,
         solver_options: dict = {},
         solve_statistics: dict = {},
@@ -100,7 +100,7 @@ class AbstractPathModelDAG(ABC):
             
             Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of length of the subpath. Defaults to `None`, meaning that this is not imposed. 
             - If you set this constraint, you cannot set `subpath_constraints_coverage` (and its default value of 1 will be ignored).
-            - If you set this constraint, you also need to set `edge_length_attr`. If an edge has missing edge length, it gets length 1.
+            - If you set this constraint, you also need to set `length_attr`. If an edge has missing edge length, it gets length 1.
 
         - `encode_edge_position: bool`, optional
         
@@ -108,13 +108,13 @@ class AbstractPathModelDAG(ABC):
 
         - `encode_path_length: bool`, optional
             
-            Whether to encode the length of the paths (in terms of number of edges, or sum of lengths of edges, if set via `edge_length_attr`). Defaults to `False`.
+            Whether to encode the length of the paths (in terms of number of edges, or sum of lengths of edges, if set via `length_attr`). Defaults to `False`.
 
-        - `edge_length_attr: str`, optional
+        - `length_attr: str`, optional
             
             The attribute name from where to get the edge lengths. Defaults to `None`.
             
-            - If set, then the edge positions, or path lengths (above) are in terms of the edge lengths specified in the `edge_length_attr` field of each edge
+            - If set, then the edge positions, or path lengths (above) are in terms of the edge lengths specified in the `length_attr` field of each edge
             - If set, and an edge has a missing edge length, then it gets length 1.
         
         - `optimization_options: dict`, optional 
@@ -159,7 +159,7 @@ class AbstractPathModelDAG(ABC):
         self.G = G
         self.id = self.G.id
         self.k = k
-        self.edge_length_attr = edge_length_attr
+        self.length_attr = length_attr
         
         self.subpath_constraints = copy.deepcopy(subpath_constraints)
         if self.subpath_constraints is not None:
@@ -176,9 +176,9 @@ class AbstractPathModelDAG(ABC):
                 if self.subpath_constraints_coverage_length <= 0 or self.subpath_constraints_coverage_length > 1:
                     utils.logger.error(f"{__name__}: subpath_constraints_coverage_length must be in the range (0, 1]")
                     raise ValueError("If set, subpath_constraints_coverage_length must be in the range (0, 1]")
-                if self.edge_length_attr is None:
-                    utils.logger.error(f"{__name__}: If subpath_constraints_coverage_length is set, edge_length_attr must be provided.")
-                    raise ValueError("If subpath_constraints_coverage_length is set, edge_length_attr must be provided.")
+                if self.length_attr is None:
+                    utils.logger.error(f"{__name__}: If subpath_constraints_coverage_length is set, length_attr must be provided.")
+                    raise ValueError("If subpath_constraints_coverage_length is set, length_attr must be provided.")
                 if self.subpath_constraints_coverage < 1:
                     utils.logger.error(f"{__name__}: If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
                     raise ValueError("If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
@@ -382,11 +382,11 @@ class AbstractPathModelDAG(ABC):
                         # If however we specified that the coverage fraction is in terms of edge lengths
                         # Then the constraints length is the sum of the lengths of the edges,
                         # where each edge without a length gets length 1
-                        constraint_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in self.subpath_constraints[j])
+                        constraint_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.subpath_constraints[j])
                         # And the fraction of edges that we need to cover is self.subpath_constraints_coverage_length
                         coverage_fraction = self.subpath_constraints_coverage_length
                         self.solver.add_constraint(
-                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.edge_length_attr, 1) for e in self.subpath_constraints[j])
+                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.length_attr, 1) for e in self.subpath_constraints[j])
                             >= constraint_length * coverage_fraction
                             * self.subpaths_vars[(i, j)],
                             name=f"7a_i={i}_j={j}",
@@ -407,8 +407,8 @@ class AbstractPathModelDAG(ABC):
         # of the edge (u, v) in the path i, starting from position 0. 
         if self.encode_edge_position:
             max_length = self.G.number_of_nodes()
-            if self.edge_length_attr is not None:
-                max_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in self.G.edges())
+            if self.length_attr is not None:
+                max_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.G.edges())
             self.edge_position_vars = self.solver.add_variables(
                 self.edge_indexes, name_prefix="position", lb=0, ub=max_length, var_type="integer"
             )
@@ -418,7 +418,7 @@ class AbstractPathModelDAG(ABC):
                         self.edge_position_vars[(u, v, i)] 
                             == self.solver.quicksum(
                                 self.edge_vars[(edge[0], edge[1], i)] 
-                                * self.G[edge[0]][edge[1]].get(self.edge_length_attr, 1) 
+                                * self.G[edge[0]][edge[1]].get(self.length_attr, 1) 
                                 for edge in self.G.reachable_edges_rev_from[u]
                                 ),
                         name=f"position_u={u}_v={v}_i={i}"
@@ -427,8 +427,8 @@ class AbstractPathModelDAG(ABC):
         # path_length_vars[(i)] = length of path i
         if self.encode_edge_position:
             max_length = self.G.number_of_nodes()
-            if self.edge_length_attr is not None:
-                max_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in self.G.edges())
+            if self.length_attr is not None:
+                max_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.G.edges())
             self.path_length_vars = self.solver.add_variables(
                 self.path_indexes, name_prefix="path_length", lb=0, ub=max_length, var_type="integer"
             )
@@ -437,7 +437,7 @@ class AbstractPathModelDAG(ABC):
                     self.path_length_vars[(i)] 
                         == self.solver.quicksum(
                             self.edge_vars[(edge[0], edge[1], i)] 
-                            * self.G[edge[0]][edge[1]].get(self.edge_length_attr, 1) 
+                            * self.G[edge[0]][edge[1]].get(self.length_attr, 1) 
                             for edge in self.G.edges()
                             ),
                     name=f"path_length_constr_i={i}"
@@ -699,7 +699,7 @@ class AbstractPathModelDAG(ABC):
             for (u,v) in zip(path_temp[:-1], path_temp[1:]):
                 if round(edge_position_sol[(str(u), str(v), path_index)]) != current_edge_position:
                     return False
-                current_edge_position += self.G[u][v].get(self.edge_length_attr, 1)
+                current_edge_position += self.G[u][v].get(self.length_attr, 1)
         return True
     
     def verify_path_length(self):
@@ -718,7 +718,7 @@ class AbstractPathModelDAG(ABC):
                 path_temp = [self.G.source] + path + [self.G.sink]            
                 path_length = 0
                 for (u,v) in zip(path_temp[:-1], path_temp[1:]):
-                    path_length += self.G[u][v].get(self.edge_length_attr, 1)   
+                    path_length += self.G[u][v].get(self.length_attr, 1)   
 
                 if round(path_length_sol[(path_index)]) != path_length:
                     return False

@@ -5,17 +5,22 @@ import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.safetyflowdecomp as sfd
 import flowpaths.utils as utils
+import flowpaths.nodeexpandeddigraph as nedg
+from copy import deepcopy
 
 class kPathCover(pathmodel.AbstractPathModelDAG):
     def __init__(
         self,
         G: nx.DiGraph,
         k: int,
+        cover_type: str = "edge",
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
-        edge_length_attr: str = None,
-        edges_to_ignore: list = [],
+        length_attr: str = None,
+        elements_to_ignore: list = [],
+        additional_starts: list = [],
+        additional_ends: list = [],
         optimization_options: dict = {},
         solver_options: dict = {},
     ):
@@ -31,6 +36,13 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         - `k: int`
             
             The number of paths to decompose in.
+
+        - `cover_type : str`, optional
+
+            The elements of the graph to cover. Default is `"edge"`. Options:
+            
+            - `"edge"`: cover the edges of the graph. This is the default.
+            - `"node"`: cover the nodes of the graph.
 
         - `subpath_constraints : list`, optional
             
@@ -48,17 +60,26 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
-            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `edge_length_attr : str`, optional
+        - `length_attr : str`, optional
             
             Attribute name for edge lengths. Default is `None`.
 
-        - `edges_to_ignore : list`, optional
+        - `elements_to_ignore : list`, optional
 
-            List of edges to ignore when adding constrains on flow explanation by the weighted paths.
+            List of graph elements to ignore when adding constrains on flow explanation by the weighted paths.
+            These elements are either edges or nodes, depending on the `cover_type` parameter.
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
+
+        - `additional_starts: list`, optional
+            
+            List of additional start nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
+
+        - `additional_ends: list`, optional
+            
+            List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `optimization_options : dict`, optional
             
@@ -70,20 +91,55 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
 
         """
 
-        self.G = stdigraph.stDiGraph(G)
-        self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore)
+        # Handling node-weighted graphs
+        self.cover_type = cover_type
+        if self.cover_type == "node":
+            # NodeExpandedDiGraph needs to have flow_attr on edges, otherwise it will add the edges to edges_to_ignore
+            graph_attr = deepcopy(G)
+            node_flow_attr = id(graph_attr) + "_flow_attr"
+            for node in graph_attr.nodes():
+                graph_attr.nodes[node][node_flow_attr] = 0 # any dummy value
+            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=node_flow_attr)
+            subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+            # If we have some nodes to ignore (via elements_to_ignore), we need to add them to the edges_to_ignore_internal
+            
+            if not all(isinstance(node, str) for node in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
+            edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
+            
+            additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
+            additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
+        elif self.cover_type == "edge":
+            self.G_internal = G
+            subpath_constraints_internal = subpath_constraints
+            
+            if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of edges, i.e. tuples of nodes, not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of edges, i.e. tuples of nodes, not {elements_to_ignore}")
+            edges_to_ignore_internal = elements_to_ignore
+
+            additional_starts_internal = additional_starts
+            additional_ends_internal = additional_ends
+        else:
+            utils.logger.error(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
+            raise ValueError(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
+
+        self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+        self.subpath_constraints = subpath_constraints_internal
+        self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 
         self.k = k
-        self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        self.edge_length_attr = edge_length_attr
+        self.length_attr = length_attr
 
         self.__solution = None
         self.__lowerbound_k = None
         
         self.solve_statistics = {}
-        self.optimization_options = optimization_options
+        self.optimization_options = optimization_options.copy() if optimization_options else {}
         self.optimization_options["trusted_edges_for_safety"] = set(e for e in self.G.edges() if e not in self.edges_to_ignore)
 
         # Call the constructor of the parent class AbstractPathModelDAG
@@ -93,7 +149,7 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-            edge_length_attr=self.edge_length_attr, 
+            length_attr=self.length_attr, 
             optimization_options=self.optimization_options,
             solver_options=solver_options,
             solve_statistics=self.solve_statistics,
@@ -147,13 +203,20 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
 
         if self.__solution is None:
             self.check_is_solved()
-            self.__solution = {
-                "paths": self.get_solution_paths(),
-            }
-
+            
+            if self.cover_type == "edge":
+                self.__solution = {
+                    "paths": self.get_solution_paths(),
+                }
+            elif self.cover_type == "node":
+                self.__solution = {
+                    "_paths_internal": self.get_solution_paths(),
+                    "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
+                }
+            
         return self.__solution
 
-    def is_valid_solution(self, tolerance=0.001):
+    def is_valid_solution(self):
         """
         Checks if the solution is valid, meaning it covers all required edges.
 
@@ -174,7 +237,7 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
             utils.logger.error(f"{__name__}: Solution is not available. Call get_solution() first.")
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_paths = self.__solution["paths"]
+        solution_paths = self.__solution.get("_paths_internal", self.__solution["paths"])
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
@@ -183,7 +246,8 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         covered_by_paths = {(u, v): 0 for (u, v) in self.G.edges()}
         for path in solution_paths_of_edges:
             for e in path:
-                covered_by_paths[e] += 1
+                if e in covered_by_paths:
+                    covered_by_paths[e] += 1
 
         for u, v in self.G.edges():
             if (u,v) not in self.edges_to_ignore:

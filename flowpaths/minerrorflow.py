@@ -1,6 +1,7 @@
 import flowpaths.utils.solverwrapper as sw
 import flowpaths.stdigraph as stdigraph
 import flowpaths.utils as utils
+import flowpaths.nodeexpandeddigraph as nedg
 import networkx as nx
 from copy import deepcopy
 import time
@@ -10,6 +11,7 @@ class MinErrorFlow():
             self, 
             G: nx.DiGraph,
             flow_attr: str,
+            flow_attr_origin: str = "edge",
             weight_type: type = float,
             sparsity_lambda: float = 0,
             few_flow_values_epsilon: float = None,
@@ -35,6 +37,13 @@ class MinErrorFlow():
         - `flow_attr: str`
 
             The name of the attribute in the edges of the graph that contains the weight of the edge.
+
+        - `flow_attr_origin : str`, optional
+
+            The origin of the flow attribute. Default is `"edge"`. Options:
+            
+            - `"edge"`: the flow attribute is assumed to be on the edges of the graph.
+            - `"node"`: the flow attribute is assumed to be on the nodes of the graph. See [the documentation](node-expanded-digraph.md) on how node-weighted graphs are handled.
 
         - `weight_type: type`, optional
 
@@ -80,17 +89,33 @@ class MinErrorFlow():
             A dictionary containing the options for the solver. The options are passed to the solver wrapper. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
         """
         
-        self.original_graph_copy = deepcopy(G)
+        # Handling node-weighted graphs
+        self.flow_attr_origin = flow_attr_origin
+        if self.flow_attr_origin == "node":
+            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr)
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+            additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
+            additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
+        elif self.flow_attr_origin == "edge":
+            self.G_internal = G
+            edges_to_ignore_internal = edges_to_ignore
+            additional_starts_internal = additional_starts
+            additional_ends_internal = additional_ends
+        else:
+            utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+            raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+
+        self.original_graph_copy = deepcopy(self.G_internal)
         self.sparsity_lambda = sparsity_lambda
         
-        if nx.is_directed_acyclic_graph(G):
+        if nx.is_directed_acyclic_graph(self.G_internal):
             self.is_acyclic = True
-            self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
-            self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
+            self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+            self.edges_to_ignore = set(edges_to_ignore_internal).union(self.G.source_sink_edges)
         else:
-            self.G = G
+            self.G = self.G_internal
             self.is_acyclic = False
-            self.edges_to_ignore = set(edges_to_ignore)
+            self.edges_to_ignore = set(edges_to_ignore_internal)
             if self.sparsity_lambda != 0:
                 utils.logger.error(f"{__name__}: You cannot set sparsity_lambda != 0 for a graph with cycles.")
                 raise ValueError(f"You cannot set sparsity_lambda != 0 for a graph with cycles.")
@@ -420,11 +445,18 @@ class MinErrorFlow():
             if self.flow_attr in corrected_graph[u][v]:
                 corrected_graph[u][v][self.flow_attr] = self.edge_sol[(u, v)]
 
-        self.__solution = {
-            "graph": corrected_graph,
-            "error": error,
-            "objective_value": self.solver.get_objective_value(),
-        }
+        if self.flow_attr_origin == "edge":
+            self.__solution = {
+                "graph": corrected_graph,
+                "error": error,
+                "objective_value": self.solver.get_objective_value(),
+            }
+        elif self.flow_attr_origin == "node":
+            self.__solution = {
+                "graph": corrected_graph.get_condensed_graph(),
+                "error": error,
+                "objective_value": self.solver.get_objective_value(),
+            }
         
         return self.__solution  
     

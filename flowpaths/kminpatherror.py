@@ -2,6 +2,7 @@ import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils as utils
+import flowpaths.nodeexpandeddigraph as nedg
 import copy
 
 
@@ -22,11 +23,12 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         G: nx.DiGraph,
         flow_attr: str,
         k: int,
+        flow_attr_origin: str = "edge",
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
-        edge_length_attr: str = None,
+        length_attr: str = None,
         edges_to_ignore: list = [],
         edge_error_scaling: dict = {},
         path_length_ranges: list = [],
@@ -57,6 +59,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             !!! note "Unknown $k$"
                 If you do not have a good guess for $k$, you can pass `k=None` and the model will set $k$ to the edge width of the graph.
 
+        - `flow_attr_origin : str`, optional
+
+            The origin of the flow attribute. Default is `"edge"`. Options:
+            
+            - `"edge"`: the flow attribute is assumed to be on the edges of the graph.
+            - `"node"`: the flow attribute is assumed to be on the nodes of the graph. See [the documentation](node-expanded-digraph.md) on how node-weighted graphs are handled.
+
         - `weight_type: int | float`, optional
             
             The type of the weights and slacks (`int` or `float`). Default is `float`.
@@ -77,10 +86,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
-            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`, see below) needs to appear in some solution path.
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`, see below) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `edge_length_attr: str`, optional
+        - `length_attr: str`, optional
 
             The attribute name from where to get the edge lengths. Default is `None`.
 
@@ -146,23 +155,42 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             - If `path_length_factors` is not empty and `weight_type` is float.
             - If the number of path length ranges is not equal to the number of error scale factors.
             - If the edge error scaling factor is not between 0 and 1.
-            - If the graph contains edges with negative (<0) flow values.            
+            - If the graph contains edges with negative (<0) flow values.  
+            - ValueError: If `flow_attr_origin` is not "node" or "edge".          
         """
 
-        self.G = stdigraph.stDiGraph(G, additional_starts=additional_starts, additional_ends=additional_ends)
+        # Handling node-weighted graphs
+        self.flow_attr_origin = flow_attr_origin
+        if self.flow_attr_origin == "node":
+            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr)
+            subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+            additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
+            additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
+        elif self.flow_attr_origin == "edge":
+            self.G_internal = G
+            subpath_constraints_internal = subpath_constraints
+            edges_to_ignore_internal = edges_to_ignore
+            additional_starts_internal = additional_starts
+            additional_ends_internal = additional_ends
+        else:
+            utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+            raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+
+        self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+        self.subpath_constraints = subpath_constraints_internal
+        self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 
         if weight_type not in [int, float]:
             utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
-        self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        self.edge_length_attr = edge_length_attr
+        self.length_attr = length_attr
         self.edge_error_scaling = edge_error_scaling
 
-        self.edges_to_ignore = set(edges_to_ignore).union(self.G.source_sink_edges)
         # Checking that every entry in self.edge_error_scaling is between 0 and 1
         for key, value in self.edge_error_scaling.items():
             if value < 0 or value > 1:
@@ -229,7 +257,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-            edge_length_attr=self.edge_length_attr,
+            length_attr=self.length_attr,
             encode_edge_position=True,
             encode_path_length=True,
             optimization_options=self.optimization_options,
@@ -508,11 +536,19 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             for i in range(self.k)
         ]
 
-        self.__solution = {
-            "paths": self.get_solution_paths(),
-            "weights": self.path_weights_sol,
-            "slacks": self.path_slacks_sol
-        }
+        if self.flow_attr_origin == "edge":
+            self.__solution = {
+                "paths": self.get_solution_paths(),
+                "weights": self.path_weights_sol,
+                "slacks": self.path_slacks_sol
+                }
+        elif self.flow_attr_origin == "node":
+            self.__solution = {
+                "_paths_internal": self.get_solution_paths(),
+                "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
+                "weights": self.path_weights_sol,
+                "slacks": self.path_slacks_sol
+                }
 
         if len(self.path_length_factors) > 0:
             slacks_scaled_sol_dict = self.solver.get_variable_values("scaled_slack", index_types=[int])
@@ -547,26 +583,35 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         if self.__solution is None:
             self.get_solution()
 
-        solution_paths = self.__solution["paths"]
+        if tolerance < 0:
+            utils.logger.error(f"{__name__}: tolerance must be non-negative, not {tolerance}")
+            raise ValueError(f"tolerance must be non-negative, not {tolerance}")
+
+        solution_paths = self.__solution.get("_paths_internal", self.__solution["paths"])
         solution_weights = self.__solution["weights"]
         solution_slacks = self.__solution["slacks"]
         if len(self.path_length_factors) > 0:
             solution_slacks = self.__solution["scaled_slacks"]
+        for path in solution_paths:
+            if len(path) == 1:
+                utils.logger.error(f"{__name__}: Encountered a solution path with length 1, which is not allowed.")
+                raise ValueError("Solution path with length 1 encountered.")
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
         ]
 
-        weight_from_paths = {(u, v): 0 for (u, v) in self.G.edges()}
-        slack_from_paths = {(u, v): 0 for (u, v) in self.G.edges()}
+        weight_from_paths = {e: 0 for e in self.G.edges()}
+        slack_from_paths = {e: 0 for e in self.G.edges()}
         num_paths_on_edges = {e: 0 for e in self.G.edges()}
         for weight, slack, path in zip(
             solution_weights, solution_slacks, solution_paths_of_edges
         ):
             for e in path:
-                weight_from_paths[e] += weight
-                slack_from_paths[e] += slack
-                num_paths_on_edges[e] += 1
+                if e in weight_from_paths:
+                    weight_from_paths[e] += weight
+                    slack_from_paths[e] += slack
+                    num_paths_on_edges[e] += 1
 
         for u, v, data in self.G.edges(data=True):
             if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
@@ -574,18 +619,17 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                     abs(data[self.flow_attr] - weight_from_paths[(u, v)])
                     > tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
                 ):
-                    # print(self.solution)
-                    # print("num_paths_on_edges[(u, v)]", num_paths_on_edges[(u, v)])
-                    # print("slack_from_paths[(u, v)]", slack_from_paths[(u, v)])
-                    # print("data[self.flow_attr] = ", data[self.flow_attr])
-                    # print(f"weight_from_paths[({u}, {v})]) = ", weight_from_paths[(u, v)])
-                    # print("> ", tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)])
+                    utils.logger.debug(f"{__name__}: Solution: {self.__solution}")
+                    utils.logger.debug(f"{__name__}: num_paths_on_edges[(u, v)] = {num_paths_on_edges[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: slack_from_paths[(u, v)] = {slack_from_paths[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: data[self.flow_attr] = {data[self.flow_attr]}")
+                    utils.logger.debug(f"{__name__}: weight_from_paths[(u, v)] = {weight_from_paths[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: > {tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]}")
+                    
+                    var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(), self.solver.get_all_variable_values())}
+                    utils.logger.debug(f"{__name__}: Variable dictionary: {var_dict}")
 
-                    # var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
-                    # print(var_dict)
-
-                    # return False
-                    pass
+                    return False
 
         if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
             utils.logger.info(f"{__name__}: self.get_objective_value() = {self.get_objective_value()} self.solver.get_objective_value() = {self.solver.get_objective_value()}")
@@ -604,10 +648,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 for index, interval in enumerate(self.path_length_ranges):
                     if path_length_sol[i] >= interval[0] and path_length_sol[i] <= interval[1]:
                         if abs(path_slack_scaled_sol[i] - self.path_length_factors[index]) > tolerance:
-                            print("path_length_sol", path_length_sol)
-                            print("slack_sol", slack_sol)
-                            print("path_slack_scaled_sol", path_slack_scaled_sol)
-                            print("scaled_slack_sol", scaled_slack_sol)
+                            utils.logger.debug(f"{__name__}: path_length_sol: {path_length_sol}")
+                            utils.logger.debug(f"{__name__}: slack_sol: {slack_sol}")
+                            utils.logger.debug(f"{__name__}: path_slack_scaled_sol: {path_slack_scaled_sol}")
+                            utils.logger.debug(f"{__name__}: scaled_slack_sol: {scaled_slack_sol}")
 
                             return False
 

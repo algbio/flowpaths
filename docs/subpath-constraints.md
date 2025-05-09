@@ -154,13 +154,13 @@ graph2.add_edge("c", "t", flow=7, length=15) #
 graph2.add_edge("d", "t", flow=6, length=1)
 ```
 
-When initializing the solver, we pass `edge_length_attr="length"` so that the solver knows from which edge attribute to get the lengths, and set the parameter `subpath_constraints_coverage_length` to say 0.6. The constraint has total length 1+20+15 = 36, and the length coverage fraction requires that 0.6 * 36 = 6 of the subpath length be covered by some solution path. This means that covering the edge `("s", "a")` alone is not enough to satisfy the constraint, as it could cover only length 1.
+When initializing the solver, we pass `length_attr="length"` so that the solver knows from which edge attribute to get the lengths, and set the parameter `subpath_constraints_coverage_length` to say 0.6. The constraint has total length 1+20+15 = 36, and the length coverage fraction requires that 0.6 * 36 = 6 of the subpath length be covered by some solution path. This means that covering the edge `("s", "a")` alone is not enough to satisfy the constraint, as it could cover only length 1.
 
 ``` python
 mfd_model = fp.MinFlowDecomp(
     graph2, 
     flow_attr="flow", 
-    edge_length_attr="length", 
+    length_attr="length", 
     subpath_constraints=[[("s", "a"),("a", "c"),("c","t")]], 
     subpath_constraints_coverage_length=0.6
     )

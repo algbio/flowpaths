@@ -1,6 +1,7 @@
 import networkx as nx
 from flowpaths.utils import graphutils as gu
 import flowpaths.utils as utils
+from copy import deepcopy
 
 class NodeExpandedDiGraph(nx.DiGraph):
     
@@ -102,6 +103,8 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self.graph["id"] = G.graph["id"]
             
         self.node_flow_attr = node_flow_attr
+        self.node_length_attr = node_length_attr
+
         self.__edges_to_ignore = []
 
         for node in G.nodes:
@@ -110,13 +113,13 @@ class NodeExpandedDiGraph(nx.DiGraph):
             self.add_node(node0, **G.nodes[node])
             self.add_node(node1, **G.nodes[node])
             self.add_edge(node0, node1, **G.nodes[node])
-            if node_flow_attr in G.nodes[node]:
-                self[node0][node1][node_flow_attr] = G.nodes[node][node_flow_attr]
+            if self.node_flow_attr in G.nodes[node]:
+                self[node0][node1][self.node_flow_attr] = G.nodes[node][self.node_flow_attr]
             else:
                 self.__edges_to_ignore.append((node0, node1))
-            if node_length_attr is not None:
-                if node_length_attr in G.nodes[node]:
-                    self[node0][node1][node_length_attr] = G.nodes[node][node_length_attr]
+            if self.node_length_attr is not None:
+                if self.node_length_attr in G.nodes[node]:
+                    self[node0][node1][self.node_length_attr] = G.nodes[node][self.node_length_attr]
 
             # Adding in-coming edges
             for pred in G.predecessors(node):
@@ -125,9 +128,9 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 self.__edges_to_ignore.append((pred1, node0))
                 
                 # If the edge (pred,node) does not have the length attribute, set it to 0
-                if node_length_attr is not None:
-                    if node_length_attr not in G.edges[pred, node]:
-                        self[pred1][node0][node_length_attr] = 0
+                if self.node_length_attr is not None:
+                    if self.node_length_attr not in G.edges[pred, node]:
+                        self[pred1][node0][self.node_length_attr] = 0
 
             # Adding out-going edges
             for succ in G.successors(node):
@@ -200,6 +203,14 @@ class NodeExpandedDiGraph(nx.DiGraph):
         for every node must considered in the decomposition model, with flow value from the node attribute `node_flow_attr`.
         """
         return self.__edges_to_ignore
+    
+    def get_expanded_additional_starts(self, additional_starts):
+        
+        return [self.get_expanded_edge(node)[0] for node in additional_starts]
+    
+    def get_expanded_additional_ends(self, additional_ends):
+        
+        return [self.get_expanded_edge(node)[1] for node in additional_ends]
     
     def get_expanded_subpath_constraints(self, subpath_constraints):
         """
@@ -365,17 +376,23 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 condensed_path.append(node)
             condensed_paths.append(condensed_path)
         return condensed_paths
+    
+    def get_condensed_graph(self):
+        """
+        Return a condensed version of the expanded graph, by mapping the node attributes `self.node_flow_attr` and `self.node_length_attr` 
+        from expanded edges back to the corresponding nodes of the original graph.
 
-if __name__ == "__main__":
-    G = NodeExpandedDiGraph()
-    G.add_node(1, flow=10)
-    G.add_node(2, flow=20)
-    G.add_edge(1, 2)
-    print(G.nodes[1])
-    print(G.nodes[2])
-    print(G.edges[1, 2])
+        This is useful when creating an expanded graph by some means, or correcting the flow values of an expanded graph, and then condensing this graph.
+        """
 
-    # Output:
-    # {'flow': 10}
-    # {'flow': 20}
-    # {}
+        condensed_graph = deepcopy(self.original_G)
+        for node in condensed_graph.nodes:
+            expanded_edge = self.get_expanded_edge(node)
+            if self.node_flow_attr in self[expanded_edge]:
+                condensed_graph.nodes[node][self.node_flow_attr] = self[expanded_edge][self.node_flow_attr]
+            if self.node_length_attr is not None:
+                if self.node_length_attr in self[expanded_edge]:
+                    condensed_graph.nodes[node][self.node_length_attr] = self[expanded_edge][self.node_length_attr]
+                
+        return condensed_graph
+    

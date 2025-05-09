@@ -6,16 +6,21 @@ import flowpaths.utils as utils
 import flowpaths.utils.solverwrapper as sw
 import flowpaths.stdigraph as stdigraph
 import flowpaths.kpathcover as kpathcover
+import flowpaths.nodeexpandeddigraph as nedg
+from copy import deepcopy
 
 class MinPathCover(pathmodel.AbstractPathModelDAG):
     def __init__(
         self,
         G: nx.DiGraph,
+        cover_type: str = "edge",
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
-        edge_length_attr: str = None,
-        edges_to_ignore: list = [],
+        length_attr: str = None,
+        elements_to_ignore: list = [],
+        additional_starts: list = [],
+        additional_ends: list = [],
         optimization_options: dict = {},
         solver_options: dict = {},
     ):
@@ -44,17 +49,26 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
-            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `edge_length_attr : str`, optional
+        - `length_attr : str`, optional
             
             Attribute name for edge lengths. Default is `None`.
 
-        - `edges_to_ignore : list`, optional
+        - `elements_to_ignore : list`, optional
 
-            List of edges to ignore when adding constrains on flow explanation by the weighted paths.
+            List of graph elements to ignore when adding constrains on flow explanation by the weighted paths.
+            These elements are either edges or nodes, depending on the `cover_type` parameter.
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
+
+        - `additional_starts: list`, optional
+            
+            List of additional start nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
+
+        - `additional_ends: list`, optional
+            
+            List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `optimization_options : dict`, optional
             
@@ -66,14 +80,51 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
 
         """
 
-        self.G = G
+        # Handling node-weighted graphs
+        self.cover_type = cover_type
+        if self.cover_type == "node":
+            # NodeExpandedDiGraph needs to have flow_attr on edges, otherwise it will add the edges to edges_to_ignore
+            graph_attr = deepcopy(G)
+            node_flow_attr = id(graph_attr) + "_flow_attr"
+            for node in graph_attr.nodes():
+                graph_attr.nodes[node][node_flow_attr] = 0 # any dummy value
+            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=node_flow_attr)
+            subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+            # If we have some nodes to ignore (via elements_to_ignore), we need to add them to the edges_to_ignore_internal
+            
+            if not all(isinstance(node, str) for node in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
+            edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
+            
+            additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
+            additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
+        elif self.cover_type == "edge":
+            self.G_internal = G
+            subpath_constraints_internal = subpath_constraints
+            
+            if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of edges, i.e. tuples of nodes, not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of edges, i.e. tuples of nodes, not {elements_to_ignore}")
+            edges_to_ignore_internal = elements_to_ignore
 
-        self.subpath_constraints = subpath_constraints
+            additional_starts_internal = additional_starts
+            additional_ends_internal = additional_ends
+        else:
+            utils.logger.error(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
+            raise ValueError(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
+
+        self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+        self.subpath_constraints = subpath_constraints_internal
+        self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
+
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        self.edge_length_attr = edge_length_attr
-        self.edges_to_ignore = edges_to_ignore
+        self.length_attr = length_attr
         
+        self.additional_starts = additional_starts
+        self.additional_ends = additional_ends
 
         self.__solution = None
         self.__lowerbound_k = None
@@ -105,8 +156,10 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
                         subpath_constraints=self.subpath_constraints,
                         subpath_constraints_coverage=self.subpath_constraints_coverage,
                         subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-                        edge_length_attr=self.edge_length_attr,
-                        edges_to_ignore=self.edges_to_ignore,
+                        length_attr=self.length_attr,
+                        elements_to_ignore=self.edges_to_ignore,
+                        additional_starts=self.additional_starts,
+                        additional_ends=self.additional_ends,
                         optimization_options=self.optimization_options,
                         solver_options=i_solver_options,
                     )

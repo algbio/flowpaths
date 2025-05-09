@@ -90,14 +90,14 @@ def example2():
 
     # We solve the problem on the node expanded graph
     # We also set the subpath constraint coverage to 0.7 in terms of length, because we pass
-    # `edge_length_attr="length"`. This means that only 70% of the length of the edges in the constraint need to be covered by some solution path
+    # `length_attr="length"`. This means that only 70% of the length of the edges in the constraint need to be covered by some solution path
     ne_mfd_model_edges = fp.MinFlowDecomp(
         neGraph, 
         flow_attr="flow",
         edges_to_ignore=neGraph.edges_to_ignore,
         subpath_constraints=ne_subpath_constraints_edges,
         subpath_constraints_coverage_length=0.7,
-        edge_length_attr="length",
+        length_attr="length",
         )
 
     ne_mfd_model_edges.solve()

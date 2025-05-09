@@ -7,8 +7,8 @@ def process_solution(graph: nx.DiGraph, model: fp.MinErrorFlow):
         print(solution["graph"].edges(data=True))
         print("error", solution["error"])
         print("objective_value", solution["objective_value"])
-        fp.utils.draw_solution(graph, filename="uncorrected_graph.pdf", flow_attr="flow", draw_options={"show_edge_weights": True})
-        fp.utils.draw_solution(solution["graph"], filename="corrected_graph.pdf", flow_attr="flow", draw_options={"show_edge_weights": True})
+        fp.utils.draw_solution(graph, filename="test_graph_uncorrected_graph.pdf", flow_attr="flow", draw_options={"show_edge_weights": True})
+        fp.utils.draw_solution(solution["graph"], filename="test_graph_corrected_graph.pdf", flow_attr="flow", draw_options={"show_edge_weights": True})
     else:
         print("Model could not be solved.")
 

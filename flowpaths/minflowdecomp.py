@@ -7,6 +7,7 @@ import flowpaths.utils.solverwrapper as sw
 import flowpaths.utils.graphutils as gu
 import flowpaths.mingenset as mgs
 import flowpaths.utils as utils
+import flowpaths.nodeexpandeddigraph as nedg
 import copy
 import math
 
@@ -32,11 +33,12 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self,
         G: nx.DiGraph,
         flow_attr: str,
+        flow_attr_origin: str = "edge",
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
-        edge_length_attr: str = None,
+        length_attr: str = None,
         edges_to_ignore: list = [],
         optimization_options: dict = {},
         solver_options: dict = {},
@@ -74,12 +76,12 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
-            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `edge_length_attr : str`, optional
+        - `length_attr : str`, optional
             
-            Attribute name for edge lengths. Default is `None`.
+            Attribute name for lengths of edges (or nodes, if `flow_attr_origin` is `"node"`). Default is `None`.
 
         - `edges_to_ignore : list`, optional
 
@@ -108,16 +110,32 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         - If the graph does not satisfy flow conservation on nodes different from source or sink.
         - If the graph contains edges with negative (<0) flow values.
         - If the graph is not acyclic.
+        - If `flow_attr_origin` is not "node" or "edge".
         """
 
-        self.G = G
+        # Handling node-weighted graphs
+        self.flow_attr_origin = flow_attr_origin
+        if self.flow_attr_origin == "node":
+            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr)
+            subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+        elif self.flow_attr_origin == "edge":
+            G_internal = G
+            subpath_constraints_internal = subpath_constraints
+            edges_to_ignore_internal = edges_to_ignore
+        else:
+            utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+            raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+
+        self.G = G_internal
+        self.subpath_constraints = subpath_constraints_internal
+        self.edges_to_ignore = edges_to_ignore_internal
+        
         self.flow_attr = flow_attr
         self.weight_type = weight_type
-        self.subpath_constraints = subpath_constraints
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        self.edge_length_attr = edge_length_attr
-        self.edges_to_ignore = edges_to_ignore
+        self.length_attr = length_attr
         self.optimization_options = optimization_options
         self.solver_options = solver_options
         self.time_limit = self.solver_options.get("time_limit", sw.SolverWrapper.time_limit)
@@ -177,7 +195,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                     subpath_constraints=self.subpath_constraints,
                     subpath_constraints_coverage=self.subpath_constraints_coverage,
                     subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-                    edge_length_attr=self.edge_length_attr,
+                    length_attr=self.length_attr,
                     edges_to_ignore=self.edges_to_ignore,
                     optimization_options=self.optimization_options,
                     solver_options=fd_solver_options,
@@ -243,7 +261,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             subpath_constraints=self.subpath_constraints,
             subpath_constraints_coverage=self.subpath_constraints_coverage,
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-            edge_length_attr=self.edge_length_attr,
+            length_attr=self.length_attr,
             edges_to_ignore=self.edges_to_ignore,
             optimization_options=given_weights_optimization_options,
             solver_options=given_weights_kfd_solver_options,
@@ -419,7 +437,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                     subpath_constraints=subgraph_subpath_constraints,
                     subpath_constraints_coverage=self.subpath_constraints_coverage,
                     subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-                    edge_length_attr=self.edge_length_attr,
+                    length_attr=self.length_attr,
                     edges_to_ignore=subgraph_edges_to_ignore,
                     optimization_options=subgraph_optimization_options,
                     solver_options=subgraph_solver_options,

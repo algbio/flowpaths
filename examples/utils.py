@@ -24,7 +24,7 @@ if mpe_model.is_solved():
     solution = mpe_model.get_solution()
     fp.utils.draw_solution(
         G=graph,
-        filename="simple_graph.pdf",
+        filename="test_graph_simple_graph.pdf",
         flow_attr="flow",
         paths=solution["paths"],
         weights=solution["weights"],

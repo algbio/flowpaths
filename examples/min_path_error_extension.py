@@ -17,7 +17,7 @@ def main():
     # We create a Minimum Path Error solver with default settings, 
     # by specifying that the flow value of each edge is in the attribute `flow` of the edges,
     # and that the number of paths to consider is 3.
-    mpe_model = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=float, edge_length_attr="length")
+    mpe_model = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=float, length_attr="length")
 
     # We solve it
     mpe_model.solve()
@@ -28,7 +28,7 @@ def main():
     edges_to_ignore = [("a", "c")]
     # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
     # when computing the path slacks (i.e. edge errors)
-    mpe_model_2 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, edges_to_ignore=edges_to_ignore, edge_length_attr="length")
+    mpe_model_2 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, edges_to_ignore=edges_to_ignore, length_attr="length")
     mpe_model_2.solve()
     process_solution(mpe_model_2)
 
@@ -52,7 +52,7 @@ def main():
         flow_attr="flow", 
         k=3, 
         weight_type=int, 
-        edge_length_attr="length", 
+        length_attr="length", 
         path_length_ranges=path_length_ranges, 
         path_length_factors=path_length_factors,
         solver_options=solver_options
@@ -66,7 +66,7 @@ def main():
         flow_attr="flow", 
         k=3, 
         weight_type=float, 
-        edge_length_attr="length", 
+        length_attr="length", 
         edge_error_scaling={("a", "c"): 0.5},
         )  
     mpe_model_5.solve()
@@ -78,7 +78,7 @@ def main():
         flow_attr="flow", 
         k=3, 
         weight_type=float, 
-        edge_length_attr="length", 
+        length_attr="length", 
         edge_error_scaling={("a", "c"): 0},
         )  
     mpe_model_6.solve()
