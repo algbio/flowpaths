@@ -32,14 +32,14 @@ def main():
     # We process its solution
     process_solution(lae_model)
 
-    # We solve again, by also telling the model to ignore the edges in `edges_to_ignore`
+    # We solve again, by also telling the model to ignore the edges in `elements_to_ignore`
     # when computing the edge errors
     lae_model_2 = fp.kLeastAbsErrors(
         graph, 
         flow_attr="flow", 
         k=3, 
         weight_type=float, 
-        edges_to_ignore=[("a", "c")],
+        elements_to_ignore=[("a", "c")],
         solver_options={"external_solver": "gurobi"}
         )
     lae_model_2.solve()
@@ -52,7 +52,7 @@ def main():
         flow_attr="flow", 
         k=3, 
         weight_type=float, 
-        edges_to_ignore=[("a", "c")],
+        elements_to_ignore=[("a", "c")],
         trusted_edges_for_safety=[("a", "b")],
         solver_options={"external_solver": "gurobi"}
         )
@@ -67,7 +67,7 @@ def main():
         k=3, 
         weight_type=float, 
         subpath_constraints=[[("a", "b")]],
-        edges_to_ignore=[("a", "c")],
+        elements_to_ignore=[("a", "c")],
         solver_options={"external_solver": "gurobi"}
         )
     lae_model_4.solve()

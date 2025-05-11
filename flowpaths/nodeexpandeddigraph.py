@@ -24,7 +24,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
             - Pass the edges from the `edges_to_ignore` attribute of this class to the decomposition models, in order to ignore all original edges of the graph,
               and thus consider in the constraints only the new edges added in the expanded graph (which have flow values).
             - Solve the decomposition model on the expanded graph.
-            - Use the `condense_paths` method to condense the solution paths (which are in the expanded graph) to paths in the original graph.
+            - Use the `get_condensed_paths` method to condense the solution paths (which are in the expanded graph) to paths in the original graph.
 
         Parameters
         ----------

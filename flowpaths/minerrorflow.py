@@ -15,8 +15,8 @@ class MinErrorFlow():
             weight_type: type = float,
             sparsity_lambda: float = 0,
             few_flow_values_epsilon: float = None,
-            edges_to_ignore: list = [],
-            edge_error_scaling: dict = {},
+            elements_to_ignore: list = [],
+            error_scaling: dict = {},
             additional_starts: list = [],
             additional_ends: list = [],
             solver_options: dict = {},
@@ -66,15 +66,16 @@ class MinErrorFlow():
 
                 Setting this can be slow on larger graphs.
 
-        - `edges_to_ignore: list`, optional
+        - `elements_to_ignore : list`, optional
 
-            A list of edges to ignore. The weights of these edges will still be corrected, but their error will not count in the objective function that is being minimized. Default is `[]`. See [ignoring edges documentation](ignoring-edges.md)
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
+            Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
-        - `edge_error_scaling: dict`, optional
+        - `error_scaling: dict`, optional
             
-            Dictionary `edge: factor` storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge weight and path weights.
-            Default is an empty dict. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
-            difference between the flow value of the edge and the sum of the weights of the paths going through the edge. See [ignoring edges documentation](ignoring-edges.md)
+            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and path weights.
+            Default is an empty dict. If an edge/node has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
+            difference between the flow value of the edge/node and the sum of the weights of the paths going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
 
         - `additional_starts: list`, optional
 
@@ -93,14 +94,29 @@ class MinErrorFlow():
         self.flow_attr_origin = flow_attr_origin
         if self.flow_attr_origin == "node":
             self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr)
-            edges_to_ignore_internal = self.G_internal.edges_to_ignore
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
             additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
+
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+            if not all(isinstance(node, str) for node in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
+            edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
+            edges_to_ignore_internal = list(set(edges_to_ignore_internal))
+
+            error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
+
         elif self.flow_attr_origin == "edge":
             self.G_internal = G
-            edges_to_ignore_internal = edges_to_ignore
             additional_starts_internal = additional_starts
             additional_ends_internal = additional_ends
+
+            if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of edges (i.e. tuples of nodes), not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of edges (i.e. tuples of nodes), not {elements_to_ignore}")
+            edges_to_ignore_internal = elements_to_ignore
+
+            error_scaling_internal = error_scaling
         else:
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
@@ -119,6 +135,15 @@ class MinErrorFlow():
             if self.sparsity_lambda != 0:
                 utils.logger.error(f"{__name__}: You cannot set sparsity_lambda != 0 for a graph with cycles.")
                 raise ValueError(f"You cannot set sparsity_lambda != 0 for a graph with cycles.")
+        self.edge_error_scaling = error_scaling_internal
+        # If the error scaling factor is 0, we ignore the edge
+        self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
+        
+        # Checking that every entry in self.error_scaling is between 0 and 1
+        for key, value in error_scaling.items():
+            if value < 0 or value > 1:
+                utils.logger.error(f"{__name__}: Error scaling factor for {key} must be between 0 and 1.")
+                raise ValueError(f"Error scaling factor for {key} must be between 0 and 1.")
 
         self.flow_attr = flow_attr
         if weight_type not in [int, float]:
@@ -126,15 +151,14 @@ class MinErrorFlow():
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
         self.solver_options = solver_options
-        
-        self.edge_error_scaling = edge_error_scaling
+
         # Checking that every entry in self.edge_error_scaling is between 0 and 1
         for key, value in self.edge_error_scaling.items():
             if value < 0 or value > 1:
-                utils.logger.error(f"{__name__}: Edge error scaling factor for edge {key} must be between 0 and 1.")
-                raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
-            if value == 0:
-                self.edges_to_ignore.add(key)
+                utils.logger.error(f"{__name__}: Error scaling factor for {key} must be between 0 and 1.")
+                raise ValueError(f"Error scaling factor for {key} must be between 0 and 1.")
+
+
         self.different_flow_values_epsilon = few_flow_values_epsilon
         if few_flow_values_epsilon is not None:
             if few_flow_values_epsilon < 0:

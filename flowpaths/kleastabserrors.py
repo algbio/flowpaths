@@ -7,12 +7,6 @@ import copy
 
 
 class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
-    """
-    This class implements the k-LeastAbsoluteErrors problem, namely it looks for a decomposition of a weighted DAG into 
-    $k$ weighted paths, minimizing the absolute errors on the edges. The error on an edge 
-    is defined as the absolute value of the difference between the weight of the edge and the sum of the weights of 
-    the paths that go through it.
-    """
     def __init__(
         self,
         G: nx.DiGraph,
@@ -24,8 +18,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
         length_attr: str = None,
-        edges_to_ignore: list = [],
-        edge_error_scaling: dict = {},
+        elements_to_ignore: list = [],
+        error_scaling: dict = {},
         additional_starts: list = [],
         additional_ends: list = [],
         solution_weights_superset: list = None,
@@ -34,7 +28,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         trusted_edges_for_safety: list = None,
     ):
         """
-        Initialize the Least Absolute Errors model for a given number of paths.
+        This class implements the k-LeastAbsoluteErrors problem, namely it looks for a decomposition of a weighted DAG into 
+        $k$ weighted paths, minimizing the absolute errors on the edges. The error on an edge 
+        is defined as the absolute value of the difference between the weight of the edge and the sum of the weights of 
+        the paths that go through it.
 
         Parameters
         ----------
@@ -50,7 +47,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             
             The number of paths to decompose in.
 
-        - `flow_attr_origin : str`, optional
+        - `flow_attr_origin: str`, optional
 
             The origin of the flow attribute. Default is `"edge"`. Options:
             
@@ -61,39 +58,44 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             
             The type of the weights and slacks (`int` or `float`). Default is `float`.
 
-         - `subpath_constraints : list`, optional
+         - `subpath_constraints: list`, optional
             
             List of subpath constraints. Default is an empty list. 
             Each subpath constraint is a list of edges that must be covered by some solution path, according 
             to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
 
-        - `subpath_constraints_coverage : float`, optional
+        - `subpath_constraints_coverage: float`, optional
             
             Coverage fraction of the subpath constraints that must be covered by some solution paths. 
             
-            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
+            the constraint need to be covered by some solution path). 
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `subpath_constraints_coverage_length : float`, optional
+        - `subpath_constraints_coverage_length: float`, optional
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
             `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `length_attr : str`, optional
+        - `length_attr: str`, optional
             
-            Attribute name for lengths of edges (or nodes, if `flow_attr_origin` is `"node"`). Default is `None`.
+            The attribute name from where to get the edge lengths (or node length, if `flow_attr_origin` is `"node"`). Defaults to `None`.
+            
+            - If set, then the subpath lengths (above) are in terms of the edge/node lengths specified in the `length_attr` field of each edge/node.
+            - If set, and an edge/node has a missing edge length, then it gets length 1.
         
-        - `edges_to_ignore: list`, optional
-            
-            List of edges to ignore when adding constrains on flow explanation by the weighted paths.
+        - `elements_to_ignore: list`, optional
+
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
-        - `edge_error_scaling: dict`, optional
+        - `error_scaling: dict`, optional
             
-            Dictionary `edge: factor` storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge weight and path weights.
-            Default is an empty dict. If an edge has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
-            difference between the flow value of the edge and the sum of the weights of the paths going through the edge.
+            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and path weights.
+            Default is an empty dict. If an edge/node has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
+            difference between the flow value of the edge/node and the sum of the weights of the paths going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
         
         - `additional_starts: list`, optional
             
@@ -139,15 +141,28 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         if self.flow_attr_origin == "node":
             self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr)
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
-            edges_to_ignore_internal = self.G_internal.edges_to_ignore
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
             additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
+
+            if not all(isinstance(element_to_ignore, str) for element_to_ignore in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of nodes (i.e strings), not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of nodes (i.e strings), not {elements_to_ignore}")
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+            edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
+            edges_to_ignore_internal = list(set(edges_to_ignore_internal))
+
+            error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
+
         elif self.flow_attr_origin == "edge":
             self.G_internal = G
             subpath_constraints_internal = subpath_constraints
-            edges_to_ignore_internal = edges_to_ignore
+            if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of edges (i.e. tuples of nodes), not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of edges (i.e. tuples of nodes), not {elements_to_ignore}")
+            edges_to_ignore_internal = elements_to_ignore
             additional_starts_internal = additional_starts
             additional_ends_internal = additional_ends
+            error_scaling_internal = error_scaling
         else:
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
@@ -155,18 +170,22 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
+        self.edge_error_scaling = error_scaling_internal
+        # If the error scaling factor is 0, we ignore the edge
+        self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
+        
+        # Checking that every entry in self.error_scaling is between 0 and 1
+        for key, value in error_scaling.items():
+            if value < 0 or value > 1:
+                utils.logger.error(f"{__name__}: Error scaling factor for {key} must be between 0 and 1.")
+                raise ValueError(f"Error scaling factor for {key} must be between 0 and 1.")
+
 
         if weight_type not in [int, float]:
             utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
-        # Checking that every entry in self.edge_error_scaling is between 0 and 1
-        self.edge_error_scaling = edge_error_scaling
-        for key, value in self.edge_error_scaling.items():
-            if value < 0 or value > 1:
-                utils.logger.error(f"{__name__}: Edge error scaling factor for edge {key} must be between 0 and 1.")
-                raise ValueError(f"Edge error scaling factor for edge {key} must be between 0 and 1.")
 
         self.k = k
         self.original_k = k

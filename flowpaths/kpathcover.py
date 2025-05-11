@@ -43,33 +43,37 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
             - `"edge"`: cover the edges of the graph. This is the default.
             - `"node"`: cover the nodes of the graph.
 
-        - `subpath_constraints : list`, optional
+        - `subpath_constraints: list`, optional
             
             List of subpath constraints. Default is an empty list. 
             Each subpath constraint is a list of edges that must be covered by some solution path, according 
             to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
 
-        - `subpath_constraints_coverage : float`, optional
+        - `subpath_constraints_coverage: float`, optional
             
             Coverage fraction of the subpath constraints that must be covered by some solution paths. 
             
-            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
+            the constraint need to be covered by some solution path). 
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `subpath_constraints_coverage_length : float`, optional
+        - `subpath_constraints_coverage_length: float`, optional
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
             `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `length_attr : str`, optional
+        - `length_attr: str`, optional
             
-            Attribute name for edge lengths. Default is `None`.
+            The attribute name from where to get the edge lengths (or node length, if `flow_attr_origin` is `"node"`). Defaults to `None`.
+            
+            - If set, then the subpath lengths (above) are in terms of the edge/node lengths specified in the `length_attr` field of each edge/node.
+            - If set, and an edge/node has a missing edge length, then it gets length 1.
 
-        - `elements_to_ignore : list`, optional
+        - `elements_to_ignore: list`, optional
 
-            List of graph elements to ignore when adding constrains on flow explanation by the weighted paths.
-            These elements are either edges or nodes, depending on the `cover_type` parameter.
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
         - `additional_starts: list`, optional
@@ -100,13 +104,13 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
                 G_with_flow_attr.nodes[node][node_flow_attr] = 0 # any dummy value
             self.G_internal = nedg.NodeExpandedDiGraph(G_with_flow_attr, node_flow_attr=node_flow_attr)
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
-            edges_to_ignore_internal = self.G_internal.edges_to_ignore
-            # If we have some nodes to ignore (via elements_to_ignore), we need to add them to the edges_to_ignore_internal
             
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
             if not all(isinstance(node, str) for node in elements_to_ignore):
                 utils.logger.error(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
                 raise ValueError(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
             edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
+            edges_to_ignore_internal = list(set(edges_to_ignore_internal))
             
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
             additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)

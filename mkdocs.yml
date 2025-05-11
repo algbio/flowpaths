@@ -108,9 +108,6 @@ plugins:
       default_handler: python
       handlers:
         python:
-          inventories:
-          - url: https://docs.python-requests.org/en/master/objects.inv
-            domains: [std, py]
           options:
             show_root_toc_entry: false
             # docstring_options:

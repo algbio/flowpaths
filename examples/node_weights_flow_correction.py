@@ -41,7 +41,7 @@ neGraph = fp.NodeExpandedDiGraph(graph, node_flow_attr="flow")
 correction_model = fp.MinErrorFlow(
     neGraph, 
     flow_attr="flow",
-    edges_to_ignore=neGraph.edges_to_ignore,
+    elements_to_ignore=neGraph.edges_to_ignore,
     )
 correction_model.solve()
 corrected_neGraph: fp.NodeExpandedDiGraph = correction_model.get_corrected_graph()
@@ -54,7 +54,7 @@ subpath_constraints=[[('a', 'c'), ('c', 't')]]
 ne_mfd_model_edges = fp.MinFlowDecomp(
     corrected_neGraph,
     flow_attr="flow",
-    edges_to_ignore=corrected_neGraph.edges_to_ignore,
+    elements_to_ignore=corrected_neGraph.edges_to_ignore,
     subpath_constraints=corrected_neGraph.get_expanded_subpath_constraints(subpath_constraints),
     )
 ne_mfd_model_edges.solve()

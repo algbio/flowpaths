@@ -50,7 +50,9 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
             
             Coverage fraction of the subpath constraints that must be covered by some solution paths. 
             
-            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
+            the constraint need to be covered by some solution path). 
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
         - `subpath_constraints_coverage_length: float`, optional
             
@@ -61,7 +63,10 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
 
         - `length_attr: str`, optional
             
-            Attribute name for edge lengths. Default is `None`.
+            The attribute name from where to get the edge lengths (or node length, if `flow_attr_origin` is `"node"`). Defaults to `None`.
+            
+            - If set, then the subpath lengths (above) are in terms of the edge/node lengths specified in the `length_attr` field of each edge/node.
+            - If set, and an edge/node has a missing edge length, then it gets length 1.
 
         - `elements_to_ignore: list`, optional
 
@@ -97,9 +102,8 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
                 G_with_flow_attr.nodes[node][node_flow_attr] = 0 # any dummy value
             self.G_internal = nedg.NodeExpandedDiGraph(G_with_flow_attr, node_flow_attr=node_flow_attr)
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
-            edges_to_ignore_internal = self.G_internal.edges_to_ignore
-            # If we have some nodes to ignore (via elements_to_ignore), we need to add them to the edges_to_ignore_internal
             
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
             if not all(isinstance(node, str) for node in elements_to_ignore):
                 utils.logger.error(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")
                 raise ValueError(f"elements_to_ignore must be a list of nodes, i.e. strings, not {elements_to_ignore}")

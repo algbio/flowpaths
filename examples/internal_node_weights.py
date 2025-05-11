@@ -45,7 +45,7 @@ def test_decomposition_models():
             neGraph, 
             k=3,
             flow_attr="flow",
-            edges_to_ignore=neGraph.edges_to_ignore,
+            elements_to_ignore=neGraph.edges_to_ignore,
             subpath_constraints=ne_subpath_constraints_edges,
             )
         ne_model.solve()
@@ -105,7 +105,7 @@ def test_min_error_flow():
     ne_model = fp.MinErrorFlow(
         neGraph,
         flow_attr="flow",
-        edges_to_ignore=neGraph.edges_to_ignore,
+        elements_to_ignore=neGraph.edges_to_ignore,
     )
     ne_model.solve()
 

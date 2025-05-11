@@ -23,7 +23,7 @@ mpe_model_2 = fp.kMinPathError(
     flow_attr="flow", 
     k=3, 
     weight_type=int,
-    edges_to_ignore=[("a", "d")])
+    elements_to_ignore=[("a", "d")])
 mpe_model_2.solve()
 if mpe_model_2.is_solved():
     print(mpe_model_2.get_solution())

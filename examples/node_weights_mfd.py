@@ -34,7 +34,7 @@ def example1():
     ne_mfd_model_nodes = fp.MinFlowDecomp(
         neGraph, 
         flow_attr="flow",
-        edges_to_ignore=neGraph.edges_to_ignore,
+        elements_to_ignore=neGraph.edges_to_ignore,
         subpath_constraints_coverage=0.75,
         subpath_constraints=ne_subpath_constraints_nodes,
         )
@@ -53,7 +53,7 @@ def example1():
     ne_mfd_model_edges = fp.MinFlowDecomp(
         neGraph, 
         flow_attr="flow",
-        edges_to_ignore=neGraph.edges_to_ignore,
+        elements_to_ignore=neGraph.edges_to_ignore,
         subpath_constraints=ne_subpath_constraints_edges,
         )
     ne_mfd_model_edges.solve()
@@ -105,7 +105,7 @@ def example2():
     ne_mfd_model_edges = fp.MinFlowDecomp(
         neGraph, 
         flow_attr="flow",
-        edges_to_ignore=neGraph.edges_to_ignore,
+        elements_to_ignore=neGraph.edges_to_ignore,
         subpath_constraints=ne_subpath_constraints_edges,
         subpath_constraints_coverage_length=0.7,
         length_attr="length",

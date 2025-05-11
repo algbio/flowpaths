@@ -28,14 +28,14 @@ def main():
     edges_to_ignore = [("a", "c")]
     # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
     # when computing the path slacks (i.e. edge errors)
-    mpe_model_2 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, edges_to_ignore=edges_to_ignore, length_attr="length")
+    mpe_model_2 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, elements_to_ignore=edges_to_ignore, length_attr="length")
     mpe_model_2.solve()
     process_solution(mpe_model_2)
 
     edges_to_ignore = [("a", "c")]
     # We solve again, by telling the model to ignore the edges in `edges_to_ignore`
     # when computing the path slacks (i.e. edge errors)
-    mpe_model_3 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, edges_to_ignore=edges_to_ignore)
+    mpe_model_3 = fp.kMinPathError(graph, flow_attr="flow", k=3, weight_type=int, elements_to_ignore=edges_to_ignore)
     mpe_model_3.solve()
     process_solution(mpe_model_3)
 
@@ -67,7 +67,7 @@ def main():
         k=3, 
         weight_type=float, 
         length_attr="length", 
-        edge_error_scaling={("a", "c"): 0.5},
+        error_scaling={("a", "c"): 0.5},
         )  
     mpe_model_5.solve()
     print(mpe_model_5.solver.get_model_status())
@@ -79,7 +79,7 @@ def main():
         k=3, 
         weight_type=float, 
         length_attr="length", 
-        edge_error_scaling={("a", "c"): 0},
+        error_scaling={("a", "c"): 0},
         )  
     mpe_model_6.solve()
     print(mpe_model_6.solver.get_model_status())
