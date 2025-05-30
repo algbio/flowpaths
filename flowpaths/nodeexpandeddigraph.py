@@ -11,8 +11,8 @@ class NodeExpandedDiGraph(nx.DiGraph):
             node_flow_attr: str,
             try_filling_in_missing_flow_attr: bool = False,
             node_length_attr: str = None,
-            additional_starts: list = None,
-            additional_ends: list = None,
+            additional_starts: list = [],
+            additional_ends: list = [],
             ):
         """
         This class is a subclass of the networkx DiGraph class. It is used to represent a directed graph
@@ -107,6 +107,9 @@ class NodeExpandedDiGraph(nx.DiGraph):
         self.node_flow_attr = node_flow_attr
         self.node_length_attr = node_length_attr
 
+        self.global_source_id = 'source' + str(id(self))
+        self.global_sink_id = 'sink' + str(id(self))
+
         self._edges_to_ignore = []
 
         for node in G.nodes:
@@ -141,25 +144,38 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 # This is not necessary, as the edge (node1, succ0) has already been added above, for succ
                 # self._edges_to_ignore.append((node1, succ0))
 
-        if not try_filling_in_missing_flow_attr and (additional_starts != None or additional_ends != None):
+        if (len(additional_starts) + len(additional_ends) > 0) and not try_filling_in_missing_flow_attr:
             utils.logger.error(f"{__name__}: If `additional_starts` or `additional_ends` are specified, `try_filling_in_missing_flow_attr` must be set to True.")
             raise ValueError("If `additional_starts` or `additional_ends` are specified, `try_filling_in_missing_flow_attr` must be set to True.")
 
-        for node in additional_starts or []:
-            if node not in G.nodes:
-                utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
-                raise ValueError(f"Node {node} not in the original graph.")
-            if G.in_degree(node) != 0:
-                self.add_edge('source' + str(id(self)), node + '.0', )
-                self._edges_to_ignore.append(('source' + str(id(self)), node + '.0'))
+        if additional_starts != []:
+            self.add_node(self.global_source_id + '.0')
+            self.add_node(self.global_source_id + '.1')
+            new_edge = (self.global_source_id + '.0', self.global_source_id + '.1')
+            self.add_edges_from([new_edge])
+            self._edges_to_ignore.append(new_edge)
 
-        for node in additional_ends or []:
-            if node not in G.nodes:
-                utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
-                raise ValueError(f"Node {node} not in the original graph.")
-            if G.out_degree(node) != 0:
-                self.add_edge(node + '.1', 'sink' + str(id(self)))
-                self._edges_to_ignore.append((node + '.1', 'sink' + str(id(self))))
+            for node in additional_starts:
+                if node not in G.nodes:
+                    utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
+                    raise ValueError(f"Node {node} not in the original graph.")
+                new_edge = (self.global_source_id + '.1', node + '.0', )
+                self.add_edges_from([new_edge])
+                self._edges_to_ignore.append(new_edge)
+
+        if additional_ends != []:
+            self.add_node(self.global_sink_id + '.0')
+            self.add_node(self.global_sink_id + '.1')
+            new_edge = (self.global_sink_id + '.0', self.global_sink_id + '.1')
+            self.add_edges_from([new_edge])
+            self._edges_to_ignore.append(new_edge)
+            for node in additional_ends or []:
+                if node not in G.nodes:
+                    utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
+                    raise ValueError(f"Node {node} not in the original graph.")
+                new_edge = (node + '.1', self.global_sink_id + '.0')
+                self.add_edges_from([new_edge])
+                self._edges_to_ignore.append(new_edge)
 
         if try_filling_in_missing_flow_attr:
             self._try_filling_in_missing_flow_values()
@@ -402,11 +418,16 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 if path[i][-2:] != '.0':
                     utils.logger.error(f"{__name__}: Invalid node name in path: {path[i]}")
                     raise ValueError(f"Invalid node name in path: {path[i]}")
+                
                 node = path[i][:-2]
-                if node not in self.original_G.nodes:
+                # Raise an error if the node is not in the original graph and is not the global source or sink
+                if node not in self.original_G.nodes and node not in [self.global_source_id, self.global_sink_id]:
                     utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
                     raise ValueError(f"Node {node} not in the original graph.")
-                condensed_path.append(node)
+                
+                # Append the node to the condensed path only if it is not the global source or sink
+                if node not in [self.global_source_id, self.global_sink_id]:
+                    condensed_path.append(node)
             condensed_paths.append(condensed_path)
         return condensed_paths
     
