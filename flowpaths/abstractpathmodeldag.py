@@ -231,8 +231,8 @@ class AbstractPathModelDAG(ABC):
         elif self.optimize_with_safe_paths and not self.is_solved() and self.trusted_edges_for_safety is not None:
             start_time = time.perf_counter()
             self.safe_lists += safetypathcovers.safe_paths(
-                self.G,
-                self.trusted_edges_for_safety,
+                G=self.G,
+                edges_to_cover=self.trusted_edges_for_safety,
                 no_duplicates=False,
                 threads=self.threads,
             )
@@ -241,8 +241,8 @@ class AbstractPathModelDAG(ABC):
         if self.optimize_with_safe_sequences and not self.is_solved():
             start_time = time.perf_counter()
             self.safe_lists += safetypathcovers.safe_sequences(
-                self.G,
-                self.trusted_edges_for_safety,
+                G=self.G,
+                edges_or_subpath_constraints_to_cover=self.trusted_edges_for_safety,
                 no_duplicates=False,
                 threads=self.threads,
             )
@@ -257,8 +257,7 @@ class AbstractPathModelDAG(ABC):
                     no_duplicates=False,
                     threads=self.threads,
                 )
-                print("optimize_with_subpath_constraints_as_safe_sequences:", self.safe_lists)
-                self.solve_statistics["subpath_constraints_as_safe_sequences_time"] = time.perf_counter() - start_time
+                self.solve_statistics["optimize_with_subpath_constraints_as_safe_sequences"] = time.perf_counter() - start_time
 
         if self.optimize_with_safety_as_subpath_constraints:
             self.subpath_constraints += self.safe_lists
@@ -497,6 +496,13 @@ class AbstractPathModelDAG(ABC):
         if self.safe_lists is None or len(self.safe_lists) == 0:
             return []
 
+        # for i, safe_list in enumerate(self.safe_lists):
+        #     utils.logger.debug(f"{__name__}: safe_list {i}: {safe_list}")        
+
+        # utils.draw(self.G, 
+        #            filename = "debug_safe_lists.pdf", 
+        #            subpath_constraints = self.safe_lists)
+
         longest_safe_list = dict()
         for i, safe_list in enumerate(self.safe_lists):
             for edge in safe_list:
@@ -509,14 +515,29 @@ class AbstractPathModelDAG(ABC):
             edge: len(self.safe_lists[longest_safe_list[edge]])
             for edge in longest_safe_list
         }
+        # for edge, length in len_of_longest_safe_list.items():
+        #     utils.logger.debug(f"{__name__}: edge {edge} has longest safe list of length {length} at index {longest_safe_list[edge]}")
 
         _, edge_antichain = self.G.compute_max_edge_antichain(
             get_antichain=True, weight_function=len_of_longest_safe_list
         )
+        utils.logger.debug(f"{__name__}: edge_antichain from safe lists SIZE: {len(edge_antichain)}")
+        # utils.logger.debug(f"{__name__}: edge_antichain from safe lists: {len(edge_antichain)}")
 
-        paths_to_fix = list(
-            map(lambda edge: self.safe_lists[longest_safe_list[edge]], edge_antichain)
-        )
+        # paths_to_fix = list(
+        #     map(lambda edge: self.safe_lists[longest_safe_list[edge]], edge_antichain)
+        # )
+        paths_to_fix = []
+        for edge in edge_antichain:
+            # utils.logger.debug(f"{__name__}: edge {edge} in edge_antichain, longest safe list idx: {longest_safe_list[edge]}, safe list: {self.safe_lists[longest_safe_list[edge]]}")
+            paths_to_fix.append(self.safe_lists[longest_safe_list[edge]])
+
+        utils.logger.debug(f"{__name__}: paths_to_fix from safe lists SIZE: {len(paths_to_fix)}")
+        # utils.logger.debug(f"{__name__}: paths_to_fix from safe lists: {paths_to_fix}")
+        
+        # utils.draw(self.G, 
+        #            filename = "debug_paths_to_fix.pdf", 
+        #            subpath_constraints = paths_to_fix)
 
         return paths_to_fix
     

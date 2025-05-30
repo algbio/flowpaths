@@ -219,7 +219,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.k = k
         # If k is not specified, we set k to the edge width of the graph
         if self.k is None:
-            self.k = self.G.get_width(self.edges_to_ignore)
+            self.k = self.G.get_width(list(self.edges_to_ignore))
         self.original_k = self.k
         self.solution_weights_superset = solution_weights_superset
         self.optimization_options = optimization_options or {}        

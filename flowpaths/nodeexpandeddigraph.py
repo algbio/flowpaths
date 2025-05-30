@@ -291,7 +291,11 @@ class NodeExpandedDiGraph(nx.DiGraph):
         """
         Expand a list of subpath constraints from the original graph (where every constraint is a list **edges** 
         in the original graph) to a list of subpath constraints in the expanded graph where every constraint 
-        is a list of the corresponding edges in the expanded graph).
+        is a list of the corresponding edges in the expanded graph). 
+
+        The subpath constraints also contain the expanded nodes, so for every edge `(u,v)` in the subpath constraint,
+        we add the expanded node `u` (as `(u.0, u.1)`) and the edge `(u.1, v.0)` in the expanded graph.
+        For the last edge `(u,v)` in the constraint, we also add the expanded node `v` (as `(v.0, v.1)`).
 
         Parameters
         ----------
@@ -310,11 +314,18 @@ class NodeExpandedDiGraph(nx.DiGraph):
 
         for constraint in subpath_constraints:
             expanded_constraint = []
-            for edge in constraint:
+            for i, edge in enumerate(constraint):
                 if edge not in self.original_G.edges:
                     utils.logger.error(f"{__name__}: Edge {edge} not in the original graph.")
                     raise ValueError(f"Edge {edge} not in the original graph.")
+                # For every edge (u,v) in the subpath constraint, we add the expanded node u (as (u.0, u.1)) and the edge (u.1, v.0)
+                expanded_constraint.append(self.get_expanded_edge(edge[0]))
                 expanded_constraint.append((edge[0] + '.1', edge[1] + '.0'))
+                
+                # For the last edge (u,v) in the constraint, we also add the expanded node v (as (v.0, v.1))
+                if i == len(constraint) - 1:
+                    expanded_constraint.append(self.get_expanded_edge(edge[1]))
+
             expanded_constraints.append(expanded_constraint)
 
         return expanded_constraints
