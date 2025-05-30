@@ -150,6 +150,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
             edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
             edges_to_ignore_internal = list(set(edges_to_ignore_internal))
+            trusted_edges_for_safety_internal = [self.G_internal.get_expanded_edge(edge) for edge in trusted_edges_for_safety] if trusted_edges_for_safety else []
 
             error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
 
@@ -162,6 +163,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             edges_to_ignore_internal = elements_to_ignore
             additional_starts_internal = additional_starts
             additional_ends_internal = additional_ends
+            trusted_edges_for_safety_internal = trusted_edges_for_safety or []
             error_scaling_internal = error_scaling
         else:
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
@@ -170,6 +172,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
+        self.trusted_edges_for_safety = trusted_edges_for_safety_internal
         self.edge_error_scaling = error_scaling_internal
         # If the error scaling factor is 0, we ignore the edge
         self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
@@ -227,7 +230,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         
         # If we get subpath constraints, and the coverage fraction is 1
         # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
-        self.optimization_options["trusted_edges_for_safety"] = set(trusted_edges_for_safety or [])
+        self.optimization_options["trusted_edges_for_safety"] = set(self.trusted_edges_for_safety or [])
         if self.subpath_constraints is not None:
             if (self.subpath_constraints_coverage == 1.0 and self.subpath_constraints_coverage_length is None) \
                 or self.subpath_constraints_coverage_length == 1:
@@ -486,11 +489,19 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
                 if (
                     abs(data[self.flow_attr] - weight_from_paths[(u, v)])
-                    > tolerance * num_paths_on_edges[(u, v)] + solution_errors[(u, v)]
+                    > tolerance * max(1,num_paths_on_edges[(u, v)]) + solution_errors[(u, v)]
                 ):
+                    utils.logger.debug(
+                        f"{__name__}: Invalid solution for edge ({u}, {v}): "
+                        f"flow value {data[self.flow_attr]} != weight from paths {weight_from_paths[(u, v)]} "
+                        f"+ error {solution_errors[(u, v)]} (tolerance: {tolerance * max(1,num_paths_on_edges[(u, v)])})"
+                    )
                     return False
 
         if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.original_k:
+            utils.logger.debug(
+                f"{__name__}: Invalid solution: objective value {self.get_objective_value()} != solver objective value {self.solver.get_objective_value()} (tolerance: {tolerance * self.original_k})"
+            )
             return False
 
         return True

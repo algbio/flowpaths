@@ -368,16 +368,32 @@ class NodeExpandedDiGraph(nx.DiGraph):
 
         return expanded_constraints
 
-    def get_expanded_edge(self, node):
+    def get_expanded_edge(self, graph_element):
         """
-        Get the the expanded edge `('node.0', 'node.1')` for a given node `node` in the original graph.
+        Given a node or an edge in the original graph, return the corresponding expanded edge in the expanded graph.
+        
+        - If `graph_element` is some `node`, it returns the edge `('node.0', 'node.1')`.
+        - If `graph_element` is some `edge`, it returns the edge `('edge[0].1', 'edge[1].0')`.
+        
+        This is useful for converting nodes and edges in the original graph to the corresponding edges in the expanded graph.
         """
 
-        if node not in self.original_G.nodes:
-            utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
-            raise ValueError(f"Node {node} not in the original graph.")
-
-        return (node + '.0', node + '.1')
+        if isinstance(graph_element, str):   
+            node = graph_element         
+            if node not in self.original_G.nodes:
+                utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
+                raise ValueError(f"Node {node} not in the original graph.")
+            return (node + '.0', node + '.1')
+        
+        elif isinstance(graph_element, tuple):
+            edge = graph_element
+            if edge not in self.original_G.edges:
+                utils.logger.error(f"{__name__}: Edge {edge} not in the original graph.")
+                raise ValueError(f"Edge {edge} not in the original graph.")
+            return (edge[0] + '.1', edge[1] + '.0')
+        else:
+            utils.logger.error(f"{__name__}: Graph element must be a node or an edge, not {graph_element}.")
+            raise ValueError(f"Graph element must be a node or an edge, not {graph_element}.")
 
     def get_condensed_paths(self, paths):
         """
