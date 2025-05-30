@@ -350,10 +350,21 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             # then we add arbitrary paths (i.e. we repeat the first path) with 0 weights to reach self.k paths.
             paths += [paths[0] for _ in range(self.k - len(paths))]
             weights += [0 for _ in range(self.k - len(weights))]
-            self._solution = {
-                "paths": paths,
-                "weights": weights,
-            }
+            # self._solution = {
+            #     "paths": paths,
+            #     "weights": weights,
+            # }
+            if self.flow_attr_origin == "edge":
+                self._solution = {
+                    "paths": paths,
+                    "weights": weights,
+                }
+            elif self.flow_attr_origin == "node":
+                self._solution = {
+                    "_paths_internal": paths,
+                    "paths": self.G_internal.get_condensed_paths(paths),
+                    "weights": self.path_weights_sol,
+                }
             self.set_solved()
             self.solve_statistics = {}
             self.solve_statistics["greedy_solve_time"] = time.perf_counter() - start_time
@@ -414,31 +425,30 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - `exception` If model is not solved.
         """
 
-        if self._solution is not None:            
-            return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
+        if self._solution is None:            
 
-        self.check_is_solved()
-        weights_sol_dict = self.solver.get_variable_values("w", [int])
-        self.path_weights_sol = [
-            (
-                round(weights_sol_dict[i])
-                if self.weight_type == int
-                else float(weights_sol_dict[i])
-            )
-            for i in range(self.k)
-        ]
+            self.check_is_solved()
+            weights_sol_dict = self.solver.get_variable_values("w", [int])
+            self.path_weights_sol = [
+                (
+                    round(weights_sol_dict[i])
+                    if self.weight_type == int
+                    else float(weights_sol_dict[i])
+                )
+                for i in range(self.k)
+            ]
 
-        if self.flow_attr_origin == "edge":
-            self._solution = {
-                "paths": self.get_solution_paths(),
-                "weights": self.path_weights_sol,
-            }
-        elif self.flow_attr_origin == "node":
-            self._solution = {
-                "_paths_internal": self.get_solution_paths(),
-                "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
-                "weights": self.path_weights_sol,
-            }
+            if self.flow_attr_origin == "edge":
+                self._solution = {
+                    "paths": self.get_solution_paths(),
+                    "weights": self.path_weights_sol,
+                }
+            elif self.flow_attr_origin == "node":
+                self._solution = {
+                    "_paths_internal": self.get_solution_paths(),
+                    "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
+                    "weights": self.path_weights_sol,
+                }
 
         return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 

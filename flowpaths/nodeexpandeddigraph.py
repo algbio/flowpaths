@@ -11,6 +11,8 @@ class NodeExpandedDiGraph(nx.DiGraph):
             node_flow_attr: str,
             try_filling_in_missing_flow_attr: bool = False,
             node_length_attr: str = None,
+            additional_starts: list = None,
+            additional_ends: list = None,
             ):
         """
         This class is a subclass of the networkx DiGraph class. It is used to represent a directed graph
@@ -138,6 +140,26 @@ class NodeExpandedDiGraph(nx.DiGraph):
                 self.add_edge(node1, succ0, **G.edges[node, succ])
                 # This is not necessary, as the edge (node1, succ0) has already been added above, for succ
                 # self._edges_to_ignore.append((node1, succ0))
+
+        if not try_filling_in_missing_flow_attr and (additional_starts != None or additional_ends != None):
+            utils.logger.error(f"{__name__}: If `additional_starts` or `additional_ends` are specified, `try_filling_in_missing_flow_attr` must be set to True.")
+            raise ValueError("If `additional_starts` or `additional_ends` are specified, `try_filling_in_missing_flow_attr` must be set to True.")
+
+        for node in additional_starts or []:
+            if node not in G.nodes:
+                utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
+                raise ValueError(f"Node {node} not in the original graph.")
+            if G.in_degree(node) != 0:
+                self.add_edge('source' + str(id(self)), node + '.0', )
+                self._edges_to_ignore.append(('source' + str(id(self)), node + '.0'))
+
+        for node in additional_ends or []:
+            if node not in G.nodes:
+                utils.logger.error(f"{__name__}: Node {node} not in the original graph.")
+                raise ValueError(f"Node {node} not in the original graph.")
+            if G.out_degree(node) != 0:
+                self.add_edge(node + '.1', 'sink' + str(id(self)))
+                self._edges_to_ignore.append((node + '.1', 'sink' + str(id(self))))
 
         if try_filling_in_missing_flow_attr:
             self._try_filling_in_missing_flow_values()

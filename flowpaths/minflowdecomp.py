@@ -40,6 +40,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         subpath_constraints_coverage_length: float = None,
         length_attr: str = None,
         elements_to_ignore: list = [],
+        additional_starts: list = [],
+        additional_ends: list = [],
         optimization_options: dict = {},
         solver_options: dict = {},
     ):
@@ -100,6 +102,14 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
+        - `additional_starts: list`, optional
+            
+            List of additional start nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md). **You can set this only if `flow_attr_origin` is `"node"`**.
+
+        - `additional_ends: list`, optional
+            
+            List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md). **You can set this only if `flow_attr_origin` is `"node"`**.
+
         - `optimization_options : dict`, optional
             
             Dictionary with the optimization options. Default is an empty dict. See [optimization options documentation](solver-options-optimizations.md).
@@ -128,7 +138,20 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         # Handling node-weighted graphs
         self.flow_attr_origin = flow_attr_origin
         if self.flow_attr_origin == "node":
-            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr)
+            if len(additional_starts) + len(additional_ends) == 0:
+                self.G_internal = nedg.NodeExpandedDiGraph(
+                    G=G, 
+                    node_flow_attr=flow_attr, 
+                    node_length_attr=length_attr)
+            else:
+                self.G_internal = nedg.NodeExpandedDiGraph(
+                    G=G, 
+                    node_flow_attr=flow_attr, 
+                    node_length_attr=length_attr,
+                    try_filling_in_missing_flow_attr=True,
+                    additional_starts=additional_starts,
+                    additional_ends=additional_ends,
+                )
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
             
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
@@ -139,6 +162,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             edges_to_ignore_internal = list(set(edges_to_ignore_internal))
 
         elif self.flow_attr_origin == "edge":
+            if len(additional_starts) + len(additional_ends) > 0:
+                utils.logger.error(f"additional_starts and additional_ends are not supported when flow_attr_origin is 'edge'.")
+                raise ValueError(f"additional_starts and additional_ends are not supported when flow_attr_origin is 'edge'.")
             self.G_internal = G
             subpath_constraints_internal = subpath_constraints
             if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):
@@ -227,6 +253,10 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
             if fd_model.is_solved():
                 self._solution = fd_model.get_solution(remove_empty_paths=True)
+                if self.flow_attr_origin == "node":
+                    # If the flow_attr_origin is "node", we need to convert the solution paths from the expanded graph to paths in the original graph.
+                    self._solution["_paths_internal"] = self._solution["paths"]
+                    self._solution["paths"] = self.G_internal.get_condensed_paths(self._solution["paths"])
                 self.set_solved()
                 self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.perf_counter() - self.solve_time_start
