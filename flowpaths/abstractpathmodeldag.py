@@ -57,6 +57,7 @@ class AbstractPathModelDAG(ABC):
     optimize_with_safe_zero_edges = True
     optimize_with_subpath_constraints_as_safe_sequences = True
     optimize_with_safety_as_subpath_constraints = False
+    optimize_with_safety_from_largest_antichain = False
 
     def __init__(
         self,
@@ -208,6 +209,7 @@ class AbstractPathModelDAG(ABC):
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
         self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
         self.optimize_with_safety_as_subpath_constraints = optimization_options.get("optimize_with_safety_as_subpath_constraints", AbstractPathModelDAG.optimize_with_safety_as_subpath_constraints)
+        self.optimize_with_safety_from_largest_antichain = optimization_options.get("optimize_with_safety_from_largest_antichain", AbstractPathModelDAG.optimize_with_safety_from_largest_antichain)
         
         self._is_solved = None
         if self.external_solution_paths is not None:
@@ -503,6 +505,10 @@ class AbstractPathModelDAG(ABC):
         #            filename = "debug_safe_lists.pdf", 
         #            subpath_constraints = self.safe_lists)
 
+        large_constant = 0
+        if self.optimize_with_safety_from_largest_antichain:
+            large_constant = self.G.number_of_edges() * self.G.number_of_edges()
+
         longest_safe_list = dict()
         for i, safe_list in enumerate(self.safe_lists):
             for edge in safe_list:
@@ -512,7 +518,7 @@ class AbstractPathModelDAG(ABC):
                     longest_safe_list[edge] = i
 
         len_of_longest_safe_list = {
-            edge: len(self.safe_lists[longest_safe_list[edge]])
+            edge: large_constant + len(self.safe_lists[longest_safe_list[edge]])
             for edge in longest_safe_list
         }
         # for edge, length in len_of_longest_safe_list.items():
@@ -535,9 +541,9 @@ class AbstractPathModelDAG(ABC):
         utils.logger.debug(f"{__name__}: paths_to_fix from safe lists SIZE: {len(paths_to_fix)}")
         # utils.logger.debug(f"{__name__}: paths_to_fix from safe lists: {paths_to_fix}")
         
-        # utils.draw(self.G, 
-        #            filename = "debug_paths_to_fix.pdf", 
-        #            subpath_constraints = paths_to_fix)
+        utils.draw(self.G, 
+                   filename = "debug_paths_to_fix.pdf", 
+                   subpath_constraints = paths_to_fix)
 
         return paths_to_fix
     
