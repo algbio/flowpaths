@@ -541,9 +541,9 @@ class AbstractPathModelDAG(ABC):
         utils.logger.debug(f"{__name__}: paths_to_fix from safe lists SIZE: {len(paths_to_fix)}")
         # utils.logger.debug(f"{__name__}: paths_to_fix from safe lists: {paths_to_fix}")
         
-        utils.draw(self.G, 
-                   filename = "debug_paths_to_fix.pdf", 
-                   subpath_constraints = paths_to_fix)
+        # utils.draw(self.G, 
+        #            filename = "debug_paths_to_fix.pdf", 
+        #            subpath_constraints = paths_to_fix)
 
         return paths_to_fix
     
