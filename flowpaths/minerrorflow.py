@@ -89,10 +89,14 @@ class MinErrorFlow():
 
             A dictionary containing the options for the solver. The options are passed to the solver wrapper. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
         """
-        
+
         # Handling node-weighted graphs
         self.flow_attr_origin = flow_attr_origin
         if self.flow_attr_origin == "node":
+            if G.number_of_nodes() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
+                raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
+            
             self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr)
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
             additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
@@ -107,6 +111,10 @@ class MinErrorFlow():
             error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
 
         elif self.flow_attr_origin == "edge":
+            if G.number_of_edges() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
+                raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
+            
             self.G_internal = G
             additional_starts_internal = additional_starts
             additional_ends_internal = additional_ends
