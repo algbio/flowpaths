@@ -164,6 +164,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         # Handling node-weighted graphs
         self.flow_attr_origin = flow_attr_origin
         if self.flow_attr_origin == "node":
+            if G.number_of_nodes() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
+                raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
             self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr)
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
@@ -179,6 +182,9 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
 
         elif self.flow_attr_origin == "edge":
+            if G.number_of_edges() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
+                raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
             self.G_internal = G
             subpath_constraints_internal = subpath_constraints
             if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):

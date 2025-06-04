@@ -138,6 +138,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         # Handling node-weighted graphs
         self.flow_attr_origin = flow_attr_origin
         if self.flow_attr_origin == "node":
+            if G.number_of_nodes() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
+                raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
             if len(additional_starts) + len(additional_ends) == 0:
                 self.G_internal = nedg.NodeExpandedDiGraph(
                     G=G, 
@@ -162,6 +165,9 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             edges_to_ignore_internal = list(set(edges_to_ignore_internal))
 
         elif self.flow_attr_origin == "edge":
+            if G.number_of_edges() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
+                raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
             if len(additional_starts) + len(additional_ends) > 0:
                 utils.logger.error(f"additional_starts and additional_ends are not supported when flow_attr_origin is 'edge'.")
                 raise ValueError(f"additional_starts and additional_ends are not supported when flow_attr_origin is 'edge'.")

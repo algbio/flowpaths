@@ -158,6 +158,9 @@ class AbstractPathModelDAG(ABC):
         """
 
         self.G = G
+        if G.number_of_edges() == 0:
+            utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
+            raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
         self.id = self.G.id
         self.k = k
         self.length_attr = length_attr

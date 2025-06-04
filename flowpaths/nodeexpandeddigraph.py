@@ -92,12 +92,12 @@ class NodeExpandedDiGraph(nx.DiGraph):
         """
         super().__init__()
 
+        if G.number_of_nodes() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
+                raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
         if not all(isinstance(node, str) for node in G.nodes()):
             utils.logger.error(f"{__name__}: Graph id {utils.fpid(G)}: every node of the graph must be a string.")
             raise ValueError("Every node of the graph must be a string.")
-        # # if not all nodes have the flow attribute, raise an error
-        # if not all(node_flow_attr in G.nodes[node] for node in G.nodes()):
-        #     raise ValueError(f"Every node must have the flow attribute specified as `node_flow_attr` ({node_flow_attr}).")
 
         self.original_G = deepcopy(G)
 

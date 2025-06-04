@@ -95,6 +95,9 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
         # Handling node-weighted graphs
         self.cover_type = cover_type
         if self.cover_type == "node":
+            if G.number_of_nodes() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
+                raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
             # NodeExpandedDiGraph needs to have flow_attr on edges, otherwise it will add the edges to edges_to_ignore
             G_with_flow_attr = deepcopy(G)
             node_flow_attr = str(id(G_with_flow_attr)) + "_flow_attr"
@@ -112,6 +115,9 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
             additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
         elif self.cover_type == "edge":
+            if G.number_of_edges() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
+                raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
             self.G_internal = G
             subpath_constraints_internal = subpath_constraints
             
