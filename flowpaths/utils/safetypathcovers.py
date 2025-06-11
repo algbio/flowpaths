@@ -152,6 +152,8 @@ def safe_sequences(
                 if isinstance(edge, tuple):
                     u, v, sequence_edge = edge[0], edge[-1], [edge]
                 elif isinstance(edge, list):
+                    if len(edge) == 0:
+                        raise ValueError("Empty edge list provided")
                     u, v, sequence_edge = edge[0][0], edge[-1][-1], edge
                 else:
                     raise ValueError("Invalid edge format (must be `tuple` or `list`)")

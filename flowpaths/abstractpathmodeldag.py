@@ -566,12 +566,21 @@ class AbstractPathModelDAG(ABC):
         is a valid path in the graph.
         """
 
-        # Check that self.subpath_constraints is a list of lists of edges
+        # Check that self.subpath_constraints is a list of lists
         if not all(isinstance(subpath, list) for subpath in self.subpath_constraints):
             utils.logger.error(f"{__name__}: subpath_constraints must be a list of lists of edges.")
             raise ValueError("subpath_constraints must be a list of lists of edges.")
 
         for subpath in self.subpath_constraints:
+            # Check that each subpath has at least one edge
+            if len(subpath) == 0:
+                utils.logger.error(f"{__name__}: subpath {subpath} must have at least 1 edge.")
+                raise ValueError(f"Subpath {subpath} must have at least 1 edge.")
+            # Check that each subpath is a list of tuples of two nodes (edges)
+            if not all(isinstance(e, tuple) and len(e) == 2 for e in subpath):
+                utils.logger.error(f"{__name__}: each subpath must be a list of edges, where each edge is a tuple of two nodes.")
+                raise ValueError("Each subpath must be a list of edges, where each edge is a tuple of two nodes.")
+            # Check that each edge in the subpath is in the graph
             for e in subpath:
                 if not self.G.has_edge(e[0], e[1]):
                     utils.logger.error(f"{__name__}: subpath {subpath} contains the edge {e} which is not in the graph.")
