@@ -209,7 +209,7 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
         
             The elapsed time in seconds.
         """
-        return time.perf_counter() - self.solve_time_start if self.solve_time_start is not None else None
+        return time.perf_counter() - self.solve_time_start if self.solve_time_start is not None else 0
 
     def get_solution(self):
         """
