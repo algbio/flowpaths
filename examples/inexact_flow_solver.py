@@ -18,7 +18,7 @@ import networkx as nx
 class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
     def __init__(self, G: nx.DiGraph, lb:str, ub:str, num_paths:int, threads:int=4):
 
-        self.G = fp.stDiGraph(G)
+        self.G = fp.stDAG(G)
         self.lb = lb # We assume all lowerbounds are >= 0
         self.ub = ub # We assume all upperbounds are >= 0
         # self.k = num_paths will be available from the superclass AbstractPathModelDAG, 

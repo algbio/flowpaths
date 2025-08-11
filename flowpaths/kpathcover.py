@@ -1,5 +1,5 @@
 import networkx as nx
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.safetyflowdecomp as sfd
@@ -135,7 +135,7 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
             utils.logger.error(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
             raise ValueError(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
 
-        self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+        self.G = stdag.stDAG(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 

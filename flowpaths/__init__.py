@@ -4,6 +4,7 @@ from .kflowdecomp import kFlowDecomp
 from .kminpatherror import kMinPathError
 from .kleastabserrors import kLeastAbsErrors
 from .numpathsoptimization import NumPathsOptimization
+from .stdag import stDAG
 from .stdigraph import stDiGraph
 from .nodeexpandeddigraph import NodeExpandedDiGraph
 from .utils import graphutils as graphutils
@@ -20,6 +21,7 @@ __all__ = [
     "kMinPathError",
     "kLeastAbsErrors",
     "NumPathsOptimization",
+    "stDAG",
     "stDiGraph",
     "NodeExpandedDiGraph",
     "graphutils",

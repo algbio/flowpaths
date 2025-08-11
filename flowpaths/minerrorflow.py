@@ -1,5 +1,5 @@
 import flowpaths.utils.solverwrapper as sw
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 import networkx as nx
@@ -134,7 +134,7 @@ class MinErrorFlow():
         
         if nx.is_directed_acyclic_graph(self.G_internal):
             self.is_acyclic = True
-            self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+            self.G = stdag.stDAG(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
             self.edges_to_ignore = set(edges_to_ignore_internal).union(self.G.source_sink_edges)
         else:
             self.G = self.G_internal

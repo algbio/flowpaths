@@ -1,6 +1,6 @@
 import time
 import networkx as nx
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.safetyflowdecomp as sfd
@@ -143,7 +143,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
 
-        self.G = stdigraph.stDiGraph(self.G_internal)
+        self.G = stdag.stDAG(self.G_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 

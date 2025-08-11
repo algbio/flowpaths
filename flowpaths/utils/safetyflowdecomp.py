@@ -1,4 +1,4 @@
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import networkx as nx
 from collections import deque 
 import flowpaths.utils as utils
@@ -195,7 +195,7 @@ def compute_flow_decomp_safe_paths(
     - ValueError: If an edge has a negative flow value.
     """
 
-    stG = stdigraph.stDiGraph(G)
+    stG = stdag.stDAG(G)
     decomp_paths = stG.decompose_using_max_bottleneck(flow_attr)[0]
     return compute_inexact_flow_decomp_safe_paths(
         G = G, 

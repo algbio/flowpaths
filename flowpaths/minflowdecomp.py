@@ -1,6 +1,6 @@
 import time
 import networkx as nx
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.kflowdecomp as kflowdecomp
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.solverwrapper as sw
@@ -564,7 +564,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         if self._lowerbound_k != None:
             return self._lowerbound_k
         
-        stG = stdigraph.stDiGraph(self.G)
+        stG = stdag.stDAG(self.G)
 
         self._lowerbound_k = self.optimization_options.get("lowerbound_k", 1)
 

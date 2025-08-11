@@ -13,7 +13,7 @@ graph.add_edge("c", "d", flow=6, length=8)
 graph.add_edge("c", "t", flow=7, length=9)
 graph.add_edge("d", "t", flow=6, length=4)
 
-width = fp.stDiGraph(graph).get_width(edges_to_ignore=[])
+width = fp.stDAG(graph).get_width(edges_to_ignore=[])
 
 # Solve the minimum path error model
 mpe_model = fp.kMinPathError(graph, flow_attr="flow", k=width, weight_type=float)

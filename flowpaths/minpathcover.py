@@ -4,7 +4,7 @@ import networkx as nx
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils as utils
 import flowpaths.utils.solverwrapper as sw
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.kpathcover as kpathcover
 import flowpaths.nodeexpandeddigraph as nedg
 from copy import deepcopy
@@ -132,7 +132,7 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
             utils.logger.error(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
             raise ValueError(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
 
-        self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+        self.G = stdag.stDAG(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 
@@ -231,7 +231,7 @@ class MinPathCover(pathmodel.AbstractPathModelDAG):
     def get_lowerbound_k(self):
 
         if self._lowerbound_k is None:
-            stG = stdigraph.stDiGraph(self.G)
+            stG = stdag.stDAG(self.G)
             self._lowerbound_k = stG.get_width(edges_to_ignore=self.edges_to_ignore)
 
         return self._lowerbound_k

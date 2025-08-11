@@ -1,4 +1,4 @@
-import flowpaths.stdag as stdag
+import flowpaths.stdigraph as stdigraph
 from flowpaths.utils import safetypathcovers
 from flowpaths.utils import solverwrapper as sw
 import flowpaths.utils as utils
@@ -6,50 +6,9 @@ import time
 import copy
 from abc import ABC, abstractmethod
 
-class AbstractPathModelDAG(ABC):
+class AbstractPathModelDiGraph(ABC):
     """
-    This is an abstract class modelling a path-finding (M)ILP in a DAG. The design of this package is based on the
-    following principles:
-
-    - The class is designed to be extended by other classes that model specific path-finding problems in DAGs.
-    In this way, they all benefit from the variables it encodes, and the safety optimizations it provides.
-    - The class uses our custom [SolverWrapper](solver-wrapper.md) class, which is a wrapper around the solvers HiGHS (open source) and 
-    Gurobi (free with academic license). In this way, both solvers can be used interchangeably.
-
-    More in detail, this class encodes `k` s-t paths in the DAG G, where s is the global source of the stDAG 
-    and t is the global sink. It also allows for subpath constraints that must appear in at least one of the s-t paths.
-
-    The class creates the following variables:
-
-    - **edge_vars**: `edge_vars[(u, v, i)]` = 1 if path `i` goes through edge `(u, v)`, `0` otherwise
-    - **edge_position_vars**: `edge_position_vars[(u, v, i)]` = position of edge `(u, v)` in path `i`, starting from position 0
-
-        - These variables are created only if `encode_edge_position` is set to `True`
-        - Note that positions are relative to the globals source `s` of the stDAG, thus the first edge in a path is 
-        the edge from `s` to the first vertex in the original graph, and this first edge has position 0
-        - If you set `length_attr`, then the positions are relative to the edge lengths, and not the number of edges
-        The first edge still gets position 0, and other edges get positions equal to the sum of the lengths of the edges before them in the path
-        - If you set `length_attr`, and an edge has missing edge length, then it gets length 1
-
-    - **path_length_vars**: `path_length_vars[(i)]` = length of path `i`
-
-        - These variables are created only if `encode_path_length` is set to `True`
-        - Note that the length of a path is the sum of the lengths of the edges in the path
-        - If you set `length_attr`, then the lengths are the sum of the lengths of the edges in the path
-        - If you set `length_attr`, and an edge has missing edge length, then it gets length 1
-        - **NOTE**: the length also includes the edges from global source to the first vertex, and from the last vertex to the global sink. By default, these do not have a length attached, so each gets length 1.
-        
-    - **solver**: a solver object to solve the (M)ILP, implemented using our [SolverWrapper](solver-wrapper.md) class.
-
-    !!! node "Safety optimizations"
-        This class uses the "safety information" (see [https://doi.org/10.48550/arXiv.2411.03871](https://doi.org/10.48550/arXiv.2411.03871)) in the graph to fix some 
-        `edge_vars` to 1 or 0. The safety information consists of safe paths, or safe sequences, that are guaranteed to appear in at least 
-        one cover (made up of any number of s-t paths) of the edges in `trusted_edges_for_safety`. That is, when implementing a new
-        path-finding (M)ILP, you can guarantee that 
-
-        1. The solution is made up of s-t paths
-        2. Any solution covers all edges in `trusted_edges_for_safety`, then safety optimizations can be used to fix some `edge_vars` to 1, 
-        which can speed up the solving process, while guaranteeing global optimality.
+    
     """
     # storing some defaults
     optimize_with_safe_paths = True
@@ -61,14 +20,10 @@ class AbstractPathModelDAG(ABC):
 
     def __init__(
         self,
-        G: stdag.stDAG,
+        G: stdigraph.stDiGraph,
         k: int,
-        subpath_constraints: list = [],
-        subpath_constraints_coverage: float = 1,
-        subpath_constraints_coverage_length: float = None,
-        encode_edge_position: bool = False,
-        encode_path_length: bool = False,
-        length_attr: str = None,
+        subset_constraints: list = [],
+        subset_constraints_coverage: float = 1,
         optimization_options: dict = None,
         solver_options: dict = {},
         solve_statistics: dict = {},
@@ -77,47 +32,26 @@ class AbstractPathModelDAG(ABC):
         Parameters
         ----------
 
-        - `G: stDAG.stDAG`  
+        - `G: stdigraph.stDiGraph`  
             
-            The directed acyclic graph (DAG) to be used.
+            The directed graph to be used.
 
         - `k: int`
             
-            The number of paths to be modeled.
+            The number of s-t walks to be modeled.
 
-        - `subpath_constraints: list`, optional
+        - `subset_constraints: list`, optional
             
-            A list of lists, where each list is a sequence of edges (not necessarily contiguous, i.e. path). Defaults to an empty list.
+            A list of lists, where each list is a *set* of edges (not necessarily contiguous). Defaults to an empty list.
             
-            Each sequence of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
-            then each sequence of edges must appear in at least subpath_constraints_coverage fraction of some solution path, see below.
+            Each set of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
+            then each set of edges must appear in at least sub_constraints_coverage fraction of some solution walk, see below.
         
         - `subpath_constraints_coverage: float`, optional
             
-            Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of number of edges. 
-                - Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution path).
-        
-        - `subpath_constraints_coverage_length: float`, optional 
-            
-            Coverage fraction of the subpath constraints that must be covered by some solution paths, in terms of length of the subpath. Defaults to `None`, meaning that this is not imposed. 
-            - If you set this constraint, you cannot set `subpath_constraints_coverage` (and its default value of 1 will be ignored).
-            - If you set this constraint, you also need to set `length_attr`. If an edge has missing edge length, it gets length 1.
-
-        - `encode_edge_position: bool`, optional
-        
-            Whether to encode the position of the edges in the paths. Defaults to `False`.
-
-        - `encode_path_length: bool`, optional
-            
-            Whether to encode the length of the paths (in terms of number of edges, or sum of lengths of edges, if set via `length_attr`). Defaults to `False`.
-
-        - `length_attr: str`, optional
-            
-            The attribute name from where to get the edge lengths. Defaults to `None`.
-            
-            - If set, then the edge positions, or path lengths (above) are in terms of the edge lengths specified in the `length_attr` field of each edge
-            - If set, and an edge has a missing edge length, then it gets length 1.
-        
+            Coverage fraction of the subset constraints that must be covered by some solution walk, in terms of number of edges. 
+                - Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution walk).
+                
         - `optimization_options: dict`, optional 
             
             Dictionary of optimization options. Defaults to `None`, in which case the default values are used. See the [available optimizations](solver-options-optimizations.md). 
@@ -131,15 +65,8 @@ class AbstractPathModelDAG(ABC):
                 !!! warning "Global optimality"
                     In order for the optimizations to still guarantee a global optimum, you must guarantee that:
 
-                    1. The solution is made up of source-to-sink paths, and
-                    2. Every edge in `trusted_edges_for_safety` appears in some solution path, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decomposition](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
-
-            - `"external_solution_paths" : list`
-            
-                External solution paths, as a list of paths, where every path is a list of nodes. Defaults to `None`.
-                If you provide this, this class skip the solver creation and encoding of paths, and just return these paths. 
-                This is useful when the child class managed to solver the problem in a different way, 
-                and needs to let this class know them, in order to have a consistent API.
+                    1. The solution is made up of source-to-sink walks, and
+                    2. Every edge in `trusted_edges_for_safety` appears in some solution walk, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decomposition](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
 
         - `solver_options: dict`, optional
             
@@ -154,7 +81,6 @@ class AbstractPathModelDAG(ABC):
         Raises
         ----------
         - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with `optimize_with_safe_paths` or `optimize_with_safe_sequences`.
-        - ValueError: If both `optimize_with_safe_paths` and `optimize_with_safe_sequences` are set to `True`.
         """
 
         self.G = G
@@ -163,37 +89,21 @@ class AbstractPathModelDAG(ABC):
             raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
         self.id = self.G.id
         self.k = k
-        self.length_attr = length_attr
         
-        self.subpath_constraints = copy.deepcopy(subpath_constraints)
-        if self.subpath_constraints is not None:
-            self._check_valid_subpath_constraints()
+        self.subset_constraints = copy.deepcopy(subset_constraints)
+        if self.subset_constraints is not None:
+            self._check_valid_subset_constraints()
 
-        self.subpath_constraints_coverage = subpath_constraints_coverage
-        self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        if len(subpath_constraints) > 0:
+        self.subpath_constraints_coverage = subset_constraints_coverage
+        if len(subset_constraints) > 0:
             if self.subpath_constraints_coverage <= 0 or self.subpath_constraints_coverage > 1:
                 utils.logger.error(f"{__name__}: subpath_constraints_coverage must be in the range (0, 1]")
                 raise ValueError("subpath_constraints_coverage must be in the range (0, 1]")
                 
-            if self.subpath_constraints_coverage_length is not None:
-                if self.subpath_constraints_coverage_length <= 0 or self.subpath_constraints_coverage_length > 1:
-                    utils.logger.error(f"{__name__}: subpath_constraints_coverage_length must be in the range (0, 1]")
-                    raise ValueError("If set, subpath_constraints_coverage_length must be in the range (0, 1]")
-                if self.length_attr is None:
-                    utils.logger.error(f"{__name__}: If subpath_constraints_coverage_length is set, length_attr must be provided.")
-                    raise ValueError("If subpath_constraints_coverage_length is set, length_attr must be provided.")
-                if self.subpath_constraints_coverage < 1:
-                    utils.logger.error(f"{__name__}: If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
-                    raise ValueError("If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
-
         self.solve_statistics = solve_statistics
         self.edge_vars = {}
         self.edge_vars_sol = {}
         self.subpaths_vars = {}
-        self.encode_edge_position = encode_edge_position
-        self.encode_path_length = encode_path_length
-        self.edge_position_vars = {}
 
         self.solver_options = solver_options
         if self.solver_options is None:
@@ -203,17 +113,17 @@ class AbstractPathModelDAG(ABC):
         # optimizations
         if optimization_options is None:
             optimization_options = {}
-        self.optimize_with_safe_paths = optimization_options.get("optimize_with_safe_paths", AbstractPathModelDAG.optimize_with_safe_paths)
+        self.optimize_with_safe_paths = optimization_options.get("optimize_with_safe_paths", AbstractPathModelDiGraph.optimize_with_safe_paths)
         self.external_safe_paths = optimization_options.get("external_safe_paths", None)
-        self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDAG.optimize_with_safe_sequences)
-        self.optimize_with_subpath_constraints_as_safe_sequences = optimization_options.get("optimize_with_subpath_constraints_as_safe_sequences", AbstractPathModelDAG.optimize_with_subpath_constraints_as_safe_sequences)
+        self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDiGraph.optimize_with_safe_sequences)
+        self.optimize_with_subpath_constraints_as_safe_sequences = optimization_options.get("optimize_with_subpath_constraints_as_safe_sequences", AbstractPathModelDiGraph.optimize_with_subpath_constraints_as_safe_sequences)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
-        self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
+        self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDiGraph.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
         self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
-        self.optimize_with_safety_as_subpath_constraints = optimization_options.get("optimize_with_safety_as_subpath_constraints", AbstractPathModelDAG.optimize_with_safety_as_subpath_constraints)
-        self.optimize_with_safety_from_largest_antichain = optimization_options.get("optimize_with_safety_from_largest_antichain", AbstractPathModelDAG.optimize_with_safety_from_largest_antichain)
-        
+        self.optimize_with_safety_as_subpath_constraints = optimization_options.get("optimize_with_safety_as_subpath_constraints", AbstractPathModelDiGraph.optimize_with_safety_as_subpath_constraints)
+        self.optimize_with_safety_from_largest_antichain = optimization_options.get("optimize_with_safety_from_largest_antichain", AbstractPathModelDiGraph.optimize_with_safety_from_largest_antichain)
+
         self._is_solved = None
         if self.external_solution_paths is not None:
             self._is_solved = True
@@ -253,19 +163,19 @@ class AbstractPathModelDAG(ABC):
             )
             self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
 
-        if self.optimize_with_subpath_constraints_as_safe_sequences and len(self.subpath_constraints) > 0 and not self.is_solved():
+        if self.optimize_with_subpath_constraints_as_safe_sequences and len(self.subset_constraints) > 0 and not self.is_solved():
             if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
                 start_time = time.perf_counter()
                 self.safe_lists += safetypathcovers.safe_sequences(
                     G=self.G,
-                    edges_or_subpath_constraints_to_cover=self.subpath_constraints,
+                    edges_or_subpath_constraints_to_cover=self.subset_constraints,
                     no_duplicates=False,
                     threads=self.threads,
                 )
                 self.solve_statistics["optimize_with_subpath_constraints_as_safe_sequences"] = time.perf_counter() - start_time
 
         if self.optimize_with_safety_as_subpath_constraints:
-            self.subpath_constraints += self.safe_lists
+            self.subset_constraints += self.safe_lists
 
     def create_solver_and_paths(self):
         """
@@ -281,14 +191,11 @@ class AbstractPathModelDAG(ABC):
             Always call this method before encoding other variables and constraints on the paths.
 
         """
-        if self.external_solution_paths is not None:
-            return
-
         self.solver = sw.SolverWrapper(**self.solver_options)
 
-        self._encode_paths()
+        self._encode_walks()
 
-    def _encode_paths(self):
+    def _encode_walks(self):
         
         # Encodes the paths in the graph by creating variables for edges and subpaths.
 
@@ -299,9 +206,9 @@ class AbstractPathModelDAG(ABC):
             (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
         ]
         self.path_indexes = [(i) for i in range(self.k)]
-        if len(self.subpath_constraints) > 0:
+        if len(self.subset_constraints) > 0:
             self.subpath_indexes = [
-                (i, j) for i in range(self.k) for j in range(len(self.subpath_constraints))
+                (i, j) for i in range(self.k) for j in range(len(self.subset_constraints))
             ]
 
 
@@ -364,20 +271,20 @@ class AbstractPathModelDAG(ABC):
 
         # Example of a subpath constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 paths to cover, the first one is 1-3-5. the second path is just a single edge 0-1
 
-        if len(self.subpath_constraints) > 0:
+        if len(self.subset_constraints) > 0:
             self.subpaths_vars = self.solver.add_variables(
                 self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
         
             for i in range(self.k):
-                for j in range(len(self.subpath_constraints)):
+                for j in range(len(self.subset_constraints)):
 
                     if self.subpath_constraints_coverage_length is None:
                         # By default, the length of the constraints is its number of edges 
-                        constraint_length = len(self.subpath_constraints[j])
+                        constraint_length = len(self.subset_constraints[j])
                         # And the fraction of edges that we need to cover is self.subpath_constraints_coverage
                         coverage_fraction = self.subpath_constraints_coverage
                         self.solver.add_constraint(
-                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subpath_constraints[j])
+                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subset_constraints[j])
                             >= constraint_length * coverage_fraction
                             * self.subpaths_vars[(i, j)],
                             name=f"7a_i={i}_j={j}",
@@ -386,65 +293,19 @@ class AbstractPathModelDAG(ABC):
                         # If however we specified that the coverage fraction is in terms of edge lengths
                         # Then the constraints length is the sum of the lengths of the edges,
                         # where each edge without a length gets length 1
-                        constraint_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.subpath_constraints[j])
+                        constraint_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.subset_constraints[j])
                         # And the fraction of edges that we need to cover is self.subpath_constraints_coverage_length
                         coverage_fraction = self.subpath_constraints_coverage_length
                         self.solver.add_constraint(
-                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.length_attr, 1) for e in self.subpath_constraints[j])
+                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.length_attr, 1) for e in self.subset_constraints[j])
                             >= constraint_length * coverage_fraction
                             * self.subpaths_vars[(i, j)],
                             name=f"7a_i={i}_j={j}",
                         )
-            for j in range(len(self.subpath_constraints)):
+            for j in range(len(self.subset_constraints)):
                 self.solver.add_constraint(
                     self.solver.quicksum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
                     name=f"7b_j={j}",
-                )
-
-        ###############################
-        #                             #
-        # Encoding position variables #
-        #                             #
-        ###############################
-
-        # edge_position_vars[(u, v, i)] = position (i.e., index) 
-        # of the edge (u, v) in the path i, starting from position 0. 
-        if self.encode_edge_position:
-            max_length = self.G.number_of_nodes()
-            if self.length_attr is not None:
-                max_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.G.edges())
-            self.edge_position_vars = self.solver.add_variables(
-                self.edge_indexes, name_prefix="position", lb=0, ub=max_length, var_type="integer"
-            )
-            for i in range(self.k):
-                for (u,v) in self.G.edges():
-                    self.solver.add_constraint(
-                        self.edge_position_vars[(u, v, i)] 
-                            == self.solver.quicksum(
-                                self.edge_vars[(edge[0], edge[1], i)] 
-                                * self.G[edge[0]][edge[1]].get(self.length_attr, 1) 
-                                for edge in self.G.reachable_edges_rev_from[u]
-                                ),
-                        name=f"position_u={u}_v={v}_i={i}"
-                    )
-
-        # path_length_vars[(i)] = length of path i
-        if self.encode_edge_position:
-            max_length = self.G.number_of_nodes()
-            if self.length_attr is not None:
-                max_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.G.edges())
-            self.path_length_vars = self.solver.add_variables(
-                self.path_indexes, name_prefix="path_length", lb=0, ub=max_length, var_type="integer"
-            )
-            for i in range(self.k):
-                self.solver.add_constraint(
-                    self.path_length_vars[(i)] 
-                        == self.solver.quicksum(
-                            self.edge_vars[(edge[0], edge[1], i)] 
-                            * self.G[edge[0]][edge[1]].get(self.length_attr, 1) 
-                            for edge in self.G.edges()
-                            ),
-                    name=f"path_length_constr_i={i}"
                 )
 
         ########################################
@@ -550,41 +411,43 @@ class AbstractPathModelDAG(ABC):
 
         return paths_to_fix
     
-    def _check_valid_subpath_constraints(self):
+    def _check_valid_subset_constraints(self):
         """
-        Checks if the subpath constraints are valid.
+        Checks if the subset constraints are valid.
 
         Parameters
         ----------
-        - subpath_constraints (list): The subpath constraints to be checked.
+        - subset_constraints (list): The subset constraints to be checked.
 
         Returns
         ----------
-        - True if the subpath constraints are valid, False otherwise.
+        - True if the subset constraints are valid, False otherwise.
 
-        The method checks if the subpath constraints are valid by ensuring that each subpath
-        is a valid path in the graph.
+        The method checks if the subset constraints are valid by ensuring that:
+        - `self.subset_constraints` is a list of lists
+        - each subset is a non-empty list of tuples of nodes
+        - each such tuple of nodes is an edge of the graph `self.G`
         """
 
-        # Check that self.subpath_constraints is a list of lists
-        if not all(isinstance(subpath, list) for subpath in self.subpath_constraints):
-            utils.logger.error(f"{__name__}: subpath_constraints must be a list of lists of edges.")
-            raise ValueError("subpath_constraints must be a list of lists of edges.")
+        # Check that self.subset_constraints is a list of lists
+        if not all(isinstance(subset, list) for subset in self.subset_constraints):
+            utils.logger.error(f"{__name__}: subset_constraints must be a list of lists of edges.")
+            raise ValueError("subset_constraints must be a list of lists of edges.")
 
-        for subpath in self.subpath_constraints:
+        for subset in self.subset_constraints:
             # Check that each subpath has at least one edge
-            if len(subpath) == 0:
-                utils.logger.error(f"{__name__}: subpath {subpath} must have at least 1 edge.")
-                raise ValueError(f"Subpath {subpath} must have at least 1 edge.")
-            # Check that each subpath is a list of tuples of two nodes (edges)
-            if not all(isinstance(e, tuple) and len(e) == 2 for e in subpath):
-                utils.logger.error(f"{__name__}: each subpath must be a list of edges, where each edge is a tuple of two nodes.")
-                raise ValueError("Each subpath must be a list of edges, where each edge is a tuple of two nodes.")
-            # Check that each edge in the subpath is in the graph
-            for e in subpath:
+            if len(subset) == 0:
+                utils.logger.error(f"{__name__}: subpath {subset} must have at least 1 edge.")
+                raise ValueError(f"Subset {subset} must have at least 1 edge.")
+            # Check that each subset is a list of tuples of two nodes (edges)
+            if not all(isinstance(e, tuple) and len(e) == 2 for e in subset):
+                utils.logger.error(f"{__name__}: each subset must be a list of edges, where each edge is a tuple of two nodes.")
+                raise ValueError("Each subset must be a list of edges, where each edge is a tuple of two nodes.")
+            # Check that each edge in the subset is in the graph
+            for e in subset:
                 if not self.G.has_edge(e[0], e[1]):
-                    utils.logger.error(f"{__name__}: subpath {subpath} contains the edge {e} which is not in the graph.")
-                    raise ValueError(f"Subpath {subpath} contains the edge {e} which is not in the graph.")
+                    utils.logger.error(f"{__name__}: subset {subset} contains the edge {e} which is not in the graph.")
+                    raise ValueError(f"Subset {subset} contains the edge {e} which is not in the graph.")
 
 
     def solve(self) -> bool:
@@ -604,12 +467,6 @@ class AbstractPathModelDAG(ABC):
         Otherwise, it sets the solved attribute to False and returns False.
         """
         utils.logger.info(f"{__name__}: solving...")
-
-        # If we already received an external solution, we don't need to solve the model
-        if self.external_solution_paths is not None:
-            utils.logger.info(f"{__name__}: no need to solve, we have an external solution.")
-            self._is_solved = True
-            return True
 
         # self.write_model(f"model-{self.id}.lp")
         start_time = time.perf_counter()
@@ -662,26 +519,25 @@ class AbstractPathModelDAG(ABC):
         """
         pass
 
-    def get_solution_paths(self) -> list:
+    def get_solution_walks(self) -> list:
         """
-        Retrieves the solution paths from the graph.
+        Retrieves the solution walks from the graph.
 
-        This method returns the solution paths either from the external solution paths
-        if they are provided at initialization time, or by calculating them based on the
+        This method returns the solution walks by calculating them based on the
         edge variable solutions.
 
         Returns
         ----------
-        - A list of paths, where each path is represented as a list of vertices.
+        - A list of walks, where each walk is represented as a list of vertices.
         """
-        if self.external_solution_paths is not None:
-            return self.external_solution_paths
 
         if self.edge_vars_sol == {}:
             self.edge_vars_sol = self.solver.get_variable_values(
                 "edge", [str, str, int], 
                 binary_values=True,
             )
+
+        # TODO: update this
 
         paths = []
         for i in range(self.k):
@@ -720,50 +576,6 @@ class AbstractPathModelDAG(ABC):
         If you cannot perform such a check, provide an implementation that always returns True.
         """
         pass
-
-    def verify_edge_position(self):
-        
-        if not self.encode_edge_position:
-            return True
-        
-        self.check_is_solved()
-
-        paths = self.get_solution_paths()
-
-        edge_position_sol = self.solver.get_variable_values("position", [str, str, int])
-
-        for path_index, path in enumerate(paths):
-            current_edge_position = 0
-            path_temp = [self.G.source] + path
-            for (u,v) in zip(path_temp[:-1], path_temp[1:]):
-                if round(edge_position_sol[(str(u), str(v), path_index)]) != current_edge_position:
-                    return False
-                current_edge_position += self.G[u][v].get(self.length_attr, 1)
-        return True
-    
-    def verify_path_length(self):
-        
-        if not self.encode_path_length:
-            return True
-        
-        self.check_is_solved()
-
-        paths = self.get_solution_paths()
-
-        path_length_sol = self.solver.get_variable_values("path_length", [int])
-
-        for path_index, path in enumerate(paths):
-            if len(path) > 0:
-                path_temp = [self.G.source] + path + [self.G.sink]            
-                path_length = 0
-                for (u,v) in zip(path_temp[:-1], path_temp[1:]):
-                    path_length += self.G[u][v].get(self.length_attr, 1)   
-
-                if round(path_length_sol[(path_index)]) != path_length:
-                    return False
-    
-    
-        return True
 
     @abstractmethod
     def get_objective_value(self):
