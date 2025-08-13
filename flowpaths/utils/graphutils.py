@@ -319,8 +319,7 @@ def draw(
         """
 
         if len(paths) != len(weights):
-            raise ValueError(f"{__name__}: Paths and weights must have the same length.")
-            raise ValueError("Paths and weights must have the same length, if provided.")
+            raise ValueError(f"{__name__}: Paths and weights must have the same length, if provided.")
 
         try:
             import graphviz as gv

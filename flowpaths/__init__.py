@@ -3,6 +3,7 @@ from .minflowdecomp import MinFlowDecomp
 from .kflowdecomp import kFlowDecomp
 from .kminpatherror import kMinPathError
 from .kleastabserrors import kLeastAbsErrors
+from .kleastabserrorscycles import kLeastAbsErrorsCycles
 from .numpathsoptimization import NumPathsOptimization
 from .stdag import stDAG
 from .stdigraph import stDiGraph
@@ -20,6 +21,7 @@ __all__ = [
     "kFlowDecomp",
     "kMinPathError",
     "kLeastAbsErrors",
+    "kLeastAbsErrorsCycles",
     "NumPathsOptimization",
     "stDAG",
     "stDiGraph",

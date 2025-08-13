@@ -11,17 +11,16 @@ class AbstractPathModelDiGraph(ABC):
     
     """
     # storing some defaults
-    optimize_with_safe_paths = True
     optimize_with_safe_sequences = False
     optimize_with_safe_zero_edges = True
-    optimize_with_subpath_constraints_as_safe_sequences = True
-    optimize_with_safety_as_subpath_constraints = False
-    optimize_with_safety_from_largest_antichain = False
+    optimize_with_subset_constraints_as_safe_sequences = True
+    optimize_with_safety_as_subset_constraints = False
 
     def __init__(
         self,
         G: stdigraph.stDiGraph,
         k: int,
+        max_edge_repetition: int = 1,
         subset_constraints: list = [],
         subset_constraints_coverage: float = 1,
         optimization_options: dict = None,
@@ -39,6 +38,10 @@ class AbstractPathModelDiGraph(ABC):
         - `k: int`
             
             The number of s-t walks to be modeled.
+
+        - `max_edge_repetition: int`, optional
+
+            The maximum number of times an edge can be used in a walk. Defaults to 1.
 
         - `subset_constraints: list`, optional
             
@@ -80,7 +83,7 @@ class AbstractPathModelDiGraph(ABC):
 
         Raises
         ----------
-        - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with `optimize_with_safe_paths` or `optimize_with_safe_sequences`.
+        - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with `optimize_with_safe_sequences`.
         """
 
         self.G = G
@@ -89,21 +92,22 @@ class AbstractPathModelDiGraph(ABC):
             raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
         self.id = self.G.id
         self.k = k
+        self.max_edge_repetition = max_edge_repetition
         
         self.subset_constraints = copy.deepcopy(subset_constraints)
         if self.subset_constraints is not None:
             self._check_valid_subset_constraints()
 
-        self.subpath_constraints_coverage = subset_constraints_coverage
+        self.subset_constraints_coverage = subset_constraints_coverage
         if len(subset_constraints) > 0:
-            if self.subpath_constraints_coverage <= 0 or self.subpath_constraints_coverage > 1:
-                utils.logger.error(f"{__name__}: subpath_constraints_coverage must be in the range (0, 1]")
-                raise ValueError("subpath_constraints_coverage must be in the range (0, 1]")
-                
+            if self.subset_constraints_coverage <= 0 or self.subset_constraints_coverage > 1:
+                utils.logger.error(f"{__name__}: subset_constraints_coverage must be in the range (0, 1]")
+                raise ValueError("subset_constraints_coverage must be in the range (0, 1]")
+
         self.solve_statistics = solve_statistics
         self.edge_vars = {}
         self.edge_vars_sol = {}
-        self.subpaths_vars = {}
+        self.subset_vars = {}
 
         self.solver_options = solver_options
         if self.solver_options is None:
@@ -113,47 +117,17 @@ class AbstractPathModelDiGraph(ABC):
         # optimizations
         if optimization_options is None:
             optimization_options = {}
-        self.optimize_with_safe_paths = optimization_options.get("optimize_with_safe_paths", AbstractPathModelDiGraph.optimize_with_safe_paths)
-        self.external_safe_paths = optimization_options.get("external_safe_paths", None)
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDiGraph.optimize_with_safe_sequences)
-        self.optimize_with_subpath_constraints_as_safe_sequences = optimization_options.get("optimize_with_subpath_constraints_as_safe_sequences", AbstractPathModelDiGraph.optimize_with_subpath_constraints_as_safe_sequences)
+        self.optimize_with_subset_constraints_as_safe_sequences = optimization_options.get("optimize_with_subset_constraints_as_safe_sequences", AbstractPathModelDiGraph.optimize_with_subset_constraints_as_safe_sequences)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
-        self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDiGraph.optimize_with_safe_zero_edges)
-        self.external_solution_paths = optimization_options.get("external_solution_paths", None)
         self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
-        self.optimize_with_safety_as_subpath_constraints = optimization_options.get("optimize_with_safety_as_subpath_constraints", AbstractPathModelDiGraph.optimize_with_safety_as_subpath_constraints)
-        self.optimize_with_safety_from_largest_antichain = optimization_options.get("optimize_with_safety_from_largest_antichain", AbstractPathModelDiGraph.optimize_with_safety_from_largest_antichain)
+        self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractPathModelDiGraph.optimize_with_safety_as_subset_constraints)
 
         self._is_solved = None
-        if self.external_solution_paths is not None:
-            self._is_solved = True
-
-        # some checks
-        if self.optimize_with_safe_paths and self.external_safe_paths is None and self.trusted_edges_for_safety is None:
-            utils.logger.error(f"{__name__}: trusted_edges_for_safety must be provided when optimizing with safe paths")
-            raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")        
-        if self.optimize_with_safe_sequences and self.external_safe_paths is not None:
-            utils.logger.error(f"{__name__}: Cannot optimize with both external safe paths and safe sequences")
-            raise ValueError("Cannot optimize with both external safe paths and safe sequences")
-
-        if self.optimize_with_safe_paths and self.optimize_with_safe_sequences:
-            utils.logger.error(f"{__name__}: Cannot optimize with both safe paths and safe sequences")
-            raise ValueError("Cannot optimize with both safe paths and safe sequences")        
                 
         self.safe_lists = []
-        if self.external_safe_paths is not None:
-            self.safe_lists = self.external_safe_paths
-        elif self.optimize_with_safe_paths and not self.is_solved() and self.trusted_edges_for_safety is not None:
-            start_time = time.perf_counter()
-            self.safe_lists += safetypathcovers.safe_paths(
-                G=self.G,
-                edges_to_cover=self.trusted_edges_for_safety,
-                no_duplicates=False,
-                threads=self.threads,
-            )
-            self.solve_statistics["safe_paths_time"] = time.perf_counter() - start_time
 
-        if self.optimize_with_safe_sequences and not self.is_solved():
+        if self.optimize_with_safe_sequences:
             start_time = time.perf_counter()
             self.safe_lists += safetypathcovers.safe_sequences(
                 G=self.G,
@@ -163,8 +137,8 @@ class AbstractPathModelDiGraph(ABC):
             )
             self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
 
-        if self.optimize_with_subpath_constraints_as_safe_sequences and len(self.subset_constraints) > 0 and not self.is_solved():
-            if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
+        if self.optimize_with_subset_constraints_as_safe_sequences and len(self.subset_constraints) > 0 and not self.is_solved():
+            if self.subset_constraints_coverage == 1:
                 start_time = time.perf_counter()
                 self.safe_lists += safetypathcovers.safe_sequences(
                     G=self.G,
@@ -172,19 +146,17 @@ class AbstractPathModelDiGraph(ABC):
                     no_duplicates=False,
                     threads=self.threads,
                 )
-                self.solve_statistics["optimize_with_subpath_constraints_as_safe_sequences"] = time.perf_counter() - start_time
+                self.solve_statistics["optimize_with_subset_constraints_as_safe_sequences"] = time.perf_counter() - start_time
 
-        if self.optimize_with_safety_as_subpath_constraints:
+        if self.optimize_with_safety_as_subset_constraints:
             self.subset_constraints += self.safe_lists
 
     def create_solver_and_paths(self):
         """
         Creates a solver instance and encodes the paths in the graph.
 
-        This method initializes the solver with the specified parameters and encodes the paths
-        by creating variables for edges and subpaths.
-
-        If external solution paths are provided, it skips the solver creation.
+        This method initializes the solver with the specified parameters and encodes the walks
+        by creating variables for edges and subsets to cover.
 
         !!! warning "Call this method before encoding other variables and constraints."
         
@@ -196,34 +168,41 @@ class AbstractPathModelDiGraph(ABC):
         self._encode_walks()
 
     def _encode_walks(self):
-        
-        # Encodes the paths in the graph by creating variables for edges and subpaths.
 
-        # This method initializes the edge and subpath variables for the solver and adds constraints
-        # to ensure the paths are valid according to the given subpath constraints and safe lists.
-        
+        # Encodes the paths in the graph by creating variables for edges and subsets to cover.
+
+        # This method initializes the edge and subset variables for the solver and adds constraints
+        # to ensure the paths are valid according to the given subset constraints and safe lists.
+
         self.edge_indexes = [
             (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
         ]
         self.path_indexes = [(i) for i in range(self.k)]
         if len(self.subset_constraints) > 0:
-            self.subpath_indexes = [
+            self.subset_indexes = [
                 (i, j) for i in range(self.k) for j in range(len(self.subset_constraints))
             ]
-
+        self.vertex_indexes = [
+            (v, i) for i in range(self.k) for v in self.G.nodes()
+        ]
 
         ################################
         #                              #
-        #       Encoding paths         #
+        #       Encoding walks         #
         #                              #
         ################################
 
-        # The identifiers of the constraints come from https://arxiv.org/pdf/2201.10923 page 14-15
+        # We follow https://arxiv.org/abs/2209.00042
 
-        self.edge_vars = self.solver.add_variables(self.edge_indexes, name_prefix="edge", lb=0, ub=1, var_type="integer")
+        # Basic
 
+        utils.logger.debug(f"{__name__}: Encoding walks for graph id = {utils.fpid(self.G)} with k = {self.k} and max_edge_repetition = {self.max_edge_repetition}")
+
+        self.edge_vars = self.solver.add_variables(self.edge_indexes, name_prefix="edge", lb=0, ub=self.max_edge_repetition, var_type="integer")
+
+        # Note that x[(u,v,i)] can take values bigger than 1 if using the edge (u,v) more times, but by our construction the self.G.source is
+        # also a source of the graph, so the walk cannot come back to self.G.source.
         for i in range(self.k):
-            
             if not self.allow_empty_paths:
                 self.solver.add_constraint(
                     self.solver.quicksum(
@@ -231,7 +210,7 @@ class AbstractPathModelDiGraph(ABC):
                         for v in self.G.successors(self.G.source)
                     )
                     == 1,
-                    name=f"10a_i={i}",
+                    name=f"17a_i={i}",
                 )
             else:
                 self.solver.add_constraint(
@@ -240,17 +219,8 @@ class AbstractPathModelDiGraph(ABC):
                         for v in self.G.successors(self.G.source)
                     )
                     <= 1,
-                    name=f"10a_i={i}",
+                    name=f"17a_i={i}",
                 )
-            # Not needed, follows from the others
-            # self.solver.add_constraint(
-            #     self.solver.quicksum(
-            #         self.edge_vars[(u, self.G.sink, i)]
-            #         for u in self.G.predecessors(self.G.sink)
-            #     )
-            #     == 1,
-            #     name=f"10b_i={i}",
-            # )
 
         for i in range(self.k):
             for v in self.G.nodes:  # find all edges u->v->w for v in V\{s,t}
@@ -260,51 +230,123 @@ class AbstractPathModelDiGraph(ABC):
                     self.solver.quicksum(self.edge_vars[(u, v, i)] for u in self.G.predecessors(v))
                     - self.solver.quicksum(self.edge_vars[(v, w, i)] for w in self.G.successors(v))
                     == 0,
-                    f"10c_v={v}_i={i}",
+                    f"17b_v={v}_i={i}",
                 )
 
-        ################################
-        #                              #
-        # Encoding subpath constraints #
-        #                              #
-        ################################
+        # Constraints to make sure the entire walk is strongly connected
+        # Every vertex gets a distance d[v,i]
+        self.distance_vars = self.solver.add_variables(self.vertex_indexes, name_prefix="distance", lb=0, ub=self.G.number_of_nodes(), var_type="integer")
+        self.edge_selected_vars = self.solver.add_variables(self.edge_indexes, name_prefix="selected_edge", lb=0, ub=1, var_type="integer")
 
-        # Example of a subpath constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 paths to cover, the first one is 1-3-5. the second path is just a single edge 0-1
+        # 18a: d[s,1] = 1
+        for i in range(self.k):
+            self.solver.add_constraint(
+                self.distance_vars[(self.G.source, i)] == 1,
+                name=f"18a_i={i}",
+            )
 
-        if len(self.subset_constraints) > 0:
-            self.subpaths_vars = self.solver.add_variables(
-                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
+        # # 18b: If a vertex v is not selected, then its distance is 0
+        # # TODO: is this needed?
+        # for i in range(self.k):
+        #     for v in self.G.nodes:
+        #         if v == self.G.source:
+        #             continue
+        #         self.solver.add_constraint(
+        #             self.solver.quicksum( self.edge_vars[(u, v, i)] for u in self.G.predecessors(v) ) 
+        #             >= 
+        #             self.distance_vars[(v, i)],
+        #             name=f"18_20_v={v}_i={i}",
+        #         )
+
+        # Edge selected constraints
+
+        # 19a: If y[(u,v,i)] = 1, then x[(u,v,i)] = 1
+        # Equivalently, y[(u,v,i)] cannot be 1 without x[(u,v,i)] being 1
+        for i in range(self.k):
+            for (u,v) in self.G.edges:
+                self.solver.add_constraint(
+                    self.edge_vars[(u, v, i)] >= self.edge_selected_vars[(u, v, i)],
+                    name=f"21_edge_selected_u={u}_v={v}_i={i}",
+                )
+
+        # 19b: If a vertex is selected, then exactly one in-coming edge is selected
+        for i in range(self.k):
+            for v in self.G.nodes:
+                if v == self.G.source:
+                    continue
+                incoming_flow_v     = self.solver.quicksum( self.edge_vars[(u, v, i)]          for u in self.G.predecessors(v) )
+                incoming_selected_v = self.solver.quicksum( self.edge_selected_vars[(u, v, i)] for u in self.G.predecessors(v) )
+
+                # If at least one x[(u,v,i)] is 1, then at least one y[(u,v,i)] is 1
+                self.solver.add_constraint(
+                    incoming_flow_v <= self.max_edge_repetition * self.G.in_degree(v) * incoming_selected_v,
+                    name=f"22a_vertex_selected_v={v}_i={i}",
+                )
+                # At most one y[(u,v,i)] = 1
+                self.solver.add_constraint(
+                    incoming_selected_v <= 1,
+                    name=f"22b_vertex_selected_v={v}_i={i}",
+                )
+
+        # 19c: The distance strictly increases along selected edges
+        M = self.G.number_of_nodes()
+        for i in range(self.k):
+            for (u,v) in self.G.edges:
+                # If edge is selected, distance must increase by at least 1 (or exactly 1, but exact equality not needed)
+                # Otherwise, we don't impose anything, which is why we use big M
+                self.solver.add_constraint(
+                    self.distance_vars[(v, i)] >= self.distance_vars[(u, i)] + 1 - M * (1 - self.edge_selected_vars[(u, v, i)]),
+                    name=f"19c_distance_order_u={u}_v={v}_i={i}",
+                )
+        # self.y_uv_prod_d_v_minus_du_vars = self.solver.add_variables(self.edge_indexes, name_prefix="y_uv_prod_d_v_minus_du", lb=0, ub=self.G.number_of_nodes(), var_type="integer")
+        # for i in range(self.k):
+        #     for (u,v) in self.G.edges:
+        #         self.solver.add_binary_continuous_product_constraint(
+        #             binary_var=self.edge_selected_vars[(u, v, i)],
+        #             continuous_var=(self.distance_vars[(v, i)] - self.distance_vars[(u, i)]),
+        #             product_var=self.y_uv_prod_d_v_minus_du_vars[(u, v, i)],
+        #             lb=0,
+        #             ub=self.G.number_of_nodes(),
+        #             name=f"19c_y_uv_prod_d_v_minus_du_u={u}_v={v}_i={i}"
+        #         )
+
+        #     for v in self.G.nodes:
+        #         if v == self.G.source:
+        #             continue
+        #         self.solver.add_constraint(
+        #             self.solver.quicksum( self.edge_vars[(u, v, i)] for u in self.G.predecessors(v) ) 
+        #             <= 
+        #             self.G.number_of_nodes() * self.solver.quicksum( self.y_uv_prod_d_v_minus_du_vars[(u, v, i)] for u in self.G.predecessors(v) ),
+        #             name=f"19c={v}_i={i}"
+        #         )
+
+        #################################
+        #                               #
+        # Encoding subset constraints   #
+        #                               #
+        #################################
+
+        # Example of a subset constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 subsets to cover, the first one is {(1,3),(3,5)}, the second set is just a single edge {(0,1)}
+
+        if False and len(self.subset_constraints) > 0:
+            self.subset_vars = self.solver.add_variables(
+                self.subset_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
         
             for i in range(self.k):
                 for j in range(len(self.subset_constraints)):
-
-                    if self.subpath_constraints_coverage_length is None:
-                        # By default, the length of the constraints is its number of edges 
-                        constraint_length = len(self.subset_constraints[j])
-                        # And the fraction of edges that we need to cover is self.subpath_constraints_coverage
-                        coverage_fraction = self.subpath_constraints_coverage
-                        self.solver.add_constraint(
-                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subset_constraints[j])
-                            >= constraint_length * coverage_fraction
-                            * self.subpaths_vars[(i, j)],
-                            name=f"7a_i={i}_j={j}",
-                        )
-                    else:
-                        # If however we specified that the coverage fraction is in terms of edge lengths
-                        # Then the constraints length is the sum of the lengths of the edges,
-                        # where each edge without a length gets length 1
-                        constraint_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in self.subset_constraints[j])
-                        # And the fraction of edges that we need to cover is self.subpath_constraints_coverage_length
-                        coverage_fraction = self.subpath_constraints_coverage_length
-                        self.solver.add_constraint(
-                            self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] * self.G[e[0]][e[1]].get(self.length_attr, 1) for e in self.subset_constraints[j])
-                            >= constraint_length * coverage_fraction
-                            * self.subpaths_vars[(i, j)],
-                            name=f"7a_i={i}_j={j}",
-                        )
+                    # By default, the length of the constraints is its number of edges 
+                    constraint_length = len(self.subset_constraints[j])
+                    # And the fraction of edges that we need to cover is self.subset_constraints_coverage
+                    coverage_fraction = self.subset_constraints_coverage
+                    self.solver.add_constraint(
+                        self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subset_constraints[j])
+                        >= constraint_length * coverage_fraction
+                        * self.subset_vars[(i, j)],
+                        name=f"7a_i={i}_j={j}",
+                    )
             for j in range(len(self.subset_constraints)):
                 self.solver.add_constraint(
-                    self.solver.quicksum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
+                    self.solver.quicksum(self.subset_vars[(i, j)] for i in range(self.k)) >= 1,
                     name=f"7b_j={j}",
                 )
 
@@ -314,10 +356,10 @@ class AbstractPathModelDiGraph(ABC):
         #                                      #
         ########################################
 
-        if self.safe_lists is not None:
+        if False and self.safe_lists is not None:
             paths_to_fix = self._get_paths_to_fix_from_safe_lists()
 
-            if not self.optimize_with_safety_as_subpath_constraints:
+            if not self.optimize_with_safety_as_subset_constraints:
                 # iterating over safe lists
                 for i in range(min(len(paths_to_fix), self.k)):
                     # print("Fixing variables for safe list #", i)
@@ -328,32 +370,10 @@ class AbstractPathModelDiGraph(ABC):
                             name=f"safe_list_u={u}_v={v}_i={i}",
                         )
 
-                    if self.optimize_with_safe_zero_edges:
-                        # get the endpoints of the longest safe path in the sequence
-                        first_node, last_node = (
-                            safetypathcovers.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
-                        )
-                        # get the reachable nodes from the last node
-                        reachable_nodes = self.G.reachable_nodes_from[last_node]
-                        # get the backwards reachable nodes from the first node
-                        reachable_nodes_reverse = self.G.reachable_nodes_rev_from[first_node]
-                        # get the edges in the path
-                        path_edges = set((u, v) for (u, v) in paths_to_fix[i])
-
-                        for u, v in self.G.base_graph.edges():
-                            if (
-                                (u, v) not in path_edges
-                                and u not in reachable_nodes
-                                and v not in reachable_nodes_reverse
-                            ):
-                                # print(f"Adding zero constraint for edge ({u}, {v}) in path {i}")
-                                self.solver.add_constraint(
-                                    self.edge_vars[(u, v, i)] == 0,
-                                    name=f"safe_list_zero_edge_u={u}_v={v}_i={i}",
-                                )
-
 
     def _get_paths_to_fix_from_safe_lists(self) -> list:
+
+        # TODO: fix this for graphs with cycles
         
         # Returns the paths to fix based on the safe lists.
         # The method finds the longest safe list for each edge and returns the paths to fix based on the longest safe list.
@@ -521,52 +541,128 @@ class AbstractPathModelDiGraph(ABC):
 
     def get_solution_walks(self) -> list:
         """
-        Retrieves the solution walks from the graph.
-
-        This method returns the solution walks by calculating them based on the
-        edge variable solutions.
-
-        Returns
-        ----------
-        - A list of walks, where each walk is represented as a list of vertices.
+        Retrieves the solution walks from the graph, handling cycles with multiplicities.
+        
+        For each layer i, this reconstructs a single Eulerian walk that uses all edges
+        with positive flow, ensuring complete flow decomposition.
         """
-
+        
         if self.edge_vars_sol == {}:
             self.edge_vars_sol = self.solver.get_variable_values(
-                "edge", [str, str, int], 
-                binary_values=True,
+                "edge", [str, str, int]
             )
+        utils.logger.debug(f"{__name__}: Getting solution walks with self.edge_vars_sol = {self.edge_vars_sol}")
 
-        # TODO: update this
+        self.distance_vars_sol = self.solver.get_variable_values("distance", [str, int])
+        utils.logger.debug(f"{__name__}: Getting solution walks with distances = {self.distance_vars_sol}")
 
-        paths = []
+        self.edge_selected_sol = self.solver.get_variable_values("selected_edge", [str, str, int])
+        utils.logger.debug(f"{__name__}: Getting solution walks with edge selected = {self.edge_selected_sol}")
+
+        walks = []
         for i in range(self.k):
-            vertex = self.G.source
-            # checking if there is a path from source to sink
-            found_path = False
-            for out_neighbor in self.G.successors(vertex):
-                if self.edge_vars_sol[(str(vertex), str(out_neighbor), i)] == 1:
-                    found_path = True
-                    break
-            if not found_path:
-                path = []
-                paths.append(path)
-                # print("Warning: No path found for path index", i)
-            else:
-                path = [vertex]
-                while vertex != self.G.sink:
-                    for out_neighbor in self.G.successors(vertex):
-                        if self.edge_vars_sol[(str(vertex), str(out_neighbor), i)] == 1:
-                            vertex = out_neighbor
-                            break
-                    path.append(vertex)
-                if len(path) < 2:
-                    utils.logger.error(f"{__name__}: Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDAG has no edge from global source {self.G.source} to global sink {self.G.sink}.")
-                    raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDAG has no edge from global source {self.G.source} to global sink {self.G.sink}.")
+            # Build residual graph for this layer with edge multiplicities
+            residual_graph = self._build_residual_graph_for_layer(i)
+            utils.logger.debug(f"{__name__}: residual_graph = {residual_graph}")
+            
+            # Check if there's any flow in this layer
+            if not residual_graph:
+                walks.append([])
+                continue
                 
-                paths.append(path[1:-1])
+            # Reconstruct complete Eulerian walk
+            walk = self._reconstruct_eulerian_walk(residual_graph, i)
+            walks.append(walk)
+        
+        return walks
 
-        return paths
+    def _build_residual_graph_for_layer(self, layer_i: int) -> dict:
+        """
+        Builds a residual graph for a specific layer with edge multiplicities.
+        
+        Returns a dictionary where keys are vertices and values are lists of 
+        outgoing neighbors (with repetition for multiple uses).
+        """
+        residual_graph = {}
+        
+        # Initialize all vertices
+        for vertex in self.G.nodes():
+            residual_graph[vertex] = []
+        
+        # Add edges based on solution values
+        for (u, v) in self.G.edges():
+            edge_key = (str(u), str(v), layer_i)
+            if edge_key in self.edge_vars_sol:
+                multiplicity = round(self.edge_vars_sol[edge_key])
+                # Add this edge 'multiplicity' times to the residual graph
+                for _ in range(multiplicity):
+                    residual_graph[u].append(v)
+        
+        return residual_graph
+
+    def _reconstruct_eulerian_walk(self, residual_graph: dict, layer_i: int) -> list:
+        """
+        Reconstructs a complete Eulerian walk using Hierholzer's algorithm.
+        """
+        # Make a copy since we'll be modifying it
+        graph = {v: neighbors[:] for v, neighbors in residual_graph.items()}
+        
+        # Start from source
+        current_vertex = self.G.source
+        walk = [current_vertex]
+        stack = []
+
+        # Find one s-t walk
+        while graph[current_vertex]:
+            # Follow an unused edge
+            next_vertex = graph[current_vertex].pop()
+            stack.append(current_vertex)
+            current_vertex = next_vertex
+            walk.append(current_vertex)
+            utils.logger.debug(f"{__name__}: Current walk: {walk}, stack: {stack}")
+        
+        # Find vertices from which we can find dangling closed walks
+        while stack:
+            utils.logger.debug(f"{__name__}: Current stack: {stack}")
+            potential_vertex = stack.pop()            
+            if graph[potential_vertex]:
+                # Build and insert closed walk from this vertex
+                closed_walk_start_idx = walk.index(potential_vertex)
+                closed_walk = self._build_closed_walk_from_vertex(graph, potential_vertex, stack)
+
+                # Insert closed walk into walk (excluding duplicate start vertex)
+                walk[closed_walk_start_idx + 1:closed_walk_start_idx + 1] = closed_walk[1:]
+
+        # Verify all edges were used
+        total_edges_remaining = sum(len(neighbors) for neighbors in graph.values())
+        if total_edges_remaining > 0:
+            utils.logger.error(f"{__name__}: Layer {layer_i}: {total_edges_remaining} edges not used")
+
+        # Remove source and sink from the walk
+        if len(walk) >= 2 and walk[0] == self.G.source and walk[-1] == self.G.sink:
+            return walk[1:-1]
+        else:
+            utils.logger.error(f"{__name__}: Layer {layer_i}: Walk does not start with source or end with sink")
+            return walk
+
+    def _build_closed_walk_from_vertex(self, graph: dict, start_vertex, stack: list) -> list:
+        """
+        Builds a closed walk starting from the given vertex, modifying graph and stack.
+        """
+        closed_walk = [start_vertex]
+        current_vertex = start_vertex
+        
+        while graph[current_vertex]:
+            next_vertex = graph[current_vertex].pop()
+            stack.append(current_vertex)
+            closed_walk.append(next_vertex)
+            current_vertex = next_vertex
+            
+            # Stop if we've completed the cycle
+            if current_vertex == start_vertex:
+                break
+        
+        return closed_walk
 
     @abstractmethod
     def is_valid_solution(self) -> bool:
