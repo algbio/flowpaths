@@ -345,8 +345,6 @@ class kLeastAbsErrorsCycles(pathmodeldigraph.AbstractPathModelDiGraph):
         - `exception` If model is not solved.
         """
 
-        utils.logger.debug(f"{__name__}: Getting solution for graph id = {utils.fpid(self.G)}")
-
         if self._solution is not None:
             return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
 

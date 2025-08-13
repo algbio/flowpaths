@@ -1,5 +1,6 @@
 import flowpaths as fp
 import networkx as nx
+from flowpaths.utils import safetypathcoverscycles as safety
 
 def test1():
     # Create a simple graph
@@ -10,21 +11,11 @@ def test1():
     graph.add_edge("b", "a", flow=2)
     graph.add_edge("a", "t", flow=1)
 
-    # We create a Least Absolute Errors solver with default settings, 
-    # by specifying that the flow value of each edge is in the attribute `flow` of the edges,
-    # and that the number of paths to consider is 1.
-    lae_model = fp.kLeastAbsErrorsCycles(
-        G=graph, 
-        flow_attr="flow", 
-        k=1, 
-        weight_type=int,
-        )
+    stD = fp.stDiGraph(graph)
 
-    # We solve it
-    lae_model.solve()
-
-    # We process its solution
-    process_solution(graph, lae_model)
+    X = graph.edges()  # All edges are considered for safety path cover
+    safe_seqs = safety.maximal_safe_sequences_via_dominators(stD, X)
+    print(safe_seqs)
 
 def test2():
     # Create a simple graph
@@ -82,5 +73,5 @@ if __name__ == "__main__":
         log_to_console=True,
     )
 
-    # test1()
-    test2()
+    test1()
+    # test2()

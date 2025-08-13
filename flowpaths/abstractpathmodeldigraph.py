@@ -238,26 +238,6 @@ class AbstractPathModelDiGraph(ABC):
         self.distance_vars = self.solver.add_variables(self.vertex_indexes, name_prefix="distance", lb=0, ub=self.G.number_of_nodes(), var_type="integer")
         self.edge_selected_vars = self.solver.add_variables(self.edge_indexes, name_prefix="selected_edge", lb=0, ub=1, var_type="integer")
 
-        # 18a: d[s,1] = 1
-        for i in range(self.k):
-            self.solver.add_constraint(
-                self.distance_vars[(self.G.source, i)] == 1,
-                name=f"18a_i={i}",
-            )
-
-        # # 18b: If a vertex v is not selected, then its distance is 0
-        # # TODO: is this needed?
-        # for i in range(self.k):
-        #     for v in self.G.nodes:
-        #         if v == self.G.source:
-        #             continue
-        #         self.solver.add_constraint(
-        #             self.solver.quicksum( self.edge_vars[(u, v, i)] for u in self.G.predecessors(v) ) 
-        #             >= 
-        #             self.distance_vars[(v, i)],
-        #             name=f"18_20_v={v}_i={i}",
-        #         )
-
         # Edge selected constraints
 
         # 19a: If y[(u,v,i)] = 1, then x[(u,v,i)] = 1
@@ -288,8 +268,14 @@ class AbstractPathModelDiGraph(ABC):
                     name=f"22b_vertex_selected_v={v}_i={i}",
                 )
 
+        # 18a: d[s,1] = 1
+        for i in range(self.k):
+            self.solver.add_constraint(
+                self.distance_vars[(self.G.source, i)] == 1,
+                name=f"18a_i={i}",
+            )
         # 19c: The distance strictly increases along selected edges
-        M = self.G.number_of_nodes()
+        M = self.G.number_of_nodes() + 1
         for i in range(self.k):
             for (u,v) in self.G.edges:
                 # If edge is selected, distance must increase by at least 1 (or exactly 1, but exact equality not needed)
@@ -298,27 +284,6 @@ class AbstractPathModelDiGraph(ABC):
                     self.distance_vars[(v, i)] >= self.distance_vars[(u, i)] + 1 - M * (1 - self.edge_selected_vars[(u, v, i)]),
                     name=f"19c_distance_order_u={u}_v={v}_i={i}",
                 )
-        # self.y_uv_prod_d_v_minus_du_vars = self.solver.add_variables(self.edge_indexes, name_prefix="y_uv_prod_d_v_minus_du", lb=0, ub=self.G.number_of_nodes(), var_type="integer")
-        # for i in range(self.k):
-        #     for (u,v) in self.G.edges:
-        #         self.solver.add_binary_continuous_product_constraint(
-        #             binary_var=self.edge_selected_vars[(u, v, i)],
-        #             continuous_var=(self.distance_vars[(v, i)] - self.distance_vars[(u, i)]),
-        #             product_var=self.y_uv_prod_d_v_minus_du_vars[(u, v, i)],
-        #             lb=0,
-        #             ub=self.G.number_of_nodes(),
-        #             name=f"19c_y_uv_prod_d_v_minus_du_u={u}_v={v}_i={i}"
-        #         )
-
-        #     for v in self.G.nodes:
-        #         if v == self.G.source:
-        #             continue
-        #         self.solver.add_constraint(
-        #             self.solver.quicksum( self.edge_vars[(u, v, i)] for u in self.G.predecessors(v) ) 
-        #             <= 
-        #             self.G.number_of_nodes() * self.solver.quicksum( self.y_uv_prod_d_v_minus_du_vars[(u, v, i)] for u in self.G.predecessors(v) ),
-        #             name=f"19c={v}_i={i}"
-        #         )
 
         #################################
         #                               #
@@ -328,7 +293,7 @@ class AbstractPathModelDiGraph(ABC):
 
         # Example of a subset constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 subsets to cover, the first one is {(1,3),(3,5)}, the second set is just a single edge {(0,1)}
 
-        if False and len(self.subset_constraints) > 0:
+        if len(self.subset_constraints) > 0:
             self.subset_vars = self.solver.add_variables(
                 self.subset_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
         
@@ -551,19 +516,19 @@ class AbstractPathModelDiGraph(ABC):
             self.edge_vars_sol = self.solver.get_variable_values(
                 "edge", [str, str, int]
             )
-        utils.logger.debug(f"{__name__}: Getting solution walks with self.edge_vars_sol = {self.edge_vars_sol}")
+        # utils.logger.debug(f"{__name__}: Getting solution walks with self.edge_vars_sol = {self.edge_vars_sol}")
 
-        self.distance_vars_sol = self.solver.get_variable_values("distance", [str, int])
-        utils.logger.debug(f"{__name__}: Getting solution walks with distances = {self.distance_vars_sol}")
+        # self.distance_vars_sol = self.solver.get_variable_values("distance", [str, int])
+        # utils.logger.debug(f"{__name__}: Getting solution walks with distances = {self.distance_vars_sol}")
 
-        self.edge_selected_sol = self.solver.get_variable_values("selected_edge", [str, str, int])
-        utils.logger.debug(f"{__name__}: Getting solution walks with edge selected = {self.edge_selected_sol}")
+        # self.edge_selected_sol = self.solver.get_variable_values("selected_edge", [str, str, int])
+        # utils.logger.debug(f"{__name__}: Getting solution walks with edge selected = {self.edge_selected_sol}")
 
         walks = []
         for i in range(self.k):
             # Build residual graph for this layer with edge multiplicities
             residual_graph = self._build_residual_graph_for_layer(i)
-            utils.logger.debug(f"{__name__}: residual_graph = {residual_graph}")
+            # utils.logger.debug(f"{__name__}: residual_graph = {residual_graph}")
             
             # Check if there's any flow in this layer
             if not residual_graph:
@@ -619,11 +584,11 @@ class AbstractPathModelDiGraph(ABC):
             stack.append(current_vertex)
             current_vertex = next_vertex
             walk.append(current_vertex)
-            utils.logger.debug(f"{__name__}: Current walk: {walk}, stack: {stack}")
+            # utils.logger.debug(f"{__name__}: Current walk: {walk}, stack: {stack}")
         
         # Find vertices from which we can find dangling closed walks
         while stack:
-            utils.logger.debug(f"{__name__}: Current stack: {stack}")
+            # utils.logger.debug(f"{__name__}: Current stack: {stack}")
             potential_vertex = stack.pop()            
             if graph[potential_vertex]:
                 # Build and insert closed walk from this vertex
