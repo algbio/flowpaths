@@ -2,17 +2,34 @@ import flowpaths.stdigraph as stdigraph
 import flowpaths.utils.dominators as dominators
 from queue import Queue
 
-def find_idom(adj_dict, s, t) -> list:
+def find_path(adj_dict, s, t):
+    """Find a path from s to t using DFS."""
+    def dfs_path(node, path: list, visited: set):
+        if node == t:
+            return True
+        visited.add(node)
+        for neighbor in adj_dict[node]:
+            if neighbor not in visited:
+                path.append(neighbor)
+                if dfs_path(neighbor, path, visited):
+                    return True
+                path.pop()  # Backtrack if this path doesn't lead to t
+        return False
+    
+    path = [s]
+    visited = set()
+    dfs_path(s, path, visited)
+    return path
 
-    #find arbitrary s-t path
-    s_aux = s
-    p = [s_aux]
-    while s_aux!=t:
-        x = adj_dict[s_aux].pop() #remove edge in O(1)
-        p.append(x)               #keep track of the path
-        s_aux = x
-    #add reversed path to G
+def find_idom(adj_dict, s, t) -> list:
+    
+    # find arbitrary s-t path p
+    p = find_path(adj_dict, s, t)
+
+    # add reversed path to G
+    # and remove the original edges of the path
     for i in range(len(p)-1):
+        adj_dict[p[i]].remove(p[i+1])  # remove original edges
         adj_dict[p[i+1]].append(p[i])
 
     n            = len(adj_dict)
@@ -61,6 +78,7 @@ def maximal_safe_sequences_via_dominators(G : stdigraph.stDiGraph, X = set()) ->
     adj_dict_rev = {u: list(G.predecessors(u)) for u in G.nodes()}
 
     for (u,v) in G.edges:
+
         s_idom = find_idom(adj_dict_rev, u, G.source)
         t_idom = find_idom(adj_dict    , v,   G.sink)
         s_idoms[(u,v)] = tuple(reversed(s_idom)) if s_idom != None else G.source

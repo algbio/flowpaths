@@ -13,8 +13,42 @@ def test1():
     graph.add_edge("s", "t", flow=1)
     stDiGraph = fp.stDiGraph(graph)
 
-    safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, graph.edges())
-    print(safe_seqs)
+    print(safety.maximal_safe_sequences_via_dominators(stDiGraph, set(graph.edges())))
+
+def test3():
+    # Create a simple graph
+    graph = nx.DiGraph()
+    graph.graph["id"] = "simple_graph"
+    graph.add_edge("s", "a", flow=3)
+    graph.add_edge("a", "t", flow=3)
+    graph.add_edge("s", "b", flow=6)
+    graph.add_edge("b", "a", flow=2)
+    graph.add_edge("a", "h", flow=2)
+    graph.add_edge("h", "t", flow=6)
+    graph.add_edge("b", "c", flow=4)
+    graph.add_edge("c", "d", flow=4)
+    graph.add_edge("c", "h", flow=4)
+    graph.add_edge("d", "h", flow=0)
+    graph.add_edge("d", "e", flow=4)
+    graph.add_edge("e", "c", flow=5)
+    graph.add_edge("e", "f", flow=4)
+    graph.add_edge("f", "g", flow=4)
+    graph.add_edge("g", "e", flow=4)
+    stDiGraph = fp.stDiGraph(graph)
+
+    X = set(graph.edges())
+    safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, X)
+    for seq in safe_seqs:
+        print("Safe sequence:", seq)
+    
+    # Now remove some edges from X
+    print("New sequences")
+    X.remove(('e', 'f'))
+    X.remove(('f', 'g'))
+    X.remove(('g', 'e'))
+    safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, X)
+    for seq in safe_seqs:
+        print("Safe sequence:", seq)
 
 def test2():
     # Create a simple graph
@@ -72,5 +106,6 @@ if __name__ == "__main__":
         log_to_console=True,
     )
 
-    test1()
+    # test1()
+    test3()
     # test2()
