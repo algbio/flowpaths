@@ -10,11 +10,10 @@ def test1():
     graph.add_edge("a", "b", flow=2)
     graph.add_edge("b", "a", flow=2)
     graph.add_edge("a", "t", flow=1)
+    graph.add_edge("s", "t", flow=1)
+    stDiGraph = fp.stDiGraph(graph)
 
-    stD = fp.stDiGraph(graph)
-
-    X = graph.edges()  # All edges are considered for safety path cover
-    safe_seqs = safety.maximal_safe_sequences_via_dominators(stD, X)
+    safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, graph.edges())
     print(safe_seqs)
 
 def test2():

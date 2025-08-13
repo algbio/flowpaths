@@ -33,8 +33,7 @@ class Arc_Dominator_Tree:
     def build_children_relation_X(self):
 
         def dfs(node, last_in_X): # recall that X is a set of arcs. the term "node" is to allude to nodes of the dominator tree
-            print("node = ", node)
-            if node in self.X and node != last_in_X: # note that sink and source are never in X
+            if isinstance(node, tuple) and node in self.X and node != last_in_X: # note that sink and source are never in X
                 self.children_X[last_in_X].append(node)
                 self.idom_X[node] = last_in_X
                 last_in_X = node
