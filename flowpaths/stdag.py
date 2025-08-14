@@ -151,9 +151,12 @@ class stDAG(nx.DiGraph):
         edges_to_ignore_set = set(edges_to_ignore or [])
 
         weight_function = {e: 1 for e in self.edges() if e not in edges_to_ignore_set}
-        self.width = self.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+        
+        width = self.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+        if (edges_to_ignore is None or len(edges_to_ignore) == 0):
+            self.width = width
 
-        return self.width
+        return width
 
     def get_flow_width(self, flow_attr: str, edges_to_ignore: list = None) -> int:
         """
