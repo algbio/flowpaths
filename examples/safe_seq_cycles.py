@@ -10,7 +10,7 @@ def test1():
     graph.add_edge("a", "b", flow=2)
     graph.add_edge("b", "a", flow=2)
     graph.add_edge("a", "t", flow=1)
-    graph.add_edge("s", "t", flow=1)
+    # graph.add_edge("s", "t", flow=1)
     stDiGraph = fp.stDiGraph(graph)
 
     print(safety.maximal_safe_sequences_via_dominators(stDiGraph, set(graph.edges())))
@@ -34,6 +34,7 @@ def test3():
     graph.add_edge("e", "f", flow=4)
     graph.add_edge("f", "g", flow=4)
     graph.add_edge("g", "e", flow=4)
+    graph.add_edge("s", "t", flow=4)
     stDiGraph = fp.stDiGraph(graph)
 
     X = set(graph.edges())
@@ -49,6 +50,40 @@ def test3():
     safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, X)
     for seq in safe_seqs:
         print("Safe sequence:", seq)
+
+def test4():
+    # Create a simple graph
+    graph = nx.DiGraph()
+    graph.graph["id"] = "simple_graph"
+    graph.add_edge("s", "u", flow=3)
+    graph.add_edge("u", "t", flow=3)
+    graph.add_edge("u", "v", flow=6)
+    graph.add_edge("v", "u", flow=2)
+    graph.add_edge("v", "w", flow=2)
+    graph.add_edge("w", "v", flow=6)
+    graph.add_edge("w", "z", flow=6)
+    graph.add_edge("z", "w", flow=6)
+
+    graph.add_edge("z", "v", flow=6)
+    stDiGraph = fp.stDiGraph(graph)
+
+    X = set(stDiGraph.edges())
+    safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, X)
+    for seq in safe_seqs:
+        print("Safe sequence:", seq)
+    
+def test5():
+
+    filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph"
+    graph = fp.graphutils.read_graphs(filename)[0]
+
+    stDiGraph = fp.stDiGraph(graph)
+    X = set(stDiGraph.edges())
+    X = set(graph.edges())
+    safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, X)
+    for seq in safe_seqs:
+        print("Safe sequence:", seq)
+
 
 def test2():
     # Create a simple graph
@@ -99,13 +134,17 @@ def process_solution(graph, model: fp.kLeastAbsErrors):
     else:
         print("Model could not be solved.")
 
+def main():
+    test1()
+    test3()
+    test2()
+    test4()
+    test5()
+
 if __name__ == "__main__":
     # Configure logging
     fp.utils.configure_logging(
         level=fp.utils.logging.DEBUG,
         log_to_console=True,
     )
-
-    # test1()
-    test3()
-    # test2()
+    main()

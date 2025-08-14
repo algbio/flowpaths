@@ -71,6 +71,9 @@ def find_idom(adj_dict, s, t) -> list:
 
 def maximal_safe_sequences_via_dominators(G : stdigraph.stDiGraph, X = set()) -> list :
 
+    if X == None or len(X) == 0:
+        return []
+
     s_idoms = dict()
     t_idoms = dict()
 

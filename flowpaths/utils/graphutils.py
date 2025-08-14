@@ -15,48 +15,115 @@ def fpid(G) -> str:
     return str(id(G))
 
 def read_graph(graph_raw) -> nx.DiGraph:
-    # Input format is: ['#Graph id\n', 'n\n', 'u_1 v_1 w_1\n', ..., 'u_k v_k w_k\n']
-    id = graph_raw[0].strip("# ").strip()
-    n = int(graph_raw[1])
+    """
+    Parse a single graph block from a list of lines.
+
+    Accepts one or more header lines at the beginning (each prefixed by '#'),
+    followed by a line containing the number of vertices (n), then any number
+    of edge lines of the form: "u v w" (whitespace-separated).
+
+    Example block:
+        # graph number = 1 name = foo
+        # any other header line
+        5
+        a b 1.0
+        b c 2.5
+    """
+
+    # Collect leading header lines (prefixed by '#')
+    idx = 0
+    header_lines = []
+    while idx < len(graph_raw) and graph_raw[idx].lstrip().startswith("#"):
+        header_lines.append(graph_raw[idx].lstrip().lstrip("#").strip())
+        idx += 1
+
+    # Determine graph id from the first header line if present
+    graph_id = header_lines[0] if header_lines else str(id(graph_raw))
+
+    # Skip blank lines before the vertex-count line
+    while idx < len(graph_raw) and graph_raw[idx].strip() == "":
+        idx += 1
+
+    if idx >= len(graph_raw):
+        utils.logger.error(f"{__name__}: Graph block missing vertex-count line.")
+        raise ValueError("Graph block missing vertex-count line.")
+
+    # Parse number of vertices (kept for information; not used to count edges here)
+    try:
+        n = int(graph_raw[idx].strip())
+    except Exception:
+        utils.logger.error(f"{__name__}: Invalid vertex-count line: {graph_raw[idx].rstrip()}.")
+        raise
+
+    idx += 1
 
     G = nx.DiGraph()
-    G.graph["id"] = id
+    G.graph["id"] = graph_id
 
     if n == 0:
-        print("Graph %s has 0 vertices.", id)
+        utils.logger.info(f"Graph {graph_id} has 0 vertices.")
         return G
 
-    for edge in graph_raw[2:]:
-        elements = edge.split(" ")
+    # Parse edges: skip blanks and comment/header lines defensively
+    for line in graph_raw[idx:]:
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        elements = line.split()
         if len(elements) != 3:
-            utils.logger.error(f"{__name__}: Invalid edge format: %s", edge)
-            raise ValueError("Invalid edge format: %s", edge)
-        # print(elements)
-        u = elements[0].strip()
-        v = elements[1].strip()
-        w = float(elements[2].strip(" \n"))
-        # print(u, v, w)
-        G.add_edge(u, v, flow=w)
+            utils.logger.error(f"{__name__}: Invalid edge format: {line.rstrip()}")
+            raise ValueError(f"Invalid edge format: {line.rstrip()}")
+        u, v, w_str = elements
+        try:
+            w = float(w_str)
+        except Exception:
+            utils.logger.error(f"{__name__}: Invalid weight value in edge: {line.rstrip()}")
+            raise
+        G.add_edge(u.strip(), v.strip(), flow=w)
 
     return G
 
 
 def read_graphs(filename):
-    f = open(filename, "r")
-    lines = f.readlines()
-    f.close()
-    graphs = []
+    """
+    Read one or more graphs from a file.
 
-    # Assume: every file contains at least one graph
-    i, j = 0, 1
-    while True:
-        if lines[j].startswith("#"):
-            graphs.append(read_graph(lines[i:j]))
-            i = j
-        j += 1
-        if j == len(lines):
-            graphs.append(read_graph(lines[i:j]))
+    Supports graphs whose header consists of one or multiple consecutive lines
+    prefixed by '#'. Each graph block is:
+        - one or more header lines starting with '#'
+        - one line with the number of vertices (n)
+        - zero or more edge lines "u v w"
+
+    Graphs are delimited by the start of the next header (a line starting with '#')
+    or the end of file.
+    """
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    graphs = []
+    n_lines = len(lines)
+    i = 0
+
+    # Iterate through the file, capturing blocks that start with one or more '#' lines
+    while i < n_lines:
+        # Move to the start of the next graph header
+        while i < n_lines and not lines[i].lstrip().startswith('#'):
+            i += 1
+        if i >= n_lines:
             break
+
+        start = i
+
+        # Consume all consecutive header lines for this graph
+        while i < n_lines and lines[i].lstrip().startswith('#'):
+            i += 1
+
+        # Advance until the next header line (start of next graph) or EOF
+        j = i
+        while j < n_lines and not lines[j].lstrip().startswith('#'):
+            j += 1
+
+        graphs.append(read_graph(lines[start:j]))
+        i = j
 
     return graphs
 

@@ -1,5 +1,5 @@
 import flowpaths.stdigraph as stdigraph
-from flowpaths.utils import safetypathcovers
+from flowpaths.utils import safetypathcoverscycles
 from flowpaths.utils import solverwrapper as sw
 import flowpaths.utils as utils
 import time
@@ -12,8 +12,7 @@ class AbstractPathModelDiGraph(ABC):
     """
     # storing some defaults
     optimize_with_safe_sequences = False
-    optimize_with_safe_zero_edges = True
-    optimize_with_subset_constraints_as_safe_sequences = True
+    # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
 
     def __init__(
@@ -118,7 +117,6 @@ class AbstractPathModelDiGraph(ABC):
         if optimization_options is None:
             optimization_options = {}
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDiGraph.optimize_with_safe_sequences)
-        self.optimize_with_subset_constraints_as_safe_sequences = optimization_options.get("optimize_with_subset_constraints_as_safe_sequences", AbstractPathModelDiGraph.optimize_with_subset_constraints_as_safe_sequences)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractPathModelDiGraph.optimize_with_safety_as_subset_constraints)
@@ -127,26 +125,14 @@ class AbstractPathModelDiGraph(ABC):
                 
         self.safe_lists = []
 
-        if self.optimize_with_safe_sequences:
+        if self.optimize_with_safe_sequences or self.optimize_with_safety_as_subset_constraints:
             start_time = time.perf_counter()
-            self.safe_lists += safetypathcovers.safe_sequences(
+            self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
                 G=self.G,
-                edges_or_subpath_constraints_to_cover=self.trusted_edges_for_safety,
-                no_duplicates=False,
-                threads=self.threads,
+                X=self.trusted_edges_for_safety,
             )
+            utils.logger.debug(f"{__name__}: Found {len(self.safe_lists)} safe sequences in {time.perf_counter() - start_time} seconds.")
             self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
-
-        if self.optimize_with_subset_constraints_as_safe_sequences and len(self.subset_constraints) > 0 and not self.is_solved():
-            if self.subset_constraints_coverage == 1:
-                start_time = time.perf_counter()
-                self.safe_lists += safetypathcovers.safe_sequences(
-                    G=self.G,
-                    edges_or_subpath_constraints_to_cover=self.subset_constraints,
-                    no_duplicates=False,
-                    threads=self.threads,
-                )
-                self.solve_statistics["optimize_with_subset_constraints_as_safe_sequences"] = time.perf_counter() - start_time
 
         if self.optimize_with_safety_as_subset_constraints:
             self.subset_constraints += self.safe_lists
@@ -166,6 +152,8 @@ class AbstractPathModelDiGraph(ABC):
         self.solver = sw.SolverWrapper(**self.solver_options)
 
         self._encode_walks()
+        
+        self._encode_subset_constraints()
 
     def _encode_walks(self):
 
@@ -178,10 +166,6 @@ class AbstractPathModelDiGraph(ABC):
             (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
         ]
         self.path_indexes = [(i) for i in range(self.k)]
-        if len(self.subset_constraints) > 0:
-            self.subset_indexes = [
-                (i, j) for i in range(self.k) for j in range(len(self.subset_constraints))
-            ]
         self.vertex_indexes = [
             (v, i) for i in range(self.k) for v in self.G.nodes()
         ]
@@ -285,36 +269,6 @@ class AbstractPathModelDiGraph(ABC):
                     name=f"19c_distance_order_u={u}_v={v}_i={i}",
                 )
 
-        #################################
-        #                               #
-        # Encoding subset constraints   #
-        #                               #
-        #################################
-
-        # Example of a subset constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 subsets to cover, the first one is {(1,3),(3,5)}, the second set is just a single edge {(0,1)}
-
-        if len(self.subset_constraints) > 0:
-            self.subset_vars = self.solver.add_variables(
-                self.subset_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
-        
-            for i in range(self.k):
-                for j in range(len(self.subset_constraints)):
-                    # By default, the length of the constraints is its number of edges 
-                    constraint_length = len(self.subset_constraints[j])
-                    # And the fraction of edges that we need to cover is self.subset_constraints_coverage
-                    coverage_fraction = self.subset_constraints_coverage
-                    self.solver.add_constraint(
-                        self.solver.quicksum(self.edge_vars[(e[0], e[1], i)] for e in self.subset_constraints[j])
-                        >= constraint_length * coverage_fraction
-                        * self.subset_vars[(i, j)],
-                        name=f"7a_i={i}_j={j}",
-                    )
-            for j in range(len(self.subset_constraints)):
-                self.solver.add_constraint(
-                    self.solver.quicksum(self.subset_vars[(i, j)] for i in range(self.k)) >= 1,
-                    name=f"7b_j={j}",
-                )
-
         ########################################
         #                                      #
         # Fixing variables based on safe lists #
@@ -334,6 +288,65 @@ class AbstractPathModelDiGraph(ABC):
                             self.edge_vars[(u, v, i)] == 1,
                             name=f"safe_list_u={u}_v={v}_i={i}",
                         )
+
+    def _encode_subset_constraints(self):
+
+        #################################
+        #                               #
+        # Encoding subset constraints   #
+        #                               #
+        #################################
+
+        # Example of a subset constraint: R=[ [(1,3),(3,5)], [(0,1)] ], means that we have 2 subsets to cover, the first one is {(1,3),(3,5)}, the second set is just a single edge {(0,1)}
+
+        if len(self.subset_constraints) == 0:
+            return
+        else:
+            utils.logger.debug(f"{__name__}: Encoding subset constraints for graph id = {utils.fpid(self.G)} with k = {self.k} and max_edge_repetition = {self.max_edge_repetition}")
+
+        self.subset_indexes = [ (i, j) for i in range(self.k) for j in range(len(self.subset_constraints)) ]
+
+        self.subset_vars = self.solver.add_variables(
+            self.subset_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
+
+        # Model z[(u,v,i)] = min(1, x[(u,v,i)]) with a binary aux var and:
+        #   z <= x
+        #   x <= U * z
+        U = self.max_edge_repetition
+        self.edge_used_vars = self.solver.add_variables(
+            self.edge_indexes, name_prefix="used_edge", lb=0, ub=1, var_type="integer"
+        )
+        for i in range(self.k):
+            for (u, v) in self.G.edges:
+                # z_ei <= x_ei
+                self.solver.add_constraint(
+                    self.edge_used_vars[(u, v, i)] <= self.edge_vars[(u, v, i)],
+                    name=f"min1_le_x_u={u}_v={v}_i={i}",
+                )
+                # x_ei <= U * z_ei
+                self.solver.add_constraint(
+                    self.edge_vars[(u, v, i)] <= U * self.edge_used_vars[(u, v, i)],
+                    name=f"x_le_U_min1_u={u}_v={v}_i={i}",
+                )
+
+        for i in range(self.k):
+            for j in range(len(self.subset_constraints)):
+                # By default, the length of the constraints is its number of edges 
+                constraint_as_set = set(self.subset_constraints[j])
+                constraint_length = len(constraint_as_set)
+                # And the fraction of edges that we need to cover is self.subset_constraints_coverage
+                coverage_fraction = self.subset_constraints_coverage
+                self.solver.add_constraint(
+                    self.solver.quicksum(self.edge_used_vars[(e[0], e[1], i)] for e in constraint_as_set)
+                    >= constraint_length * coverage_fraction
+                    * self.subset_vars[(i, j)],
+                    name=f"7a_i={i}_j={j}",
+                )
+        for j in range(len(self.subset_constraints)):
+            self.solver.add_constraint(
+                self.solver.quicksum(self.subset_vars[(i, j)] for i in range(self.k)) >= 1,
+                name=f"7b_j={j}",
+            )
 
 
     def _get_paths_to_fix_from_safe_lists(self) -> list:
