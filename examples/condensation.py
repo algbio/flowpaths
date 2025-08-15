@@ -25,16 +25,16 @@ def test1():
     graph.add_edge("f", "d")
     
     stDiGraph = fp.stDiGraph(graph)
-    assert stDiGraph.get_condensation_width() == 5
+    assert stDiGraph.get_width() == 5
 
     edges_to_ignore = [ ("f", "d") ]
-    assert stDiGraph.get_condensation_width(edges_to_ignore=edges_to_ignore) == 4
+    assert stDiGraph.get_width(edges_to_ignore=edges_to_ignore) == 4
 
     edges_to_ignore = [ ("f", "d"), ("s", "t") ]
-    assert stDiGraph.get_condensation_width(edges_to_ignore=edges_to_ignore) == 3
+    assert stDiGraph.get_width(edges_to_ignore=edges_to_ignore) == 3
 
     edges_to_ignore = [ ("f", "d"), ("s", "t"), ("c", "d") ]
-    assert stDiGraph.get_condensation_width(edges_to_ignore=edges_to_ignore) == 3
+    assert stDiGraph.get_width(edges_to_ignore=edges_to_ignore) == 3
 
     sequences = [ 
         [('d', 'c'), ('c', 'd'), ('d', 't')],

@@ -501,7 +501,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                     abs(flow_from_paths[(u, v)] - data[self.flow_attr])
                     > tolerance * num_paths_on_edges[(u, v)]
                 ):
-                    utils.logger.debug(f"Flow validation failed for edge ({u}, v): expected {data[self.flow_attr]}, got {flow_from_paths[(u, v)]}")
+                    utils.logger.error(f"Flow validation failed for edge ({u}, v): expected {data[self.flow_attr]}, got {flow_from_paths[(u, v)]}")
                     return False
 
         return True

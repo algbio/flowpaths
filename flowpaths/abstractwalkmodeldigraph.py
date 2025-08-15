@@ -14,6 +14,7 @@ class AbstractWalkModelDiGraph(ABC):
     optimize_with_safe_sequences = False
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
+    allow_empty_paths = False
 
     def __init__(
         self,
@@ -118,7 +119,7 @@ class AbstractWalkModelDiGraph(ABC):
             optimization_options = {}
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractWalkModelDiGraph.optimize_with_safe_sequences)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
-        self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
+        self.allow_empty_paths = optimization_options.get("allow_empty_paths", AbstractWalkModelDiGraph.allow_empty_paths)
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
 
         self._is_solved = None

@@ -201,7 +201,7 @@ class stDiGraph(nx.DiGraph):
         
         return str(self._condensation.graph['mapping'][u])
 
-    def get_condensation_width(self, edges_to_ignore: list = None) -> int:
+    def get_width(self, edges_to_ignore: list = None) -> int:
 
         if self.condensation_width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
             return self.condensation_width

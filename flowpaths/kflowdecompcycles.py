@@ -6,7 +6,7 @@ import flowpaths.nodeexpandeddigraph as nedg
 import copy
 
 
-class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
+class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
         self,
         G: nx.DiGraph,
@@ -17,18 +17,14 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         subset_constraints: list = [],
         subset_constraints_coverage: float = 1.0,
         elements_to_ignore: list = [],
-        error_scaling: dict = {},
         additional_starts: list = [],
         additional_ends: list = [],
         optimization_options: dict = None,
         solver_options: dict = {},
-        trusted_edges_for_safety: list = None,
     ):
         """
-        This class implements the k-LeastAbsoluteErrors problem, namely it looks for a decomposition of a weighted general directed graph, possibly with cycles, into 
-        $k$ weighted walks, minimizing the absolute errors on the edges. The error on an edge 
-        is defined as the absolute value of the difference between the weight of the edge and the sum of the weights of 
-        the walks that go through it.
+        This class implements the k-Flow Decomposition problem, namely it looks for a decomposition of a weighted general directed graph, possibly with cycles, into 
+        $k$ weighted walks such that the flow on each edge of the graph equals the sum of the weights of the paths going through that edge.
 
         Parameters
         ----------
@@ -76,12 +72,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
             List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
-
-        - `error_scaling: dict`, optional
-            
-            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and path weights.
-            Default is an empty dict. If an edge/node has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
-            difference between the flow value of the edge/node and the sum of the weights of the paths going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
         
         - `additional_starts: list`, optional
             
@@ -99,18 +89,11 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
             Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
 
-        - `trusted_edges_for_safety: list`, optional
-
-            List of edges that are trusted to appear in an optimal solution. Default is `None`. 
-            If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
-            See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
-
         Raises
         ------
         - `ValueError`
             
             - If `weight_type` is not `int` or `float`.
-            - If the edge error scaling factor is not in [0,1].
             - If the flow attribute `flow_attr` is not specified in some edge.
             - If the graph contains edges with negative flow values.
             - ValueError: If `flow_attr_origin` is not "node" or "edge".
@@ -133,9 +116,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
             edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
             edges_to_ignore_internal = list(set(edges_to_ignore_internal))
-            trusted_edges_for_safety_internal = [self.G_internal.get_expanded_edge(edge) for edge in trusted_edges_for_safety] if trusted_edges_for_safety else []
-
-            error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
 
         elif self.flow_attr_origin == "edge":
             if G.number_of_edges() == 0:
@@ -149,8 +129,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             edges_to_ignore_internal = elements_to_ignore
             additional_starts_internal = additional_starts
             additional_ends_internal = additional_ends
-            trusted_edges_for_safety_internal = trusted_edges_for_safety or []
-            error_scaling_internal = error_scaling
         else:
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
@@ -158,17 +136,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subset_constraints = subset_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
-        self.trusted_edges_for_safety = trusted_edges_for_safety_internal
-        self.edge_error_scaling = error_scaling_internal
-        # If the error scaling factor is 0, we ignore the edge
-        self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
         
-        # Checking that every entry in self.error_scaling is between 0 and 1
-        for key, value in error_scaling.items():
-            if value < 0 or value > 1:
-                utils.logger.error(f"{__name__}: Error scaling factor for {key} must be between 0 and 1.")
-                raise ValueError(f"Error scaling factor for {key} must be between 0 and 1.")
-
         if weight_type not in [int, float]:
             utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
@@ -176,9 +144,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
 
         self.k = k
-        # If k is not specified, we set k to the edge width of the graph
-        if self.k is None:
-            self.k = self.G.get_width(list(self.edges_to_ignore))
         self.original_k = self.k
         self.optimization_options = optimization_options or {}        
 
@@ -193,22 +158,14 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.pi_vars = {}
         self.path_weights_vars = {}
-        self.edge_errors_vars = {}
 
         self.path_weights_sol = None
-        self.edge_errors_sol = None
         self._solution = None
         self._lowerbound_k = None
 
         self.solve_statistics = {}
         
-        # If we get subset constraints, and the coverage fraction is 1
-        # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
-        self.optimization_options["trusted_edges_for_safety"] = set(self.trusted_edges_for_safety or [])
-        if self.subset_constraints is not None:
-            if self.subset_constraints_coverage == 1.0:
-                for constraint in self.subset_constraints:
-                    self.optimization_options["trusted_edges_for_safety"].update(constraint)
+        self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
 
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
@@ -226,14 +183,11 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self._encode_leastabserrors_decomposition()
-
-        # This method is called from the current class to add the objective function
-        self._encode_objective()
+        self._encode_flow_decomposition()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
-    def _encode_leastabserrors_decomposition(self):
+    def _encode_flow_decomposition(self):
 
         # pi vars 
         self.pi_vars = self.solver.add_variables(
@@ -251,20 +205,10 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             var_type="integer" if self.weight_type == int else "continuous",
         )
 
-        self.edge_indexes_basic = [(u,v) for (u,v) in self.G.edges() if (u,v) not in self.edges_to_ignore]
-        
-        self.edge_errors_vars = self.solver.add_variables(
-            self.edge_indexes_basic,
-            name_prefix="ee",
-            lb=0,
-            ub=self.w_max,
-            var_type="integer" if self.weight_type == int else "continuous",
-        )
-
+        # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
         for u, v, data in self.G.edges(data=True):
             if (u, v) in self.edges_to_ignore:
                 continue
-
             f_u_v = data[self.flow_attr]
 
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
@@ -279,28 +223,10 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
                     name=f"10_u={u}_v={v}_i={i}",
                 )
 
-
-            # Encoding the error on the edge (u, v) as the difference between 
-            # the flow value of the edge and the sum of the weights of the paths that go through it (pi variables)
-            # If we minimize the sum of edge_errors_vars, then we are minimizing the sum of the absolute errors.
             self.solver.add_constraint(
-                f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= self.edge_errors_vars[(u, v)],
-                name=f"9aa_u={u}_v={v}_i={i}",
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
+                name=f"10d_u={u}_v={v}_i={i}",
             )
-
-            self.solver.add_constraint(
-                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) - f_u_v <= self.edge_errors_vars[(u, v)],
-                name=f"9ab_u={u}_v={v}_i={i}",
-            )
-
-    def _encode_objective(self):
-
-        self.solver.set_objective(
-            self.solver.quicksum(
-                self.edge_errors_vars[(u, v)] * self.edge_error_scaling.get((u, v), 1) if self.edge_error_scaling.get((u, v), 1) != 1 else self.edge_errors_vars[(u, v)]
-                for (u,v) in self.edge_indexes_basic), 
-            sense="minimize"
-        )
 
     def _remove_empty_walks(self, solution):
         """
@@ -336,7 +262,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
-        Otherwise, it checks if the problem has been solved, computes the solution paths, weights, slacks
+        Otherwise, it checks if the problem has been solved, computes the solution paths, weights
         and caches the solution.
 
 
@@ -344,7 +270,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         -------
         - `solution: dict`
         
-            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`), and the edge errors (key `"edge_errors"`).
+            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`).
 
         Raises
         -------
@@ -368,22 +294,17 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             )
             for i in range(self.k)
         ]
-        self.edge_errors_sol = self.solver.get_variable_values("ee", [str, str])
-        for (u,v) in self.edge_indexes_basic:
-            self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
 
         if self.flow_attr_origin == "edge":
             self._solution = {
                 "walks": self.get_solution_walks(),
                 "weights": self.path_weights_sol,
-                "edge_errors": self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
             }
         elif self.flow_attr_origin == "node":
             self._solution = {
                 "_walks_internal": self.get_solution_walks(),
                 "walks": self.G_internal.get_condensed_paths(self.get_solution_walks()),
                 "weights": self.path_weights_sol,
-                "edge_errors": self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
             }
 
         return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
@@ -412,7 +333,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
         solution_walks = self._solution.get("_walks_internal", self._solution["walks"])
         solution_weights = self._solution["weights"]
-        solution_errors = self._solution["edge_errors"]
         solution_walks_of_edges = [
             [(walk[i], walk[i + 1]) for i in range(len(walk) - 1)]
             for walk in solution_walks
@@ -429,31 +349,30 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
                 if (
                     abs(data[self.flow_attr] - weight_from_walks[(u, v)])
-                    > tolerance * max(1,num_edge_walks_on_edges[(u, v)]) + solution_errors[(u, v)]
+                    > tolerance * max(1,num_edge_walks_on_edges[(u, v)])
                 ):
-                    utils.logger.debug(
+                    utils.logger.error(
                         f"{__name__}: Invalid solution for edge ({u}, {v}): "
                         f"flow value {data[self.flow_attr]} != weight from walks {weight_from_walks[(u, v)]} "
-                        f"+ error {solution_errors[(u, v)]} (tolerance: {tolerance * max(1,num_edge_walks_on_edges[(u, v)])})"
                     )
                     return False
-
-        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.original_k:
-            utils.logger.debug(
-                f"{__name__}: Invalid solution: objective value {self.get_objective_value()} != solver objective value {self.solver.get_objective_value()} (tolerance: {tolerance * self.original_k})"
-            )
-            return False
 
         return True
 
     def get_objective_value(self):
-
+        
         self.check_is_solved()
 
-        # sum of edge errors
-        edge_errors = self.get_solution()["edge_errors"]
-        return sum(edge_errors.values())
+        if self._solution is None:
+            self.get_solution()
+
+        return self.k
     
     def get_lowerbound_k(self):
 
-        return 1
+        if self._lowerbound_k != None:
+            return self._lowerbound_k
+
+        self._lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
+
+        return self._lowerbound_k
