@@ -11,7 +11,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self,
         G: nx.DiGraph,
         flow_attr: str,
-        k: int,
+        k: int = None,
         flow_attr_origin: str = "edge",
         weight_type: type = float,
         subset_constraints: list = [],
@@ -43,6 +43,9 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         - `k: int`
             
             The number of paths to decompose in.
+
+            !!! note "Unknown $k$"
+                If you do not have a good guess for $k$, you can pass `k=None` and the model will set $k$ to the condensation width of the graph (i.e. the minimum number of $s$-$t$ walks needed to cover all the edges of the graph, except those in `edges_to_ignore`).
 
         - `flow_attr_origin: str`, optional
 
@@ -173,7 +176,10 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
 
         self.k = k
-        self.original_k = k
+        # If k is not specified, we set k to the edge width of the graph
+        if self.k is None:
+            self.k = self.G.get_condensation_width(list(self.edges_to_ignore))
+        self.original_k = self.k
         self.optimization_options = optimization_options or {}        
 
         self.subset_constraints_coverage = subset_constraints_coverage
@@ -349,8 +355,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
 
         self.check_is_solved()
-
-        
 
         weights_sol_dict = self.solver.get_variable_values("weights", [int])
 
