@@ -76,6 +76,7 @@ def test3(k:int, filename: str):
         k=k,
         weight_type=int,
         optimization_options={
+            "optimize_with_safe_sequences": True,
             "optimize_with_safety_as_subset_constraints": False,
         },
         solver_options={"external_solver": "highs"},
@@ -108,8 +109,8 @@ def process_solution(graph, filename, model: fp.kLeastAbsErrors):
 def main():
     # test1()
     # test2()
-    test3(k = 3, filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
-    # test3(k = 5, filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
+    # test3(k = 3, filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    test3(k = 5, filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
 
 if __name__ == "__main__":
     # Configure logging
@@ -117,3 +118,4 @@ if __name__ == "__main__":
         level=fp.utils.logging.DEBUG,
         log_to_console=True,
     )
+    main()

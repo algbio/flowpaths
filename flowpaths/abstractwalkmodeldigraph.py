@@ -155,6 +155,8 @@ class AbstractWalkModelDiGraph(ABC):
         
         self._encode_subset_constraints()
 
+        self._fix_variables_based_on_safe_sequences()
+
     def _encode_walks(self):
 
         # Encodes the paths in the graph by creating variables for edges and subsets to cover.
@@ -269,26 +271,6 @@ class AbstractWalkModelDiGraph(ABC):
                     name=f"19c_distance_order_u={u}_v={v}_i={i}",
                 )
 
-        ########################################
-        #                                      #
-        # Fixing variables based on safe lists #
-        #                                      #
-        ########################################
-
-        if False and self.safe_lists is not None:
-            paths_to_fix = self._get_paths_to_fix_from_safe_lists()
-
-            if not self.optimize_with_safety_as_subset_constraints:
-                # iterating over safe lists
-                for i in range(min(len(paths_to_fix), self.k)):
-                    # print("Fixing variables for safe list #", i)
-                    # iterate over the edges in the safe list to fix variables to 1
-                    for u, v in paths_to_fix[i]:
-                        self.solver.add_constraint(
-                            self.edge_vars[(u, v, i)] == 1,
-                            name=f"safe_list_u={u}_v={v}_i={i}",
-                        )
-
     def _encode_subset_constraints(self):
 
         #################################
@@ -348,8 +330,37 @@ class AbstractWalkModelDiGraph(ABC):
                 name=f"7b_j={j}",
             )
 
+    def _fix_variables_based_on_safe_sequences(self):
 
-    def _get_paths_to_fix_from_safe_lists(self) -> list:
+        ########################################
+        #                                      #
+        # Fixing variables based on safe lists #
+        #                                      #
+        ########################################
+
+        if not self.optimize_with_safe_sequences:
+            return
+
+        if self.safe_lists is not None:
+            walks_to_fix = self._get_walks_to_fix_from_safe_lists()
+
+        # iterating over safe lists
+        for i in range(min(len(walks_to_fix), self.k)):
+            # print("Fixing variables for safe list #", i)
+            # iterate over the edges in the safe list to fix variables to 1
+            for u, v in walks_to_fix[i]:
+                if self.G.is_scc_edge(u, v):
+                    self.solver.add_constraint(
+                        self.edge_vars[(u, v, i)] >= 1,
+                        name=f"safe_list_u={u}_v={v}_i={i}",
+                    )
+                else:
+                    self.solver.add_constraint(
+                        self.edge_vars[(u, v, i)] == 1,
+                        name=f"safe_list_u={u}_v={v}_i={i}",
+                    )
+
+    def _get_walks_to_fix_from_safe_lists(self) -> list:
 
         # TODO: fix this for graphs with cycles
         
@@ -360,55 +371,14 @@ class AbstractWalkModelDiGraph(ABC):
         if self.safe_lists is None or len(self.safe_lists) == 0:
             return []
 
-        # for i, safe_list in enumerate(self.safe_lists):
-        #     utils.logger.debug(f"{__name__}: safe_list {i}: {safe_list}")        
+        walks_to_fix = self.G.get_longest_incompatible_sequences(self.safe_lists)
 
-        # utils.draw(self.G, 
-        #            filename = "debug_safe_lists.pdf", 
-        #            subpath_constraints = self.safe_lists)
+        utils.logger.debug(f"{__name__}: Found {len(walks_to_fix)} walks to fix based on safe lists.")
+        for i, walk in enumerate(walks_to_fix):
+            utils.logger.debug(f"{__name__}: Safe walk {i}: {walk}")
 
-        large_constant = 0
-        if self.optimize_with_safety_from_largest_antichain:
-            large_constant = self.G.number_of_edges() * self.G.number_of_edges()
+        return walks_to_fix
 
-        longest_safe_list = dict()
-        for i, safe_list in enumerate(self.safe_lists):
-            for edge in safe_list:
-                if edge not in longest_safe_list:
-                    longest_safe_list[edge] = i
-                elif len(self.safe_lists[longest_safe_list[edge]]) < len(safe_list):
-                    longest_safe_list[edge] = i
-
-        len_of_longest_safe_list = {
-            edge: large_constant + len(self.safe_lists[longest_safe_list[edge]])
-            for edge in longest_safe_list
-        }
-        # for edge, length in len_of_longest_safe_list.items():
-        #     utils.logger.debug(f"{__name__}: edge {edge} has longest safe list of length {length} at index {longest_safe_list[edge]}")
-
-        _, edge_antichain = self.G.compute_max_edge_antichain(
-            get_antichain=True, weight_function=len_of_longest_safe_list
-        )
-        utils.logger.debug(f"{__name__}: edge_antichain from safe lists SIZE: {len(edge_antichain)}")
-        # utils.logger.debug(f"{__name__}: edge_antichain from safe lists: {len(edge_antichain)}")
-
-        # paths_to_fix = list(
-        #     map(lambda edge: self.safe_lists[longest_safe_list[edge]], edge_antichain)
-        # )
-        paths_to_fix = []
-        for edge in edge_antichain:
-            # utils.logger.debug(f"{__name__}: edge {edge} in edge_antichain, longest safe list idx: {longest_safe_list[edge]}, safe list: {self.safe_lists[longest_safe_list[edge]]}")
-            paths_to_fix.append(self.safe_lists[longest_safe_list[edge]])
-
-        utils.logger.debug(f"{__name__}: paths_to_fix from safe lists SIZE: {len(paths_to_fix)}")
-        # utils.logger.debug(f"{__name__}: paths_to_fix from safe lists: {paths_to_fix}")
-        
-        # utils.draw(self.G, 
-        #            filename = "debug_paths_to_fix.pdf", 
-        #            subpath_constraints = paths_to_fix)
-
-        return paths_to_fix
-    
     def _check_valid_subset_constraints(self):
         """
         Checks if the subset constraints are valid.

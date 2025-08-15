@@ -134,6 +134,15 @@ class stDiGraph(nx.DiGraph):
         utils.logger.debug(f"{__name__}: Condensation member edges: {self._condensation.graph['member_edges']}")
         utils.logger.debug(f"{__name__}: Condensation mapping: {self._condensation.graph['mapping']}")
 
+        # Conventions
+        # self._condensation has int nodes 
+        # self._condensation.graph['mapping'][u] : str (i.e. original nodes) -> int (i.e. condensation nodes)
+        # self._condensation.graph["member_edges"] : str (i.e. str(condensation nodes)) -> set(str,str) (i.e. set of original edges, which are (str,str))
+
+        # self._condensation_expanded has str nodes
+        # self._condensation_expanded has nodes of the form 
+        # - str(int), if the SCC node is trivial
+        # - str(int) and str(int) + "_expanded", if the SCC node is non-trivial
 
         # cond_expanded is a copy of self._condensation, with the difference
         # that all nodes v corresponding to non-trivial SCCs (i.e. with more than 2 nodes, equiv with at least one edge)
@@ -159,6 +168,39 @@ class stDiGraph(nx.DiGraph):
 
         utils.logger.debug(f"{__name__}: Condensation expanded graph: {self._condensation_expanded.edges()}")
 
+    def _edge_to_condensation_expanded_edge(self, u, v) -> tuple:
+        """
+        Maps an edge (u,v) in the original graph to an edge in the condensation_expanded graph.
+        """
+        mapping_u = self._condensation.graph['mapping'][u]
+        mapping_v = self._condensation.graph['mapping'][v]
+        
+        if mapping_u != mapping_v:
+            # If an edge between SCCs, then check if the source of the edge is a trivial SCC or not
+            edge_source = str(mapping_u) if len(self._condensation.graph["member_edges"][str(mapping_u)]) == 0 else self._expanded(str(mapping_u))
+            edge_target = str(mapping_v)
+        else:
+            # If an edge inside an SCC, then that SCC is non-trivial, and we return the expanded edge corresponding to that SCC
+            edge_source = str(mapping_u)
+            edge_target = self._expanded(str(mapping_u))
+
+        if (edge_source, edge_target) not in self._condensation_expanded.edges():
+            utils.logger.error(f"{__name__}: Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
+            raise ValueError(f"Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
+
+        return (edge_source, edge_target)
+    
+    def _edge_to_condensation_node(self, u, v) -> str:
+        """
+        Maps an edge (u,v) in the original graph in an SCC to the corresponding node (as str) in the condensation graph
+        """
+
+        if not self.is_scc_edge(u, v):
+            utils.logger.error(f"{__name__}: Edge ({u},{v}) is not an edge inside an SCC.")
+            raise ValueError(f"Edge ({u},{v}) is not an edge inside an SCC.")
+        
+        return str(self._condensation.graph['mapping'][u])
+
     def get_condensation_width(self, edges_to_ignore: list = None) -> int:
 
         if self.condensation_width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
@@ -172,17 +214,12 @@ class stDiGraph(nx.DiGraph):
         for u, v in (edges_to_ignore or []):
             # If (u,v) is an edge between different SCCs
             # Then the corresponding edge to ignore is between the two SCCs
-            mapping_u = self._condensation.graph['mapping'][u]
-            mapping_v = self._condensation.graph['mapping'][v]
-            if mapping_u != mapping_v:
-                edge_source = str(mapping_u) if len(self._condensation.graph["member_edges"][str(mapping_u)]) == 0 else self._expanded(str(mapping_u))
-                edge_target = str(mapping_v)
-                edges_to_ignore_expanded.append((edge_source, edge_target))
+            if not self.is_scc_edge(u, v):
+                edges_to_ignore_expanded.append(self._edge_to_condensation_expanded_edge(u, v))
             else:
-                # (u,v) is an edge within the same SCC indexed by mapping_u = mapping v
-                # member_edges[mapping_u] stores the original graph edges in this SCC, 
+                # (u,v) is an edge within the same SCC
                 # and thus we remove the edge (u,v) from the member edges
-                member_edges[str(mapping_u)].discard((u, v))
+                member_edges[self._edge_to_condensation_node(u, v)].discard((u, v))
 
         # We also add to edges_to_ignore_expanded the expanded edges arising from non-trivial SCCs
         # (i.e. SCCs with more than one node, which are expanded into an edge, 
@@ -201,3 +238,46 @@ class stDiGraph(nx.DiGraph):
             self.condensation_width = width
 
         return width
+    
+    def is_scc_edge(self, u, v) -> bool:
+        """
+        Returns True if (u,v) is an edge inside an SCCs, False otherwise.
+        """
+
+        # Check if (u,v) is an edge of the graph
+        if (u,v) not in self.edges():
+            utils.logger.error(f"{__name__}: Edge ({u},{v}) is not in the graph.")
+            raise ValueError(f"Edge ({u},{v}) is not in the graph.")
+
+        return self._condensation.graph['mapping'][u] == self._condensation.graph['mapping'][v]
+
+    def get_longest_incompatible_sequences(self, sequences: list) -> list:
+
+        # We map the edges in sequences to edges in self._condensation_expanded
+
+        large_constant = 0 #self.number_of_edges() + 1
+
+        weight_function = {edge: 0 for edge in self._condensation_expanded.edges} # edge in self._condensation_expanded -> length of a longest sequence using that edge (whn interpreting the sequence as a set)
+        sequence_function = dict() # edge in self._condensation_expanded -> id of a longest sequence using that edge
+
+        for seq_index, sequence in enumerate(sequences):
+            seq_length_as_set = large_constant + len(set(sequence))
+            for u, v in sequence:
+                condensation_expanded_edge = self._edge_to_condensation_expanded_edge(u, v)
+                if seq_length_as_set > weight_function[condensation_expanded_edge]:
+                    weight_function[condensation_expanded_edge] = seq_length_as_set
+                    sequence_function[condensation_expanded_edge] = seq_index
+
+        utils.logger.debug(f"{__name__}: Weight function for incompatible sequences: {weight_function}")
+
+        _, antichain = self._condensation_expanded.compute_max_edge_antichain(
+            get_antichain=True,
+            weight_function=weight_function,
+        )
+
+        incompatible_sequences = []
+
+        for u, v in antichain:
+            incompatible_sequences.append(sequences[sequence_function[(u, v)]])
+
+        return incompatible_sequences

@@ -36,6 +36,17 @@ def test1():
     edges_to_ignore = [ ("f", "d"), ("s", "t"), ("c", "d") ]
     assert stDiGraph.get_condensation_width(edges_to_ignore=edges_to_ignore) == 3
 
+    sequences = [ 
+        [('d', 'c'), ('c', 'd'), ('d', 't')],
+        [('s', 'c')],
+        [('a', 't')],
+        [('s', 'a')],
+        [('g', 'e')],
+    ]
+    incompatible_sequences = stDiGraph.get_longest_incompatible_sequences(sequences)
+    print(f"Incompatible sequences: {incompatible_sequences}")
+    assert len(incompatible_sequences) == 2
+
 def main():
     test1()
 
