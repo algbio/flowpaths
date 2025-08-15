@@ -6,7 +6,7 @@ import time
 import copy
 from abc import ABC, abstractmethod
 
-class AbstractPathModelDiGraph(ABC):
+class AbstractWalkModelDiGraph(ABC):
     """
     
     """
@@ -116,10 +116,10 @@ class AbstractPathModelDiGraph(ABC):
         # optimizations
         if optimization_options is None:
             optimization_options = {}
-        self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDiGraph.optimize_with_safe_sequences)
+        self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractWalkModelDiGraph.optimize_with_safe_sequences)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.allow_empty_paths = optimization_options.get("allow_empty_paths", False)
-        self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractPathModelDiGraph.optimize_with_safety_as_subset_constraints)
+        self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
 
         self._is_solved = None
                 

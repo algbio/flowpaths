@@ -1,12 +1,12 @@
 import networkx as nx
 import flowpaths.stdigraph as stdigraph
-import flowpaths.abstractpathmodeldigraph as pathmodeldigraph
+import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 import copy
 
 
-class kLeastAbsErrorsCycles(pathmodeldigraph.AbstractPathModelDiGraph):
+class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
         self,
         G: nx.DiGraph,
@@ -34,7 +34,7 @@ class kLeastAbsErrorsCycles(pathmodeldigraph.AbstractPathModelDiGraph):
         ----------
         - `G: nx.DiGraph`
             
-            The input directed acyclic graph, as networkx DiGraph.
+            The input directed graph, as networkx DiGraph, which can have cycles.
 
         - `flow_attr: str`
             

@@ -1,4 +1,5 @@
 from .abstractpathmodeldag import AbstractPathModelDAG
+from .abstractwalkmodeldigraph import AbstractWalkModelDiGraph
 from .minflowdecomp import MinFlowDecomp
 from .kflowdecomp import kFlowDecomp
 from .kminpatherror import kMinPathError
@@ -17,6 +18,7 @@ from .minpathcover import MinPathCover
 
 __all__ = [
     "AbstractPathModelDAG",
+    "AbstractWalkModelDiGraph",
     "MinFlowDecomp",
     "kFlowDecomp",
     "kMinPathError",
