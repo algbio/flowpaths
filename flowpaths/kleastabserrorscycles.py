@@ -179,7 +179,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         # If k is not specified, we set k to the edge width of the graph
         if self.k is None:
             self.k = self.G.get_width(list(self.edges_to_ignore))
-        self.original_k = self.k
         self.optimization_options = optimization_options or {}        
 
         self.subset_constraints_coverage = subset_constraints_coverage
@@ -390,7 +389,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def is_valid_solution(self, tolerance=0.001):
         """
-        Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
+        Checks if the solution is valid by comparing the flow from walks with the flow attribute in the graph edges.
 
         Raises
         ------
@@ -438,9 +437,9 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
                     )
                     return False
 
-        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.original_k:
+        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
             utils.logger.debug(
-                f"{__name__}: Invalid solution: objective value {self.get_objective_value()} != solver objective value {self.solver.get_objective_value()} (tolerance: {tolerance * self.original_k})"
+                f"{__name__}: Invalid solution: objective value {self.get_objective_value()} != solver objective value {self.solver.get_objective_value()} (tolerance: {tolerance * self.k})"
             )
             return False
 

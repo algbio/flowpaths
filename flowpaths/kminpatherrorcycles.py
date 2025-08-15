@@ -6,7 +6,7 @@ import flowpaths.nodeexpandeddigraph as nedg
 import copy
 
 
-class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
+class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
         self,
         G: nx.DiGraph,
@@ -17,14 +17,16 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         subset_constraints: list = [],
         subset_constraints_coverage: float = 1.0,
         elements_to_ignore: list = [],
+        error_scaling: dict = {},
         additional_starts: list = [],
         additional_ends: list = [],
         optimization_options: dict = None,
         solver_options: dict = {},
     ):
         """
-        This class implements the k-Flow Decomposition problem, namely it looks for a decomposition of a weighted general directed graph, possibly with cycles, into 
-        $k$ weighted walks such that the flow on each edge of the graph equals the sum of the weights of the paths going through that edge.
+        This class implements the k-MinPathError problem. Given an edge-weighted DAG, this model looks for k paths, with associated weights and slacks, such that for every edge (u,v), 
+        the sum of the weights of the paths going through (u,v) minus the flow value of (u,v) is at most 
+        the sum of the slacks of the paths going through (u,v). The objective is to minimize the sum of the slacks.
 
         Parameters
         ----------
@@ -72,6 +74,12 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
             List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
+
+        - `error_scaling: dict`, optional
+            
+            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and path weights.
+            Default is an empty dict. If an edge/node has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
+            difference between the flow value of the edge/node and the sum of the weights of the paths going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
         
         - `additional_starts: list`, optional
             
@@ -89,11 +97,18 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
             Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
 
+        - `trusted_edges_for_safety: list`, optional
+
+            List of edges that are trusted to appear in an optimal solution. Default is `None`. 
+            If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
+            See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
+
         Raises
         ------
         - `ValueError`
             
             - If `weight_type` is not `int` or `float`.
+            - If the edge error scaling factor is not in [0,1].
             - If the flow attribute `flow_attr` is not specified in some edge.
             - If the graph contains edges with negative flow values.
             - ValueError: If `flow_attr_origin` is not "node" or "edge".
@@ -117,6 +132,8 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
             edges_to_ignore_internal = list(set(edges_to_ignore_internal))
 
+            error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
+
         elif self.flow_attr_origin == "edge":
             if G.number_of_edges() == 0:
                 utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
@@ -129,6 +146,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             edges_to_ignore_internal = elements_to_ignore
             additional_starts_internal = additional_starts
             additional_ends_internal = additional_ends
+            error_scaling_internal = error_scaling
         else:
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
@@ -136,7 +154,16 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subset_constraints = subset_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
+        self.edge_error_scaling = error_scaling_internal
+        # If the error scaling factor is 0, we ignore the edge
+        self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
         
+        # Checking that every entry in self.error_scaling is between 0 and 1
+        for key, value in error_scaling.items():
+            if value < 0 or value > 1:
+                utils.logger.error(f"{__name__}: Error scaling factor for {key} must be between 0 and 1.")
+                raise ValueError(f"Error scaling factor for {key} must be between 0 and 1.")
+
         if weight_type not in [int, float]:
             utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
@@ -144,6 +171,9 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
 
         self.k = k
+        # If k is not specified, we set k to the edge width of the graph
+        if self.k is None:
+            self.k = self.G.get_width(list(self.edges_to_ignore))
         self.optimization_options = optimization_options or {}        
 
         self.subset_constraints_coverage = subset_constraints_coverage
@@ -157,14 +187,27 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.pi_vars = {}
         self.path_weights_vars = {}
+        self.path_slacks_vars = {}
 
         self.path_weights_sol = None
+        self.path_slacks_sol = None
+        self.path_slacks_scaled_sol = None
         self._solution = None
         self._lowerbound_k = None
 
         self.solve_statistics = {}
         
-        self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
+        # We trust for safety all edges with non-zero flow and which are not in edges_to_ignore
+        self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
+            flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
+        ).difference(self.edges_to_ignore)
+        
+        # If we get subset constraints, and the coverage fraction is 1
+        # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
+        if self.subset_constraints is not None:
+            if self.subset_constraints_coverage == 1.0:
+                for constraint in self.subset_constraints:
+                    self.optimization_options["trusted_edges_for_safety"].update(constraint)
 
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
@@ -182,20 +225,16 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self._encode_flow_decomposition()
+        self._encode_minpatherror_decomposition()
+
+        # This method is called from the current class to add the objective function
+        self._encode_objective()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
-    def _encode_flow_decomposition(self):
+    def _encode_minpatherror_decomposition(self):
 
-        # pi vars 
-        self.pi_vars = self.solver.add_variables(
-            self.edge_indexes,
-            name_prefix="pi",
-            lb=0,
-            ub=self.w_max,
-            var_type="integer" if self.weight_type == int else "continuous",
-        )
+        # path weights 
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
             name_prefix="weights",
@@ -203,12 +242,42 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             ub=self.w_max,
             var_type="integer" if self.weight_type == int else "continuous",
         )
-
-        # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
+        
+        # We will encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
+        # assuming self.w_max is a bound for self.path_weights_vars[(i)]
+        self.pi_vars = self.solver.add_variables(
+            self.edge_indexes,
+            name_prefix="pi",
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+        )
+        
+        # path slacks
+        self.path_slacks_vars = self.solver.add_variables(
+            self.path_indexes,
+            name_prefix="slack",
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+        )
+        
+        # We will encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
+        # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
+        self.gamma_vars = self.solver.add_variables(
+            self.edge_indexes,
+            name_prefix="gamma",
+            lb=0,
+            ub=self.w_max,
+            var_type="continuous",
+        )
+                
         for u, v, data in self.G.edges(data=True):
             if (u, v) in self.edges_to_ignore:
                 continue
+
             f_u_v = data[self.flow_attr]
+            edge_error_scaling_u_v = self.edge_error_scaling.get((u, v), 1)
 
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
@@ -222,10 +291,40 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                     name=f"10_u={u}_v={v}_i={i}",
                 )
 
+            # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
+            # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
+            for i in range(self.k):
+                self.solver.add_integer_continuous_product_constraint(
+                    integer_var=self.edge_vars[(u, v, i)],
+                    continuous_var=self.path_slacks_vars[i],
+                    product_var=self.gamma_vars[(u, v, i)],
+                    lb=0,
+                    ub=self.w_max,
+                    name=f"12_u={u}_v={v}_i={i}",
+                )
+
+            # We encode that 
+            #   abs(f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+            #   * edge_error_scale_u_v 
+            #   <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k))
             self.solver.add_constraint(
-                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
-                name=f"10d_u={u}_v={v}_i={i}",
+                (f_u_v - self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+                * edge_error_scaling_u_v
+                <= self.solver.quicksum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                name=f"9aa_u={u}_v={v}_i={i}",
             )
+            self.solver.add_constraint(
+                (f_u_v - self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+                * edge_error_scaling_u_v
+                >= -self.solver.quicksum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                name=f"9ab_u={u}_v={v}_i={i}",
+            )
+
+    def _encode_objective(self):
+
+        self.solver.set_objective(
+            self.solver.quicksum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
+        )
 
     def _remove_empty_walks(self, solution):
         """
@@ -247,29 +346,34 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         solution_copy = copy.deepcopy(solution)
         non_empty_walks = []
         non_empty_weights = []
-        for walk, weight in zip(solution["walks"], solution["weights"]):
+        non_empty_slacks = []
+        for walk, weight, slack in zip(solution["walks"], solution["weights"], solution["slacks"]):
             if len(walk) > 1:
                 non_empty_walks.append(walk)
                 non_empty_weights.append(weight)
+                non_empty_slacks.append(slack)
 
         solution_copy["walks"] = non_empty_walks
         solution_copy["weights"] = non_empty_weights
+        solution_copy["slacks"] = non_empty_slacks
         return solution_copy
 
-    def get_solution(self, remove_empty_paths=True):
+    def get_solution(self, remove_empty_walks=True):
         """
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
-        Otherwise, it checks if the problem has been solved, computes the solution paths, weights
+        Otherwise, it checks if the problem has been solved, computes the solution walks, weights, slacks
         and caches the solution.
 
+        !!! warning "Warning"
+            Make sure you called `.solve()` before calling this method.
 
         Returns
         -------
         - `solution: dict`
-        
-            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`).
+
+            A dictionary containing the solution walks (key `"walks"`) and their corresponding weights (key `"weights"`) and slacks (key `"slacks"`).
 
         Raises
         -------
@@ -277,14 +381,11 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         """
 
         if self._solution is not None:
-            return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
+            return self._remove_empty_walks(self._solution) if remove_empty_walks else self._solution
 
         self.check_is_solved()
 
         weights_sol_dict = self.solver.get_variable_values("weights", [int])
-
-        utils.logger.debug(f"{__name__}: weights_sol_dict = {weights_sol_dict}")
-
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])
@@ -293,79 +394,119 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             )
             for i in range(self.k)
         ]
+        slacks_sol_dict = self.solver.get_variable_values("slack", [int])
+        self.path_slacks_sol = [
+            (
+                round(slacks_sol_dict[i])
+                if self.weight_type == int
+                else float(slacks_sol_dict[i])
+            )
+            for i in range(self.k)
+        ]
 
         if self.flow_attr_origin == "edge":
             self._solution = {
                 "walks": self.get_solution_walks(),
                 "weights": self.path_weights_sol,
-            }
+                "slacks": self.path_slacks_sol
+                }
         elif self.flow_attr_origin == "node":
             self._solution = {
                 "_walks_internal": self.get_solution_walks(),
                 "walks": self.G_internal.get_condensed_paths(self.get_solution_walks()),
                 "weights": self.path_weights_sol,
-            }
+                "slacks": self.path_slacks_sol
+                }
 
-        return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
+
+        return self._remove_empty_walks(self._solution) if remove_empty_walks else self._solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
-        Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
+        Checks if the solution is valid by checking of the weighted paths and their slacks satisfy the constraints of the problem. 
+
+        !!! warning "Warning"
+            Make sure you called `.solve()` before calling this method.
 
         Raises
         ------
-        - ValueError: If the solution is not available (i.e., self.solution is None).
+        - `ValueError`: If the solution is not available.
 
         Returns
         -------
-        - bool: True if the solution is valid, False otherwise.
+        - `bool`: `True` if the solution is valid, `False` otherwise.
 
         Notes
         -------
         - `get_solution()` must be called before this method.
         - The solution is considered valid if the flow from paths is equal
-            (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
+            (up to `tolerance * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
         if self._solution is None:
             self.get_solution()
 
+        if tolerance < 0:
+            utils.logger.error(f"{__name__}: tolerance must be non-negative, not {tolerance}")
+            raise ValueError(f"tolerance must be non-negative, not {tolerance}")
+
         solution_walks = self._solution.get("_walks_internal", self._solution["walks"])
         solution_weights = self._solution["weights"]
-        solution_walks_of_edges = [
-            [(walk[i], walk[i + 1]) for i in range(len(walk) - 1)]
-            for walk in solution_walks
+        solution_slacks = self._solution["slacks"]
+        for path in solution_walks:
+            if len(path) == 1:
+                utils.logger.error(f"{__name__}: Encountered a solution path with length 1, which is not allowed.")
+                raise ValueError("Solution path with length 1 encountered.")
+        solution_paths_of_edges = [
+            [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+            for path in solution_walks
         ]
 
-        weight_from_walks = {(u, v): 0 for (u, v) in self.G.edges()}
-        num_edge_walks_on_edges = {e: 0 for e in self.G.edges()}
-        for weight, walk in zip(solution_weights, solution_walks_of_edges):
-            for e in walk:
-                weight_from_walks[e] += weight
-                num_edge_walks_on_edges[e] += 1
+        weight_from_paths = {e: 0 for e in self.G.edges()}
+        slack_from_paths = {e: 0 for e in self.G.edges()}
+        num_paths_on_edges = {e: 0 for e in self.G.edges()}
+        for weight, slack, path in zip(
+            solution_weights, solution_slacks, solution_paths_of_edges
+        ):
+            for e in path:
+                if e in weight_from_paths:
+                    weight_from_paths[e] += weight
+                    slack_from_paths[e] += slack
+                    num_paths_on_edges[e] += 1
 
         for u, v, data in self.G.edges(data=True):
             if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
                 if (
-                    abs(data[self.flow_attr] - weight_from_walks[(u, v)])
-                    > tolerance * max(1,num_edge_walks_on_edges[(u, v)])
+                    abs(data[self.flow_attr] - weight_from_paths[(u, v)])
+                    > tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
                 ):
-                    utils.logger.error(
-                        f"{__name__}: Invalid solution for edge ({u}, {v}): "
-                        f"flow value {data[self.flow_attr]} != weight from walks {weight_from_walks[(u, v)]} "
-                    )
+                    utils.logger.debug(f"{__name__}: Solution: {self._solution}")
+                    utils.logger.debug(f"{__name__}: num_paths_on_edges[(u, v)] = {num_paths_on_edges[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: slack_from_paths[(u, v)] = {slack_from_paths[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: data[self.flow_attr] = {data[self.flow_attr]}")
+                    utils.logger.debug(f"{__name__}: weight_from_paths[(u, v)] = {weight_from_paths[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: > {tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]}")
+                    
+                    var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(), self.solver.get_all_variable_values())}
+                    utils.logger.debug(f"{__name__}: Variable dictionary: {var_dict}")
+
                     return False
 
+        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
+            utils.logger.info(f"{__name__}: self.get_objective_value() = {self.get_objective_value()} self.solver.get_objective_value() = {self.solver.get_objective_value()}")
+            return False
+        
         return True
 
     def get_objective_value(self):
-        
+
         self.check_is_solved()
 
         if self._solution is None:
             self.get_solution()
 
-        return self.k
+        # sum of slacks
+        return sum(self._solution["slacks"])
     
     def get_lowerbound_k(self):
 

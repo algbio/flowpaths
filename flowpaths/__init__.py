@@ -5,6 +5,7 @@ from .minflowdecompcycles import MinFlowDecompCycles
 from .kflowdecomp import kFlowDecomp
 from .kflowdecompcycles import kFlowDecompCycles
 from .kminpatherror import kMinPathError
+from .kminpatherrorcycles import kMinPathErrorCycles
 from .kleastabserrors import kLeastAbsErrors
 from .kleastabserrorscycles import kLeastAbsErrorsCycles
 from .numpathsoptimization import NumPathsOptimization
@@ -26,6 +27,7 @@ __all__ = [
     "kFlowDecomp",
     "kFlowDecompCycles",
     "kMinPathError",
+    "kMinPathErrorCycles",
     "kLeastAbsErrors",
     "kLeastAbsErrorsCycles",
     "NumPathsOptimization",
