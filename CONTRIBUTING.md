@@ -38,6 +38,37 @@ Tips:
 - Keep branches small and focused (e.g., `feat/k-min-path-error-speedups`, `fix/mfd-edge-case`).
 - Aim for clear commit messages and PR descriptions.
 
+## Repository structure
+
+The top-level repo layout is the following:
+
+```
+flowpaths/                 # Python package source (imported as `flowpaths`)
+  utils/                   # Utilities (e.g., drawing, logging, graph helpers)
+  __init__.py              # Public API exports
+  ...                      # Solvers and core modules
+
+docs/                      # MkDocs site (Markdown pages, assets)
+
+examples/                  # Small, runnable scripts demonstrating usage
+
+tests/                     # Pytest suite (unit tests + tiny graph inputs)
+
+.github/                   # GitHub workflows and repo meta (if present)
+
+mkdocs.yml                 # Docs site configuration and navigation
+pyproject.toml             # Package metadata and runtime deps
+requirements.txt           # Pinned runtime deps for local installs
+README.md, LICENSE         # Project overview and license
+
+```
+
+Where to put things:
+- New features/solvers: add code under `flowpaths/` and tests in `tests/`.
+- New examples: add a small runnable script under `examples/`.
+- Docs edits: update/add `docs/*.md` and register pages in `mkdocs.yml`.
+- Graph fixtures for tests: use tiny graphs; store under `tests/` (e.g., `tests/cyclic_graphs/`).
+
 ## Running tests locally
 
 The test suite lives in `tests/` and uses `pytest`.
