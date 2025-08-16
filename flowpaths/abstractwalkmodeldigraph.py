@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 
 class AbstractWalkModelDiGraph(ABC):
     # storing some defaults
-    optimize_with_safe_sequences = False
+    optimize_with_safe_sequences = True
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
     allow_empty_paths = False

@@ -1,5 +1,9 @@
 # Subpath constraints in DAGs
 
+!!! info inline end "See also"
+
+    - [Subset constraints in general graphs](subset-constraints.md)
+
 ## 1. Definition
 
 To any of the models on directed acyclic graphs that are based on (or inherit from) the [AbstractPathModelDAG](abstract-path-model.md) class you can add *subpath constraints*. This means the following. Say that you have prior knowledge of some (shorter) paths that *must* appear in at least one solution path of you model. These *constrain* the space of possible solution paths.
