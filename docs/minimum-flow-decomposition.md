@@ -114,7 +114,7 @@ There are several works on this problem, for example.
 
 4. See also flowpaths [References](references.md), and the other papers cited by these works.
 
-::: flowpaths.minflowdecomp
+::: flowpaths.MinFlowDecomp
     options:
       filters: 
         - "!^_"

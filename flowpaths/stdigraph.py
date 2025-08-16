@@ -39,9 +39,9 @@ class stDiGraph(nx.DiGraph):
         super().__init__()
         self.base_graph = base_graph
         if "id" in base_graph.graph:
-            self.id = base_graph.graph["id"]
+            self.id = str(base_graph.graph["id"])
         else:
-            self.id = id(self)
+            self.id = str(id(self))
         self.additional_starts = set(additional_starts)
         self.additional_ends = set(additional_ends)
 
