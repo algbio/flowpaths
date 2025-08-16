@@ -70,7 +70,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             
             Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
             the constraint need to be covered by some solution path). 
-            See [subset constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
         
         - `elements_to_ignore: list`, optional
 
@@ -85,11 +85,11 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         
         - `additional_starts: list`, optional
             
-            List of additional start nodes of the paths. Default is an empty list.
+            List of additional start nodes of the walks. Default is an empty list.
 
         - `additional_ends: list`, optional
             
-            List of additional end nodes of the paths. Default is an empty list.
+            List of additional end nodes of the walks. Default is an empty list.
 
         - `optimization_options: dict`, optional
 
@@ -330,7 +330,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         solution_copy["weights"] = non_empty_weights
         return solution_copy
 
-    def get_solution(self, remove_empty_paths=True):
+    def get_solution(self, remove_empty_walks=True):
         """
         Retrieves the solution for the flow decomposition problem.
 
@@ -351,7 +351,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         """
 
         if self._solution is not None:
-            return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
+            return self._remove_empty_walks(self._solution) if remove_empty_walks else self._solution
 
         self.check_is_solved()
 
@@ -385,7 +385,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
                 "edge_errors": self.edge_errors_sol # This is a dictionary with keys (u,v) and values the error on the edge (u,v)
             }
 
-        return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
+        return self._remove_empty_walks(self._solution) if remove_empty_walks else self._solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -402,8 +402,8 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         Notes
         -------
         - `get_solution()` must be called before this method.
-        - The solution is considered valid if the flow from paths is equal
-            (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
+        - The solution is considered valid if the flow from walks is equal
+            (up to `TOLERANCE * num_edge_walks_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
         if self._solution is None:

@@ -11,6 +11,27 @@ class stDiGraph(nx.DiGraph):
         additional_starts: list = [],
         additional_ends: list = [],
     ):
+        """
+        This class inherits from networkx.DiGraph. The graph equals `base_graph` plus:
+
+        - a global source connected to all sources of `base_graph` and to all nodes in `additional_starts`;
+        - a global sink connected from all sinks of `base_graph` and from all nodes in `additional_ends`.
+
+        !!! warning Warning
+
+            The graph `base_graph` must satisfy the following properties:
+            
+            - the nodes must be strings; 
+            - `base_graph` must have at least one source (i.e. node without incoming edges), or at least one node in `additional_starts`;
+            - `base_graph` must have at least one sink (i.e. node without outgoing edges), or at least one node in `additional_ends`.
+
+        Raises:
+        -------
+        - `ValueError`: If any of the above three conditions are not satisfied.
+        - `ValueError`: If any node in `additional_starts` is not in the base graph.
+        - `ValueError`: If any node in `additional_ends` is not in the base graph.
+
+        """
         if not all(isinstance(node, str) for node in base_graph.nodes()):
             utils.logger.error(f"{__name__}: Every node of the graph must be a string.")
             raise ValueError("Every node of the graph must be a string.")
@@ -23,6 +44,16 @@ class stDiGraph(nx.DiGraph):
             self.id = id(self)
         self.additional_starts = set(additional_starts)
         self.additional_ends = set(additional_ends)
+
+        # check if some node in additional_starts is not in base_graph
+        if not self.additional_starts.issubset(base_graph.nodes()):
+            utils.logger.error(f"{__name__}: Some nodes in additional_starts are not in the base graph.")
+            raise ValueError(f"Some nodes in additional_starts are not in the base graph.")
+        # check if some node in additional_ends is not in base_graph
+        if not self.additional_ends.issubset(base_graph.nodes()):
+            utils.logger.error(f"{__name__}: Some nodes in additional_ends are not in the base graph.")
+            raise ValueError(f"Some nodes in additional_ends are not in the base graph.")
+        
         self.source = f"source_{id(self)}"
         self.sink = f"sink_{id(self)}"
 
@@ -47,6 +78,13 @@ class stDiGraph(nx.DiGraph):
         self.sink_edges = list(self.in_edges(self.sink))
 
         self.source_sink_edges = set(self.source_edges + self.sink_edges)
+
+        if len(self.source_edges) == 0:
+            utils.logger.error(f"{__name__}: The graph passed to stDiGraph must have at least one source, or at least one node in `additional_starts`.")
+            raise ValueError(f"The graph passed to stDiGraph must have at least one source, or at least one node in `additional_starts`.")
+        if len(self.sink_edges) == 0:
+            utils.logger.error(f"{__name__}: The graph passed to stDiGraph must have at least one sink, or at least one node in `additional_ends`.")
+            raise ValueError(f"The graph passed to stDiGraph must have at least one sink, or at least one node in `additional_ends`.")
 
         self.condensation_width = None
         self._build_condensation_expanded()
@@ -172,6 +210,11 @@ class stDiGraph(nx.DiGraph):
         """
         Maps an edge (u,v) in the original graph to an edge in the condensation_expanded graph.
         """
+
+        if (u,v) not in self.edges():
+            utils.logger.error(f"{__name__}: Edge ({u}, {v}) not found in original graph.")
+            raise ValueError(f"Edge ({u}, {v}) not found in original graph.")
+
         mapping_u = self._condensation.graph['mapping'][u]
         mapping_v = self._condensation.graph['mapping'][v]
         
@@ -192,7 +235,13 @@ class stDiGraph(nx.DiGraph):
     
     def _edge_to_condensation_node(self, u, v) -> str:
         """
-        Maps an edge (u,v) in the original graph in an SCC to the corresponding node (as str) in the condensation graph
+        Maps an edge `(u,v)` inside an SCC of the original graph 
+        to the node corresponding to the SCC (as `str`) in the condensation graph
+
+        Raises:
+        -------
+        - `ValueError` if the edge (u,v) is not an edge of the graph.
+        - `ValueError` if the edge (u,v) is not inside an SCC.
         """
 
         if not self.is_scc_edge(u, v):
@@ -202,6 +251,29 @@ class stDiGraph(nx.DiGraph):
         return str(self._condensation.graph['mapping'][u])
 
     def get_width(self, edges_to_ignore: list = None) -> int:
+        """
+        Returns the width of the graph, which we define as the minimum number of $s$-$t$ walks needed to cover all edges.
+
+        This is computed as the width of the condensation DAGs (minimum number of $s$-$t$ paths to cover all edges), with the following modification.
+        Nodes `v` in the condensation corresponding to non-trivial SCCs (i.e. SCCs with more than one node, equivalent to having at least one edge) 
+        are subdivided into a edge `(v, v_expanded)`, all condensation in-neighbors of `v` are connected to `v`,
+        and all condensation out-neighbors of `v` are connected from `v_expanded`.
+
+        Parameters:
+        -----------
+        - `edges_to_ignore`: A list of edges in the original graph to ignore when computing the width.
+
+            The width is then computed as as above, with the exception that:
+
+            - If an edge `(u,v)` in `edges_to_ignore` is between different SCCs, 
+                then the corresponding edge to ignore is between the two SCCs in the condensation graph, 
+                and we can ignore it when computing the normal width of the condensation.
+
+            - If an edge `(u,v)` in `edges_to_ignore` is inside the same SCC, 
+                then we remove the edge `(u,v)` from (a copy of) the member edges of the SCC in the condensation. 
+                If an SCC `v` has no more member edges left, we can also add the condensation edge `(v, v_expanded)` to
+                the list of edges to ignore when computing the width of the condensation.
+        """
 
         if self.condensation_width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
             return self.condensation_width

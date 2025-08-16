@@ -5,28 +5,33 @@ nav:
   - Home: 
     - About: index.md
     - References: references.md
-  - Decomposition models:
-    - Models:
-      - Minimum Flow Decomposition: minimum-flow-decomposition.md
-      - $k$-Flow Decomposition: k-flow-decomposition.md
-      - $k$-Least Absolute Errors: k-least-absolute-errors.md
-      - $k$-Minimum Path Error: k-min-path-error.md
-      - Minimum Path Cover: minimum-path-cover.md
-      - Optimizing $k$: numpathsoptimization.md
-    - Additional features:
-      - Flows/weights on nodes: node-expanded-digraph.md
-      - Subpath constraints: subpath-constraints.md
-      - Ignoring edges: ignoring-edges.md
-      - Additional start/end nodes: additional-start-end-nodes.md
-      - Correcting weights: minimum-error-flow.md
-    - Further options:
-      - Solver options and optimizations: solver-options-optimizations.md
-      - Various utils: utils.md
-    
-  - Developing new models:
-    - Abstract Path Model: abstract-path-model.md
+  - Acyclic Decomposition Models:
+    - Minimum Flow Decomposition: minimum-flow-decomposition.md
+    - $k$-Flow Decomposition: k-flow-decomposition.md
+    - $k$-Least Absolute Errors: k-least-absolute-errors.md
+    - $k$-Minimum Path Error: k-min-path-error.md
+    - Minimum Path Cover: minimum-path-cover.md
+    - Optimizing $k$: numpathsoptimization.md
+  - Decomposition Models with Cycles:
+    - Minimum Flow Decomposition: minimum-flow-decomposition-cycles.md
+    - $k$-Flow Decomposition: k-flow-decomposition-cycles.md
+    - $k$-Least Absolute Errors: k-least-absolute-errors-cycles.md
+    - $k$-Minimum Path Error: k-min-path-error-cycles.md
+  - Advanced Options:
+    - Flows/weights on nodes: node-expanded-digraph.md
+    - Subpath constraints: subpath-constraints.md
+    - Subset constraints: subset-constraints.md
+    - Ignoring edges: ignoring-edges.md
+    - Additional start/end nodes: additional-start-end-nodes.md
+    - Correcting weights: minimum-error-flow.md
+    - Solver options and optimizations: solver-options-optimizations.md
+    - Various utils: utils.md
+  - Developing New Models:
     - Solver Wrapper: solver-wrapper.md
-    - stDiGraph: stdigraph.md  
+    - Abstract Path Model: abstract-path-model.md
+    - stDAG: stdag.md
+    - Abstract Walk Model: abstract-walk-model.md
+    - stDiGraph: stdigraph.md
     - Minimum Generating Set: minimum-generating-set.md
     - Minimum Set Cover: minimum-set-cover.md
 
@@ -65,6 +70,7 @@ theme:
     - navigation.tabs.sticky
     - navigation.expand
     - navigation.path
+    - search.highlight
   logo: flowpaths-logo.svg  
   favicon: flowpaths-logo.svg
   icon:

@@ -40,9 +40,6 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             
             The number of paths to decompose in.
 
-            !!! note "Unknown $k$"
-                If you do not have a good guess for $k$, you can pass `k=None` and the model will set $k$ to the condensation width of the graph (i.e. the minimum number of $s$-$t$ walks needed to cover all the edges of the graph, except those in `edges_to_ignore`).
-
         - `flow_attr_origin: str`, optional
 
             The origin of the flow attribute. Default is `"edge"`. Options:
@@ -66,7 +63,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             
             Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
             the constraint need to be covered by some solution path). 
-            See [subset constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
         
         - `elements_to_ignore: list`, optional
 
@@ -75,11 +72,11 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         
         - `additional_starts: list`, optional
             
-            List of additional start nodes of the paths. Default is an empty list.
+            List of additional start nodes of the walks. Default is an empty list.
 
         - `additional_ends: list`, optional
-            
-            List of additional end nodes of the paths. Default is an empty list.
+
+            List of additional end nodes of the walks. Default is an empty list.
 
         - `optimization_options: dict`, optional
 
@@ -96,7 +93,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             - If `weight_type` is not `int` or `float`.
             - If the flow attribute `flow_attr` is not specified in some edge.
             - If the graph contains edges with negative flow values.
-            - ValueError: If `flow_attr_origin` is not "node" or "edge".
+            - ValueError: If `flow_attr_origin` is not `node` or `edge`.
         """
     
         # Handling node-weighted graphs
@@ -256,7 +253,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         solution_copy["weights"] = non_empty_weights
         return solution_copy
 
-    def get_solution(self, remove_empty_paths=True):
+    def get_solution(self, remove_empty_walks=True):
         """
         Retrieves the solution for the flow decomposition problem.
 
@@ -277,7 +274,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         """
 
         if self._solution is not None:
-            return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
+            return self._remove_empty_walks(self._solution) if remove_empty_walks else self._solution
 
         self.check_is_solved()
 
@@ -306,7 +303,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                 "weights": self.path_weights_sol,
             }
 
-        return self._remove_empty_walks(self._solution) if remove_empty_paths else self._solution
+        return self._remove_empty_walks(self._solution) if remove_empty_walks else self._solution
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -323,8 +320,8 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         Notes
         -------
         - `get_solution()` must be called before this method.
-        - The solution is considered valid if the flow from paths is equal
-            (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
+        - The solution is considered valid if the flow from walks is equal
+            (up to `TOLERANCE * num_edge_walks_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
         if self._solution is None:

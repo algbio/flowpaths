@@ -20,7 +20,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         G: nx.DiGraph,
         flow_attr: str,
         flow_attr_origin: str = "edge",
-        weight_type: type = float,
+        weight_type: type = int,
         subset_constraints: list = [],
         subset_constraints_coverage: float = 1.0,
         elements_to_ignore: list = [],
@@ -30,8 +30,6 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         solver_options: dict = {},
     ):
         """
-        Initialize the Minimum Flow Decomposition model, minimizing the number of walks.
-
         Parameters
         ----------
         - `G : nx.DiGraph`
@@ -65,7 +63,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             
             Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
             the constraint need to be covered by some solution path). 
-            See [subset constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
 
         - `elements_to_ignore : list`, optional
 
@@ -74,11 +72,11 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
         - `additional_starts: list`, optional
             
-            List of additional start nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md). **You can set this only if `flow_attr_origin` is `"node"`**.
+            List of additional start nodes of the walks. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `additional_ends: list`, optional
-            
-            List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md). **You can set this only if `flow_attr_origin` is `"node"`**.
+
+            List of additional end nodes of the walks. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
         - `optimization_options : dict`, optional
             
@@ -204,7 +202,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                 return False
 
             if fd_model.is_solved():
-                self._solution = fd_model.get_solution(remove_empty_paths=True)
+                self._solution = fd_model.get_solution(remove_empty_walks=True)
                 if self.flow_attr_origin == "node":
                     # If the flow_attr_origin is "node", we need to convert the solution walks from the expanded graph to walks in the original graph.
                     self._solution["_walks_internal"] = self._solution["walks"]

@@ -79,7 +79,7 @@ class AbstractPathModelDAG(ABC):
 
         - `G: stDAG.stDAG`  
             
-            The directed acyclic graph (DAG) to be used.
+            The directed acyclic graph (DAG) to be used. Create it using the [`stDAG` class](stdag.md).
 
         - `k: int`
             

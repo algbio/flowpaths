@@ -68,7 +68,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             
             Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
             the constraint need to be covered by some solution path). 
-            See [subset constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
         
         - `elements_to_ignore: list`, optional
 
@@ -83,11 +83,11 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         
         - `additional_starts: list`, optional
             
-            List of additional start nodes of the paths. Default is an empty list.
+            List of additional start nodes of the walks. Default is an empty list.
 
         - `additional_ends: list`, optional
-            
-            List of additional end nodes of the paths. Default is an empty list.
+
+            List of additional end nodes of the walks. Default is an empty list.
 
         - `optimization_options: dict`, optional
 
@@ -439,8 +439,8 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         Notes
         -------
         - `get_solution()` must be called before this method.
-        - The solution is considered valid if the flow from paths is equal
-            (up to `tolerance * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
+        - The solution is considered valid if the flow from walks is equal
+            (up to `tolerance * num_edge_walks_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
         if self._solution is None:
@@ -462,31 +462,31 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             for path in solution_walks
         ]
 
-        weight_from_paths = {e: 0 for e in self.G.edges()}
-        slack_from_paths = {e: 0 for e in self.G.edges()}
-        num_paths_on_edges = {e: 0 for e in self.G.edges()}
+        weight_from_walks = {e: 0 for e in self.G.edges()}
+        slack_from_walks = {e: 0 for e in self.G.edges()}
+        num_edge_walks_on_edges = {e: 0 for e in self.G.edges()}
         for weight, slack, path in zip(
             solution_weights, solution_slacks, solution_paths_of_edges
         ):
             for e in path:
-                if e in weight_from_paths:
-                    weight_from_paths[e] += weight
-                    slack_from_paths[e] += slack
-                    num_paths_on_edges[e] += 1
+                if e in weight_from_walks:
+                    weight_from_walks[e] += weight
+                    slack_from_walks[e] += slack
+                    num_edge_walks_on_edges[e] += 1
 
         for u, v, data in self.G.edges(data=True):
             if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
                 if (
-                    abs(data[self.flow_attr] - weight_from_paths[(u, v)])
-                    > tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
+                    abs(data[self.flow_attr] - weight_from_walks[(u, v)])
+                    > tolerance * num_edge_walks_on_edges[(u, v)] + slack_from_walks[(u, v)]
                 ):
                     utils.logger.debug(f"{__name__}: Solution: {self._solution}")
-                    utils.logger.debug(f"{__name__}: num_paths_on_edges[(u, v)] = {num_paths_on_edges[(u, v)]}")
-                    utils.logger.debug(f"{__name__}: slack_from_paths[(u, v)] = {slack_from_paths[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: num_edge_walks_on_edges[(u, v)] = {num_edge_walks_on_edges[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: slack_from_walks[(u, v)] = {slack_from_walks[(u, v)]}")
                     utils.logger.debug(f"{__name__}: data[self.flow_attr] = {data[self.flow_attr]}")
-                    utils.logger.debug(f"{__name__}: weight_from_paths[(u, v)] = {weight_from_paths[(u, v)]}")
-                    utils.logger.debug(f"{__name__}: > {tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]}")
-                    
+                    utils.logger.debug(f"{__name__}: weight_from_walks[(u, v)] = {weight_from_walks[(u, v)]}")
+                    utils.logger.debug(f"{__name__}: > {tolerance * num_edge_walks_on_edges[(u, v)] + slack_from_walks[(u, v)]}")
+
                     var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(), self.solver.get_all_variable_values())}
                     utils.logger.debug(f"{__name__}: Variable dictionary: {var_dict}")
 

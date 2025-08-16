@@ -1,35 +1,9 @@
 import flowpaths as fp
 import networkx as nx
 
-def test1():
-    # Create a simple graph
+
+def test():
     graph = nx.DiGraph()
-    graph.graph["id"] = "simple_graph"
-    graph.add_edge("s", "a", flow=1)
-    graph.add_edge("a", "b", flow=2)
-    graph.add_edge("b", "a", flow=2)
-    graph.add_edge("a", "t", flow=1)
-
-    # We create a Least Absolute Errors solver with default settings, 
-    # by specifying that the flow value of each edge is in the attribute `flow` of the edges,
-    # and that the number of paths to consider is 1.
-    mpe_model = fp.kMinPathErrorCycles(
-        G=graph, 
-        flow_attr="flow", 
-        k=1, 
-        weight_type=int,
-        )
-
-    # We solve it
-    mpe_model.solve()
-
-    # We process its solution
-    process_solution(graph, None, mpe_model)
-
-def test2():
-    # Create a simple graph
-    graph = nx.DiGraph()
-    graph.graph["id"] = "simple_graph"
     graph.add_edge("s", "a", flow=3)
     graph.add_edge("a", "t", flow=3)
     graph.add_edge("s", "b", flow=6)
@@ -41,21 +15,20 @@ def test2():
     graph.add_edge("c", "h", flow=4)
     graph.add_edge("d", "h", flow=0)
     graph.add_edge("d", "e", flow=4)
-    graph.add_edge("e", "c", flow=5)
-    graph.add_edge("e", "f", flow=4)
-    graph.add_edge("f", "g", flow=4)
-    graph.add_edge("g", "e", flow=4)
+    graph.add_edge("e", "c", flow=4)
+    graph.add_edge("e", "f", flow=8)
+    graph.add_edge("f", "g", flow=8)
+    graph.add_edge("g", "e", flow=8)
 
-    mpe_model = fp.kMinPathErrorCycles(
-        G=graph, 
-        flow_attr="flow", 
-        k=3, 
-        weight_type=int,
-        )
-    mpe_model.solve()
-    process_solution(graph, None, mpe_model)
+    mfd_model = fp.MinFlowDecompCycles(G=graph, flow_attr="flow")
+    mfd_model.solve()
 
-def test3(filename: str):
+    if mfd_model.is_solved():
+        print(mfd_model.get_solution())
+
+    process_solution(graph, "test", mfd_model)
+
+def test3(k: int, filename: str):
     # read the graph from file
     graph = fp.graphutils.read_graphs(filename)[0]
     fp.utils.draw(
@@ -70,20 +43,21 @@ def test3(filename: str):
             "pathwidth": 2,
         })
 
-    mpe_model = fp.kMinPathErrorCycles(
+    kfd_model = fp.kFlowDecompCycles(
         G=graph,
+        k=k,
         flow_attr="flow",
         weight_type=int,
         optimization_options={
             "optimize_with_safe_sequences": False,
             "optimize_with_safety_as_subset_constraints": False,
         },
-        solver_options={"external_solver": "highs"}
+        solver_options={"external_solver": "highs"},
     )
-    mpe_model.solve()
-    process_solution(graph, filename, mpe_model)
+    kfd_model.solve()
+    process_solution(graph, filename, kfd_model)
 
-def process_solution(graph, filename, model: fp.kLeastAbsErrors):
+def process_solution(graph, filename = None, model: fp.kFlowDecompCycles = None):
     if model.is_solved():
         print(model.get_solution())
         print("model.is_valid_solution()", model.is_valid_solution())
@@ -106,10 +80,9 @@ def process_solution(graph, filename, model: fp.kLeastAbsErrors):
         print("Model could not be solved.")
 
 def main():
-    # test1()
-    test2()
-    # test3(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
-    # test3(filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
+    test()
+    # test3(k = 3, filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    # test3(k = 4, filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
 
 if __name__ == "__main__":
     # Configure logging

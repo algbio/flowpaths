@@ -1,10 +1,12 @@
-# Subpath constraints in DAGs
+# Subset constraints in general graphs
 
 ## 1. Definition
 
-To any of the models on directed acyclic graphs that are based on (or inherit from) the [AbstractPathModelDAG](abstract-path-model.md) class you can add *subpath constraints*. This means the following. Say that you have prior knowledge of some (shorter) paths that *must* appear in at least one solution path of you model. These *constrain* the space of possible solution paths.
+To any of the models on directed graphs (possibly with cycles) that are based on (or inherit from) the [AbstractWalkModelDiGraph](abstract-walk-model.md) class you can add *subset constraints*. As opposed to the [subpath constraints](subpath-constraints.md) that you can add for directed **acyclic** graphs, here they mean the following.
 
-Let's consider the [Minimum Flow Decomposition](minimum-flow-decomposition.md) problem, and let's take the example graph from there. Let's assume that you want the subpath `[a,c,t]` (which we draw in brown) to appear in at last one solution path. 
+Say that you have prior knowledge of some **set of edges** that *must* appear together in at least one solution walk of you model. These *constrain* the space of possible solution walks.
+
+Let's consider the [Minimum Flow Decomposition](minimum-flow-decomposition-cycles.md) problem in graphs with cycles, and let's take the example graph from there. Let's assume that you want the subpath `[a,c,t]` (which we draw in brown) to appear in at last one solution path. 
 
 ``` mermaid
 flowchart LR

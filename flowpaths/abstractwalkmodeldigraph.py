@@ -7,9 +7,6 @@ import copy
 from abc import ABC, abstractmethod
 
 class AbstractWalkModelDiGraph(ABC):
-    """
-    
-    """
     # storing some defaults
     optimize_with_safe_sequences = False
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
@@ -32,8 +29,8 @@ class AbstractWalkModelDiGraph(ABC):
         ----------
 
         - `G: stdigraph.stDiGraph`  
-            
-            The directed graph to be used.
+
+            The directed graph to be used, possibly with cycles. Create it using the [`stDiGraph` class](stdigraph.md).
 
         - `k: int`
             
