@@ -236,7 +236,7 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
     ----------
     - `G`: nx.DiGraph
     
-        The input directed acyclic graph, as networkx DiGraph.
+        The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
     - `flow_attr`: str
     
@@ -325,7 +325,7 @@ def draw(
 
         - `G`: nx.DiGraph 
         
-            The input directed acyclic graph, as networkx DiGraph. 
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html). 
 
         - `filename`: str
         

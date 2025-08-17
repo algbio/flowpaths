@@ -22,7 +22,7 @@ def compute_inexact_flow_decomp_safe_paths(
     ----------
     - `G`: nx.DiGraph: 
 
-        A directed graph as networkx DiGraph.
+        A directed graph as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
     - `lowerbound_attr`: str
 
@@ -171,7 +171,7 @@ def compute_flow_decomp_safe_paths(
     ----------
     - `G`: nx.DiGraph:
 
-        A directed graph as networkx DiGraph.
+        A directed graph as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
     - `flow_attr`: str
 

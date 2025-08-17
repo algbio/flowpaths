@@ -37,7 +37,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         ----------
         - `G: nx.DiGraph`
             
-            The input directed acyclic graph, as networkx DiGraph.
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
         - `flow_attr: str`
             

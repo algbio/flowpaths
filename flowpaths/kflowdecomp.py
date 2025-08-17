@@ -8,9 +8,6 @@ import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 
 class kFlowDecomp(pathmodel.AbstractPathModelDAG):
-    """
-    Class to decompose a flow into a given number of weighted paths.
-    """
     # storing some defaults
     optimize_with_greedy = True
     optimize_with_flow_safe_paths = True
@@ -37,7 +34,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         ----------
         - `G : nx.DiGraph`
             
-            The input directed acyclic graph, as networkx DiGraph.
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
         - `flow_attr : str`
             

@@ -32,7 +32,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         ----------
         - `G: nx.DiGraph`
             
-            The input directed graph, as networkx DiGraph, which can have cycles.
+            The input directed graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html), which can have cycles.
 
         - `flow_attr: str`
             
@@ -60,7 +60,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             
             List of subset constraints. Default is an empty list. 
             Each subset constraint is a list of edges that must be covered by some solution path, according 
-            to the `subset_constraints_coverage` or `subset_constraints_coverage_length` parameters (see below).
+            to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional
             
@@ -96,12 +96,6 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         - `solver_options: dict`, optional
 
             Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
-
-        - `trusted_edges_for_safety: list`, optional
-
-            List of edges that are trusted to appear in an optimal solution. Default is `None`. 
-            If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
-            See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
 
         Raises
         ------

@@ -32,7 +32,7 @@ class NodeExpandedDiGraph(nx.DiGraph):
         ----------
         - `G : nx.DiGraph`
             
-            The input directed graph, as networkx DiGraph.
+            The input directed graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
         - `node_flow_attr : str`
 

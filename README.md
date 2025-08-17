@@ -55,17 +55,16 @@ For graphs with cycles, use the cyclic variants which return walks rather than s
 import flowpaths as fp
 import networkx as nx
 
-# A tiny graph with a cycle and conserved flow
 G = nx.DiGraph()
 G.add_edge("s", "a", flow=1)
 G.add_edge("a", "b", flow=2)  # part of a cycle
 G.add_edge("b", "a", flow=2)  # part of a cycle
 G.add_edge("a", "t", flow=1)
 
-mfd_cycles = fp.MinFlowDecompCycles(G, flow_attr="flow")
-mfd_cycles.solve()
-if mfd_cycles.is_solved():
-    print(mfd_cycles.get_solution())
+mfd_solver = fp.MinFlowDecompCycles(G, flow_attr="flow")
+mfd_solver.solve()
+if mfd_solver.is_solved():
+    print(mfd_solver.get_solution())
     # {'walks': [['s', 'a', 'b', 'a', 'b', 'a', 't']], 'weights': [1]}
 ```
 
@@ -84,24 +83,16 @@ if mfd_cycles.is_solved():
 
 4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` means that any optimization to the path-finding mechanisms benefits **all** solvers that inherit from this class. We implement some "safety optimizations" described in [this paper](https://doi.org/10.48550/arXiv.2411.03871), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
 
-5. **Flexible inputs**: Graphs with flows/weights on either edges or nodes are supported; see [Handling graphs with flows / weights on nodes](https://algbio.github.io/flowpaths/node-expanded-digraph.html).
+5. **Flexible inputs**: The models support graphs with flows/weights on either edges or nodes, and additional real use-case input features, such as subpath or subset constraints.
 
 ### Models currently implemented
-- [**Minimum Flow Decomposition**](https://algbio.github.io/flowpaths/minimum-flow-decomposition.html): Given a DAG with flow values on its edges (i.e. at every node different from source or sink the flow enetering the node is equal to the flow exiting the node), find the minimum number of weighted paths such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
+- [**Minimum Flow Decomposition**](https://algbio.github.io/flowpaths/minimum-flow-decomposition.html): Given a graph with flow values on its edges (i.e. at every node different from source or sink the flow entering the node is equal to the flow exiting the node), find the minimum number of weighted paths / walks such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
     
-- [**$k$-Least Absolute Errors**](https://algbio.github.io/flowpaths/k-least-absolute-errors.html): Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths such that the sum of the absolute errors of each edge is minimized. 
-    - The *error of an edge* is defined as the weight of the edge minus the sum of the weights of the paths going through it.
-- [**$k$-Minimum Path Error**](https://algbio.github.io/flowpaths/k-min-path-error.html): Given a DAG with weights on its edges, and a number $k$, find $k$ weighted paths, with associated *slack* values, such that:
-    - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths going through the edge, and
-    - The sum of path slacks is minimized.
-
-Models for general directed graphs (with cycles), decomposed into walks:
-
-- [**Minimum Flow Decomposition (cycles)**](https://algbio.github.io/flowpaths/minimum-flow-decomposition-cycles.html): Given a directed graph with conserved flow on edges and allowed start/end node sets, find the minimum number of weighted walks whose edgewise weights sum to the flow.
-- [**$k$-Flow Decomposition (cycles)**](https://algbio.github.io/flowpaths/k-flow-decomposition-cycles.html): Given a directed graph with conserved flow and an integer $k$, find a decomposition of the flow into $k$ weighted walks.
-- [**$k$-Least Absolute Errors (cycles)**](https://algbio.github.io/flowpaths/k-least-absolute-errors-cycles.html): Given a directed graph with arbitrary non-negative edge weights and an integer $k$, find $k$ weighted walks minimizing the sum of absolute edge errors (with options for ignoring/scaling edges and subpath constraints).
-- [**$k$-Minimum Path Error (cycles)**](https://algbio.github.io/flowpaths/k-min-path-error-cycles.html): Given a directed graph with arbitrary non-negative edge weights and an integer $k$, find $k$ weighted walks with slacks that bound per-edge errors and minimize the sum of slacks.
-
+- [**$k$-Least Absolute Errors**](https://algbio.github.io/flowpaths/k-least-absolute-errors.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks such that the sum of the absolute errors of each edge is minimized. 
+    - The *error of an edge* is defined as the weight of the edge minus the sum of the weights of the paths / walks going through it.
+- [**$k$-Minimum Path Error**](https://algbio.github.io/flowpaths/k-min-path-error.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks, with associated *slack* values, such that:
+    - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths / walks going through the edge, and
+    - The sum of path / walk slacks is minimized.
 
 ### Contributing
 

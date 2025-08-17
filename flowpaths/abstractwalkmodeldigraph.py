@@ -11,7 +11,7 @@ class AbstractWalkModelDiGraph(ABC):
     optimize_with_safe_sequences = True
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
-    allow_empty_paths = False
+    allow_empty_walks = False
 
     def __init__(
         self,
@@ -43,11 +43,11 @@ class AbstractWalkModelDiGraph(ABC):
         - `subset_constraints: list`, optional
             
             A list of lists, where each list is a *set* of edges (not necessarily contiguous). Defaults to an empty list.
-            
-            Each set of edges must appear in at least one solution path; if you also pass subpath_constraints_coverage, 
-            then each set of edges must appear in at least sub_constraints_coverage fraction of some solution walk, see below.
-        
-        - `subpath_constraints_coverage: float`, optional
+
+            Each set of edges must appear in at least one solution path; if you also pass `subset_constraints_coverage`, 
+            then each set of edges must appear in at least `subset_constraints_coverage` fraction of some solution walk, see below.
+
+        - `subset_constraints_coverage: float`, optional
             
             Coverage fraction of the subset constraints that must be covered by some solution walk, in terms of number of edges. 
                 - Defaults to 1 (meaning that 100% of the edges of the constraint need to be covered by some solution walk).
@@ -66,7 +66,7 @@ class AbstractWalkModelDiGraph(ABC):
                     In order for the optimizations to still guarantee a global optimum, you must guarantee that:
 
                     1. The solution is made up of source-to-sink walks, and
-                    2. Every edge in `trusted_edges_for_safety` appears in some solution walk, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decomposition](minimum-flow-decomposition.md) or [k-Minimum Path Error] where in fact, under default settings, **all** edges appear in all solutions.
+                    2. Every edge in `trusted_edges_for_safety` appears in some solution walk, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decomposition](minimum-flow-decomposition-cycles.md) or [k-Minimum Path Error](k-minimum-path-error-cycles.md) where in fact, under default settings, **all** edges appear in all solutions.
 
         - `solver_options: dict`, optional
             
@@ -116,7 +116,7 @@ class AbstractWalkModelDiGraph(ABC):
             optimization_options = {}
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractWalkModelDiGraph.optimize_with_safe_sequences)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
-        self.allow_empty_paths = optimization_options.get("allow_empty_paths", AbstractWalkModelDiGraph.allow_empty_paths)
+        self.allow_empty_walks = optimization_options.get("allow_empty_walks", AbstractWalkModelDiGraph.allow_empty_walks)
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
 
         self._is_solved = None
@@ -187,7 +187,7 @@ class AbstractWalkModelDiGraph(ABC):
         # Note that x[(u,v,i)] can take values bigger than 1 if using the edge (u,v) more times, but by our construction the self.G.source is
         # also a source of the graph, so the walk cannot come back to self.G.source.
         for i in range(self.k):
-            if not self.allow_empty_paths:
+            if not self.allow_empty_walks:
                 self.solver.add_constraint(
                     self.solver.quicksum(
                         self.edge_vars[(self.G.source, v, i)]
@@ -401,9 +401,9 @@ class AbstractWalkModelDiGraph(ABC):
             raise ValueError("subset_constraints must be a list of lists of edges.")
 
         for subset in self.subset_constraints:
-            # Check that each subpath has at least one edge
+            # Check that each subset has at least one edge
             if len(subset) == 0:
-                utils.logger.error(f"{__name__}: subpath {subset} must have at least 1 edge.")
+                utils.logger.error(f"{__name__}: subset {subset} must have at least 1 edge.")
                 raise ValueError(f"Subset {subset} must have at least 1 edge.")
             # Check that each subset is a list of tuples of two nodes (edges)
             if not all(isinstance(e, tuple) and len(e) == 2 for e in subset):

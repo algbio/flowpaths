@@ -1,6 +1,7 @@
 !!! info inline end "See also"
 
     - [k-Flow Decomposition](k-flow-decomposition.md)
+    - [Minimum Flow Decomposition with Cycles](minimum-flow-decomposition-cycles.md)
 
 # Minimum Flow Decomposition
 

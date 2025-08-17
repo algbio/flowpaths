@@ -34,7 +34,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         ----------
         - `G : nx.DiGraph`
             
-            The input directed graph, as networkx DiGraph, possibly with cycles.
+            The input directed graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html), possibly with cycles.
 
         - `flow_attr : str`
             
@@ -49,13 +49,13 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
         - `weight_type : type`, optional
             
-            The type of weights (`int` or `float`). Default is `float`.
+            The type of weights (`int` or `float`). Default is `int`.
 
         - `subset_constraints : list`, optional
             
             List of subset constraints. Default is an empty list. 
             Each subset constraint is a list of edges that must be covered by some solution path, according 
-            to the `subset_constraints_coverage` or `subset_constraints_coverage_length` parameters (see below).
+            to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional
             
