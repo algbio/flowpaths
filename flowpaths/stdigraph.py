@@ -179,17 +179,17 @@ class stDiGraph(nx.DiGraph):
 
         # self._condensation_expanded has str nodes
         # self._condensation_expanded has nodes of the form 
-        # - str(int), if the SCC node is trivial
+        # - str(int), if the SCC node is trivial (having no edges)
         # - str(int) and str(int) + "_expanded", if the SCC node is non-trivial
 
         # cond_expanded is a copy of self._condensation, with the difference
-        # that all nodes v corresponding to non-trivial SCCs (i.e. with more than 2 nodes, equiv with at least one edge)
+        # that all nodes v corresponding to non-trivial SCCs (i.e. with at least one edge)
         # are expanded into an edge (v, self._expanded(v))
         condensation_expanded = nx.DiGraph()
-        for v, data in self._condensation.nodes(data=True):
-            # If v belongs to an SCC made up of a single node,
+        for v in self._condensation.nodes:
+            # If v belongs to a trivial SCC (having no edges),
             # then we don't expand the node
-            if len(data['members']) == 1:
+            if len(self._condensation.graph["member_edges"][str(v)]) == 0:
                 condensation_expanded.add_node(str(v))
             else:
                 # Otherwise, if the SCC of the node is non-trivial, then we expand the node into the edge (v, self._expanded(v))
