@@ -385,7 +385,7 @@ def draw(
 
         """
 
-        if len(paths) != len(weights):
+        if len(paths) != len(weights) and len(weights) > 0:
             raise ValueError(f"{__name__}: Paths and weights must have the same length, if provided.")
 
         try:
@@ -470,7 +470,7 @@ def draw(
                             fontcolor=pathColor,
                             color=pathColor,
                             penwidth=str(draw_options.get("pathwidth", 3.0)),
-                            label=str(weights[index]),
+                            label=str(weights[index]) if len(weights) > 0 else "",
                             fontname="Arial",
                         )
                     else:

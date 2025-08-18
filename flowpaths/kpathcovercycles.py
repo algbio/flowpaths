@@ -3,10 +3,9 @@ import flowpaths.stdigraph as stdigraph
 import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
-import copy
+from copy import deepcopy
 
-
-class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
+class kPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
         self,
         G: nx.DiGraph,
@@ -22,6 +21,8 @@ class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
     ):
         """
         This class finds, if possible, `k` walks covering the edges of a directed graph, possibly with cycles -- and generalizations of this problem, see the parameters below.
+
+        Moreover, among all such walk covers, it finds minimizing the sum of the lengths of the walks (in terms of total number of edges).
 
         Parameters
         ----------
@@ -83,7 +84,12 @@ class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             if G.number_of_nodes() == 0:
                 utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
                 raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
-            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr)
+            # NodeExpandedDiGraph needs to have flow_attr on edges, otherwise it will add the edges to edges_to_ignore
+            G_with_flow_attr = deepcopy(G)
+            node_flow_attr = str(id(G_with_flow_attr)) + "_flow_attr"
+            for node in G_with_flow_attr.nodes():
+                G_with_flow_attr.nodes[node][node_flow_attr] = 0 # any dummy value
+            self.G_internal = nedg.NodeExpandedDiGraph(G_with_flow_attr, node_flow_attr=node_flow_attr)
             subset_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subset_constraints)
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
             additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
@@ -94,8 +100,6 @@ class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
             edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
             edges_to_ignore_internal = list(set(edges_to_ignore_internal))
-
-            error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
 
         elif self.cover_type == "edge":
             if G.number_of_edges() == 0:
@@ -131,7 +135,7 @@ class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         super().__init__(
             G=self.G,
             k=self.k,
-            max_edge_repetition=self.G.number_of_edges * self.G.number_of_nodes,
+            max_edge_repetition=self.G.number_of_edges() * self.G.number_of_nodes(),
             subset_constraints=self.subset_constraints,
             subset_constraints_coverage=self.subset_constraints_coverage,
             optimization_options=self.optimization_options,
@@ -144,6 +148,9 @@ class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
         # This method is called from the current class to encode the path cover
         self._encode_walk_cover()
+
+        # This method is called from the current class to encode the objective function
+        self._encode_objective()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
@@ -169,7 +176,22 @@ class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
                 name=f"cover_u={u}_v={v}",
             )
 
-    def get_solution(self, remove_empty_walks=True):
+    def _encode_objective(self):
+
+        # Minimize the total number of edges in the walks, otherwise, e.g. 
+        # also walk going around a cycle multiple times and covering it multiple times are valid solutions,
+        # but they are not desirable.
+        
+        self.solver.set_objective(
+            self.solver.quicksum(
+                self.edge_vars[(u, v, i)]
+                for (u, v) in self.G.edges()
+                for i in range(self.k)
+            ),
+            sense="minimize"
+        )
+
+    def get_solution(self):
         """
         Retrieves the solution for the path cover problem.
 
@@ -227,7 +249,7 @@ class kPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             utils.logger.error(f"{__name__}: Solution is not available. Call get_solution() first.")
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_walks = self._solution.get("_walks_internal", self._solution["paths"])
+        solution_walks = self._solution.get("_walks_internal", self._solution["walks"])
         solution_walks_of_edges = [
             [(walk[i], walk[i + 1]) for i in range(len(walk) - 1)]
             for walk in solution_walks

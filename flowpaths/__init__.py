@@ -17,7 +17,9 @@ from .mingenset import MinGenSet
 from .minsetcover import MinSetCover
 from .minerrorflow import MinErrorFlow
 from .kpathcover import kPathCover
+from .kpathcovercycles import kPathCoverCycles
 from .minpathcover import MinPathCover
+from .minpathcovercycles import MinPathCoverCycles
 
 __all__ = [
     "AbstractPathModelDAG",
@@ -39,5 +41,7 @@ __all__ = [
     "MinSetCover",
     "MinErrorFlow",
     "kPathCover",
+    "kPathCoverCycles",
     "MinPathCover",
+    "MinPathCoverCycles",
 ]

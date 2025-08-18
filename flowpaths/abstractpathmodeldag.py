@@ -707,7 +707,9 @@ class AbstractPathModelDAG(ABC):
                 if len(path) < 2:
                     utils.logger.error(f"{__name__}: Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDAG has no edge from global source {self.G.source} to global sink {self.G.sink}.")
                     raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDAG has no edge from global source {self.G.source} to global sink {self.G.sink}.")
-                
+
+                # We remove the first and the last vertex, because
+                # these are the global source and the global sink introduced by stDAG
                 paths.append(path[1:-1])
 
         return paths
