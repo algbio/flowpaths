@@ -12,7 +12,7 @@ def test1():
 
     # We create a Least Absolute Errors solver with default settings, 
     # by specifying that the flow value of each edge is in the attribute `flow` of the edges,
-    # and that the number of paths to consider is 1.
+    # and that the number of walks to consider is 1.
     kfd_model = fp.kFlowDecompCycles(
         G=graph, 
         flow_attr="flow", 

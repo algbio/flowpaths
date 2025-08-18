@@ -44,15 +44,15 @@ class kPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
          - `subset_constraints: list`, optional
             
             List of subset constraints. Default is an empty list. 
-            Each subset constraint is a list of edges that must be covered by some solution path, according 
+            Each subset constraint is a list of edges that must be covered by some solution walk, in any order, according 
             to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional
-            
-            Coverage fraction of the subset constraints that must be covered by some solution paths. 
-            
-            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
-            the constraint need to be covered by some solution path). 
+
+            Coverage fraction of the subset constraints that must be covered by some solution walk.
+
+            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of
+            the constraint need to be covered by some solution walk).
             See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
         
         - `elements_to_ignore: list`, optional
@@ -144,7 +144,7 @@ class kPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
         )
 
         # This method is called from the super class AbstractPathModelDiGraph
-        self.create_solver_and_paths()
+        self.create_solver_and_walks()
 
         # This method is called from the current class to encode the path cover
         self._encode_walk_cover()
@@ -157,8 +157,8 @@ class kPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
     def _encode_walk_cover(self):
         
         subset_constraint_edges = set()
-        for subpath_constraint in self.subset_constraints:
-            for edge in zip(subpath_constraint[:-1], subpath_constraint[1:]):
+        for subset_constraint in self.subset_constraints:
+            for edge in zip(subset_constraint[:-1], subset_constraint[1:]):
                 subset_constraint_edges.add(edge)
 
         for u, v in self.G.edges():
@@ -193,9 +193,9 @@ class kPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def get_solution(self):
         """
-        Retrieves the solution for the path cover problem.
+        Retrieves the solution for problem.
 
-        If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
+        If the solution has already been computed and cached as `self._solution`, it returns the cached solution.
         Otherwise, it checks if the problem has been solved, computes the solution walks
         and caches the solution.
 

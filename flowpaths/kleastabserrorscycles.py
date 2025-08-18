@@ -42,7 +42,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
         - `k: int`
             
-            The number of paths to decompose in.
+            The number of walks to decompose in.
 
             !!! note "Unknown $k$"
                 If you do not have a good guess for $k$, you can pass `k=None` and the model will set $k$ to the condensation width of the graph (i.e. the minimum number of $s$-$t$ walks needed to cover all the edges of the graph, except those in `edges_to_ignore`).
@@ -61,27 +61,27 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
          - `subset_constraints: list`, optional
             
             List of subset constraints. Default is an empty list. 
-            Each subset constraint is a list of edges that must be covered by some solution path, according 
+            Each subset constraint is a list of edges that must be covered by some solution walk, in any order, according 
             to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional
             
-            Coverage fraction of the subset constraints that must be covered by some solution paths. 
+            Coverage fraction of the subset constraints that must be covered by some solution walk. 
             
             Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
-            the constraint need to be covered by some solution path). 
+            the constraint need to be covered by some solution walk). 
             See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
         
         - `elements_to_ignore: list`, optional
 
-            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted walks. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
         - `error_scaling: dict`, optional
-            
-            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and path weights.
+
+            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and walk weights.
             Default is an empty dict. If an edge/node has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
-            difference between the flow value of the edge/node and the sum of the weights of the paths going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
+            difference between the flow value of the edge/node and the sum of the weights of the walks going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
         
         - `additional_starts: list`, optional
             
@@ -209,7 +209,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
                 for constraint in self.subset_constraints:
                     self.optimization_options["trusted_edges_for_safety"].update(constraint)
 
-        # Call the constructor of the parent class AbstractPathModelDAG
+        # Call the constructor of the parent class AbstractWalkModelDiGraph
         super().__init__(
             G=self.G,
             k=self.k,
@@ -221,8 +221,8 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             solve_statistics=self.solve_statistics
         )
 
-        # This method is called from the super class AbstractPathModelDiGraph
-        self.create_solver_and_paths()
+        # This method is called from the super class AbstractWalkModelDiGraph
+        self.create_solver_and_walks()
 
         # This method is called from the current class 
         self._encode_leastabserrors_decomposition()
@@ -280,7 +280,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
 
             # Encoding the error on the edge (u, v) as the difference between 
-            # the flow value of the edge and the sum of the weights of the paths that go through it (pi variables)
+            # the flow value of the edge and the sum of the weights of the walks that go through it (pi variables)
             # If we minimize the sum of edge_errors_vars, then we are minimizing the sum of the absolute errors.
             self.solver.add_constraint(
                 f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= self.edge_errors_vars[(u, v)],
@@ -303,19 +303,19 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def _remove_empty_walks(self, solution):
         """
-        Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
+        Removes empty walks from the solution. Empty walks are those with 0 or 1 nodes.
 
         Parameters
         ----------
         - `solution: dict`
             
-            The solution dictionary containing paths and weights.
+            The solution dictionary containing walks and weights.
 
         Returns
         -------
         - `solution: dict`
-            
-            The solution dictionary with empty paths removed.
+
+            The solution dictionary with empty walks removed.
 
         """
         solution_copy = copy.deepcopy(solution)
@@ -335,15 +335,15 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
-        Otherwise, it checks if the problem has been solved, computes the solution paths, weights, slacks
+        Otherwise, it checks if the problem has been solved, computes the solution walks, weights, slacks
         and caches the solution.
 
 
         Returns
         -------
         - `solution: dict`
-        
-            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`), and the edge errors (key `"edge_errors"`).
+
+            A dictionary containing the solution walks (key `"walks"`) and their corresponding weights (key `"weights"`), and the edge errors (key `"edge_errors"`).
 
         Raises
         -------

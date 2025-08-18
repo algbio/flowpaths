@@ -19,6 +19,7 @@ nav:
     - $k$-Flow Decomposition: k-flow-decomposition-cycles.md
     - $k$-Least Absolute Errors: k-least-absolute-errors-cycles.md
     - $k$-Minimum Path Error: k-min-path-error-cycles.md
+    - Minimum Path Cover: minimum-path-cover-cycles.md
   - Advanced Options:
     - Flows/weights on nodes: node-expanded-digraph.md
     - Subpath constraints: subpath-constraints.md

@@ -23,7 +23,7 @@ class MinPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
         solver_options: dict = {},
     ):
         """
-        This class finds a minimum number of walks covering the edges of a directed graph (DAG), possibly with cycles -- and generalizations of this problem, see the parameters below.
+        This class finds a minimum number of walks covering the edges of a directed graph, possibly with cycles -- and generalizations of this problem, see the parameters below.
 
         Parameters
         ----------
@@ -41,7 +41,7 @@ class MinPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
         - `subset_constraints: list`, optional
 
             List of subset constraints. Default is an empty list. 
-            Each subset constraint is a list of edges that must be covered by some solution walks, according 
+            Each subset constraint is a list of edges that must all appear in some solution walks (in any order), according 
             to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional

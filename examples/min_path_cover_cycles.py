@@ -28,6 +28,15 @@ def test():
 
     process_solution(graph, 4, "test", mpc_model)
 
+    subset_constraints=[[("b", "a"),("a", "t")]]
+    mpc_model_sc = fp.MinPathCoverCycles(
+        graph,
+        subset_constraints=subset_constraints,
+    )
+    mpc_model_sc.solve()
+
+    process_solution(graph, 4, "test_sc", mpc_model_sc)
+
 def test3(k: int, filename: str):
     # read the graph from file
     graph = fp.graphutils.read_graphs(filename)[0]
@@ -78,8 +87,8 @@ def process_solution(graph, k: int, filename = None, model = None):
 
 def main():
     test()
-    test3(k = 2, filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
-    test3(k = 4, filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
+    # test3(k = 2, filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    # test3(k = 4, filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
 
 if __name__ == "__main__":
     # Configure logging

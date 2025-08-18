@@ -12,7 +12,7 @@ import copy
 
 class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
     """
-    A class to decompose a network flow if a general directed graph into a minimum number of weighted s-t paths.
+    A class to decompose a network flow if a general directed graph into a minimum number of weighted s-t walks.
     """
 
     def __init__(
@@ -54,20 +54,20 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         - `subset_constraints : list`, optional
             
             List of subset constraints. Default is an empty list. 
-            Each subset constraint is a list of edges that must be covered by some solution path, according 
+            Each subset constraint is a list of edges that must be covered by some solution walks, in any order, according 
             to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional
             
-            Coverage fraction of the subset constraints that must be covered by some solution paths. 
-            
-            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
-            the constraint need to be covered by some solution path). 
+            Coverage fraction of the subset constraints that must be covered by some solution walk. 
+
+            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of
+            the constraint need to be covered by some solution walk).
             See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
 
         - `elements_to_ignore : list`, optional
 
-            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted walks. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
         - `additional_starts: list`, optional
@@ -163,11 +163,11 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def solve(self) -> bool:
         """
-        Attempts to solve the flow decomposition problem using a model with varying number of paths.
+        Attempts to solve the flow decomposition problem using a model with varying number of walks.
 
-        This method iterates over a range of possible path numbers, creating and solving a flow decomposition model for each count.
+        This method iterates over a range of possible walk numbers, creating and solving a flow decomposition model for each count.
         If a solution is found, it stores the solution and relevant statistics, and returns True. If no solution is found after
-        iterating through all possible path counts, it returns False.
+        iterating through all possible walk numbers, it returns False.
 
         Returns:
             bool: True if a solution is found, False otherwise.

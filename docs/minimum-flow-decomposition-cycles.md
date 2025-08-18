@@ -125,7 +125,7 @@ mfd_model = fp.MinFlowDecompCycles(G=graph, flow_attr="flow")
 mfd_model.solve()
 ```
 
-The model might not be solved because the MILP solver couldn't do it in the time it had allocated, or other problems. Thus, you need to check if it was solved, and then get its solution. The solution of `MinFlowDecompCycles` is a dictionary, with an key `'walks'`, and a key `'weights'`:
+The model might not be solved because the MILP solver couldn't do it in the time it had allocated, or other problems. Thus, you need to check if it was solved, and then get its solution. The solution of `MinFlowDecompCycles` is a dictionary, with a key `'walks'`, and a key `'weights'`:
 
 ``` python
 if mfd_model.is_solved():

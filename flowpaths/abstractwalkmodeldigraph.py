@@ -135,16 +135,16 @@ class AbstractWalkModelDiGraph(ABC):
         if self.optimize_with_safety_as_subset_constraints:
             self.subset_constraints += self.safe_lists
 
-    def create_solver_and_paths(self):
+    def create_solver_and_walks(self):
         """
-        Creates a solver instance and encodes the paths in the graph.
+        Creates a solver instance and encodes the walks in the graph.
 
         This method initializes the solver with the specified parameters and encodes the walks
         by creating variables for edges and subsets to cover.
 
         !!! warning "Call this method before encoding other variables and constraints."
         
-            Always call this method before encoding other variables and constraints on the paths.
+            Always call this method before encoding other variables and constraints on the walks.
 
         """
         self.solver = sw.SolverWrapper(**self.solver_options)

@@ -24,7 +24,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
     ):
         """
         This class implements the k-Flow Decomposition problem, namely it looks for a decomposition of a weighted general directed graph, possibly with cycles, into 
-        $k$ weighted walks such that the flow on each edge of the graph equals the sum of the weights of the paths going through that edge.
+        $k$ weighted walks such that the flow on each edge of the graph equals the sum of the weights of the walks going through that edge.
 
         Parameters
         ----------
@@ -38,7 +38,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
         - `k: int`
             
-            The number of paths to decompose in.
+            The number of walks to decompose in.
 
         - `flow_attr_origin: str`, optional
 
@@ -54,20 +54,20 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
          - `subset_constraints: list`, optional
             
             List of subset constraints. Default is an empty list. 
-            Each subset constraint is a list of edges that must be covered by some solution path, according 
+            Each subset constraint is a list of edges that must be covered by some solution walk (in any order), according 
             to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional
             
-            Coverage fraction of the subset constraints that must be covered by some solution paths. 
+            Coverage fraction of the subset constraints that must be covered by some solution walk. 
             
             Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
-            the constraint need to be covered by some solution path). 
+            the constraint need to be covered by some solution walk). 
             See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
         
         - `elements_to_ignore: list`, optional
 
-            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted walks. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
         
         - `additional_starts: list`, optional
@@ -175,8 +175,8 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             solve_statistics=self.solve_statistics
         )
 
-        # This method is called from the super class AbstractPathModelDiGraph
-        self.create_solver_and_paths()
+        # This method is called from the super class AbstractWalkModelDiGraph
+        self.create_solver_and_walks()
 
         # This method is called from the current class 
         self._encode_flow_decomposition()
@@ -226,19 +226,19 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def _remove_empty_walks(self, solution):
         """
-        Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
+        Removes empty walks from the solution. Empty walks are those with 0 or 1 nodes.
 
         Parameters
         ----------
         - `solution: dict`
             
-            The solution dictionary containing paths and weights.
+            The solution dictionary containing walks and weights.
 
         Returns
         -------
         - `solution: dict`
             
-            The solution dictionary with empty paths removed.
+            The solution dictionary with empty walks removed.
 
         """
         solution_copy = copy.deepcopy(solution)
@@ -258,7 +258,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
-        Otherwise, it checks if the problem has been solved, computes the solution paths, weights
+        Otherwise, it checks if the problem has been solved, computes the solution walks, weights
         and caches the solution.
 
 
@@ -266,7 +266,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         -------
         - `solution: dict`
         
-            A dictionary containing the solution paths (key `"paths"`) and their corresponding weights (key `"weights"`).
+            A dictionary containing the solution walks (key `"walks"`) and their corresponding weights (key `"weights"`).
 
         Raises
         -------
@@ -307,7 +307,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def is_valid_solution(self, tolerance=0.001):
         """
-        Checks if the solution is valid by comparing the flow from paths with the flow attribute in the graph edges.
+        Checks if the solution is valid by comparing the flow from walks with the flow attribute in the graph edges.
 
         Raises
         ------

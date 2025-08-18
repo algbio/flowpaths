@@ -1,3 +1,7 @@
+!!! info inline end "See also"
+
+    - [Minimum Path Cover in General Graphs](minimum-path-cover-cycles.md)
+
 # Minimum Path Cover
 
 ## 1. Definition
@@ -14,7 +18,7 @@ The Minimum Path Cover problem on a directed **acyclic** graph (*DAG*) is define
 
 ## 2. Solving the problem
 
-We create the graph as a [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html). In real project, you will likely have a method that transforms your graph to a DiGraph. We also give an attribute `flow` for every edge storing its flow value.
+We create the graph as a [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html). In real project, you will likely have a method that transforms your graph to a DiGraph.
 
 ``` python
 import flowpaths as fp
@@ -34,7 +38,7 @@ mpc_model = fp.MinPathCover(graph)
 mpc_model.solve()
 ```
 
-The solution of `MinPathCover` is a dictionary, with an key `'paths'` containing the solution paths:
+The solution of `MinPathCover` is a dictionary, with a key `'paths'` containing the solution paths:
 
 ``` python
 if mpc_model.is_solved():

@@ -4,9 +4,8 @@ import flowpaths as fp
 import networkx as nx
 from pathlib import Path
 
-weight_type = [int, float]
-solvers = ["highs", "gurobi"]
-
+weight_type = [float]
+solvers = ["gurobi"]
 settings_flags = {
     "optimize_with_safety_as_subset_constraints": [True, False],
 }

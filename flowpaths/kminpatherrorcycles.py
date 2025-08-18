@@ -24,9 +24,9 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         solver_options: dict = {},
     ):
         """
-        This class implements the k-MinPathError problem. Given an edge-weighted DAG, this model looks for k paths, with associated weights and slacks, such that for every edge (u,v), 
-        the sum of the weights of the paths going through (u,v) minus the flow value of (u,v) is at most 
-        the sum of the slacks of the paths going through (u,v). The objective is to minimize the sum of the slacks.
+        This class implements the k-MinPathError problem. Given an edge-weighted DAG, this model looks for k walks, with associated weights and slacks, such that for every edge (u,v), 
+        the sum of the weights of the walks going through (u,v) minus the flow value of (u,v) is at most 
+        the sum of the slacks of the walks going through (u,v). The objective is to minimize the sum of the slacks.
 
         Parameters
         ----------
@@ -40,7 +40,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
         - `k: int`
             
-            The number of paths to decompose in.
+            The number of walks to decompose in.
 
             !!! note "Unknown $k$"
                 If you do not have a good guess for $k$, you can pass `k=None` and the model will set $k$ to the condensation width of the graph (i.e. the minimum number of $s$-$t$ walks needed to cover all the edges of the graph, except those in `edges_to_ignore`).
@@ -59,28 +59,28 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
          - `subset_constraints: list`, optional
             
             List of subset constraints. Default is an empty list. 
-            Each subset constraint is a list of edges that must be covered by some solution path, according 
+            Each subset constraint is a list of edges that must be covered by some solution walk, in any order, according 
             to the `subset_constraints_coverage` parameter (see below).
 
         - `subset_constraints_coverage: float`, optional
-            
-            Coverage fraction of the subset constraints that must be covered by some solution paths. 
+
+            Coverage fraction of the subset constraints that must be covered by some solution walk. 
             
             Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
-            the constraint need to be covered by some solution path). 
+            the constraint need to be covered by some solution walk). 
             See [subset constraints documentation](subset-constraints.md#3-relaxing-the-constraint-coverage)
         
         - `elements_to_ignore: list`, optional
 
-            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. 
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted walks. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
         - `error_scaling: dict`, optional
-            
-            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and path weights.
+
+            Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and walk weights.
             Default is an empty dict. If an edge/node has a missing error scale factor, it is assumed to be 1. The factors are used to scale the 
-            difference between the flow value of the edge/node and the sum of the weights of the paths going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
-        
+            difference between the flow value of the edge/node and the sum of the weights of the walks going through the edge/node. See [ignoring edges documentation](ignoring-edges.md)
+
         - `additional_starts: list`, optional
             
             List of additional start nodes of the walks. Default is an empty list.
@@ -203,7 +203,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
                 for constraint in self.subset_constraints:
                     self.optimization_options["trusted_edges_for_safety"].update(constraint)
 
-        # Call the constructor of the parent class AbstractPathModelDAG
+        # Call the constructor of the parent class AbstractWalkModelDiGraph
         super().__init__(
             G=self.G,
             k=self.k,
@@ -215,8 +215,8 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             solve_statistics=self.solve_statistics
         )
 
-        # This method is called from the super class AbstractPathModelDiGraph
-        self.create_solver_and_paths()
+        # This method is called from the super class AbstractWalkModelDiGraph
+        self.create_solver_and_walks()
 
         # This method is called from the current class 
         self._encode_minpatherror_decomposition()
@@ -228,7 +228,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def _encode_minpatherror_decomposition(self):
 
-        # path weights 
+        # walk weights 
         self.path_weights_vars = self.solver.add_variables(
             self.path_indexes,
             name_prefix="weights",
@@ -247,7 +247,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             var_type="integer" if self.weight_type == int else "continuous",
         )
         
-        # path slacks
+        # walk slacks
         self.path_slacks_vars = self.solver.add_variables(
             self.path_indexes,
             name_prefix="slack",
@@ -322,19 +322,19 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def _remove_empty_walks(self, solution):
         """
-        Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
+        Removes empty walks from the solution. Empty walks are those with 0 or 1 nodes.
 
         Parameters
         ----------
         - `solution: dict`
-            
-            The solution dictionary containing paths and weights.
+
+            The solution dictionary containing walks and weights.
 
         Returns
         -------
         - `solution: dict`
-            
-            The solution dictionary with empty paths removed.
+
+            The solution dictionary with empty walks removed.
 
         """
         solution_copy = copy.deepcopy(solution)
@@ -417,7 +417,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def is_valid_solution(self, tolerance=0.001):
         """
-        Checks if the solution is valid by checking of the weighted paths and their slacks satisfy the constraints of the problem. 
+        Checks if the solution is valid by checking of the weighted walks and their slacks satisfy the constraints of the problem. 
 
         !!! warning "Warning"
             Make sure you called `.solve()` before calling this method.
@@ -447,22 +447,22 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         solution_walks = self._solution.get("_walks_internal", self._solution["walks"])
         solution_weights = self._solution["weights"]
         solution_slacks = self._solution["slacks"]
-        for path in solution_walks:
-            if len(path) == 1:
-                utils.logger.error(f"{__name__}: Encountered a solution path with length 1, which is not allowed.")
-                raise ValueError("Solution path with length 1 encountered.")
-        solution_paths_of_edges = [
-            [(path[i], path[i + 1]) for i in range(len(path) - 1)]
-            for path in solution_walks
+        for walk in solution_walks:
+            if len(walk) == 1:
+                utils.logger.error(f"{__name__}: Encountered a solution walk with length 1, which is not allowed.")
+                raise ValueError("Solution walk with length 1 encountered.")
+        solution_walks_of_edges = [
+            [(walk[i], walk[i + 1]) for i in range(len(walk) - 1)]
+            for walk in solution_walks
         ]
 
         weight_from_walks = {e: 0 for e in self.G.edges()}
         slack_from_walks = {e: 0 for e in self.G.edges()}
         num_edge_walks_on_edges = {e: 0 for e in self.G.edges()}
-        for weight, slack, path in zip(
-            solution_weights, solution_slacks, solution_paths_of_edges
+        for weight, slack, walk in zip(
+            solution_weights, solution_slacks, solution_walks_of_edges
         ):
-            for e in path:
+            for e in walk:
                 if e in weight_from_walks:
                     weight_from_walks[e] += weight
                     slack_from_walks[e] += slack
