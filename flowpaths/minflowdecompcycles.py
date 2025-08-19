@@ -289,6 +289,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             weight_type = self.weight_type,
             max_multiplicity=self.w_max,
             lowerbound = current_lowerbound_k,
+            remove_complement_values=True,
             solver_options = mingenset_solver_options,
             )
         mingenset_model.solve()
@@ -323,7 +324,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         given_weights_optimization_options["optimize_with_safety_as_subset_constraints"] = False
         given_weights_optimization_options["allow_empty_walks"] = True
         given_weights_optimization_options["given_weights"] = all_weights_list
-        utils.logger.info(f"{__name__}: Solving with given weights = {given_weights_optimization_options['given_weights']}")
+        utils.logger.info(f"{__name__}: Solving with given weights = {sorted(given_weights_optimization_options['given_weights'])}")
 
         given_weights_kfd_solver_options = copy.deepcopy(self.solver_options)
         if "time_limit" in given_weights_kfd_solver_options:

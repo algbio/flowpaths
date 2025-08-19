@@ -181,6 +181,9 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         # This method is called from the current class 
         self._encode_flow_decomposition()
 
+        # This method is called from the current class
+        self._encode_given_weights()
+
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
     def _encode_flow_decomposition(self):
