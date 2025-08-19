@@ -216,13 +216,42 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                     product_var=self.pi_vars[(u, v, i)],
                     lb=0,
                     ub=self.w_max,
-                    name=f"10_u={u}_v={v}_i={i}",
+                    name=f"10_i={i}_u={u}_v={v}",
                 )
 
             self.solver.add_constraint(
                 self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
-                name=f"10d_u={u}_v={v}_i={i}",
+                name=f"10d_i={i}_u={u}_v={v}",
             )
+
+    def _encode_given_weights(self):
+
+        weights = self.optimization_options.get("given_weights", None)
+        if weights is None:
+            return
+        
+        if self.optimization_options.get("optimize_with_safe_sequences", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safe sequences")
+            raise ValueError("Cannot optimize with both given weights and safe sequences")
+        if self.optimization_options.get("optimize_with_safety_as_subset_constraints", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safety as subset constraints")
+            raise ValueError("Cannot optimize with both given weights and safety as subset constraints")
+
+        if len(weights) > self.k:
+            utils.logger.error(f"Length of given weights ({len(weights)}) is greater than k ({self.k})")
+            raise ValueError(f"Length of given weights ({len(weights)}) is greater than k ({self.k})")
+
+        for i, weight in enumerate(weights):
+            self.solver.add_constraint(
+                self.path_weights_vars[i] == weight,
+                name=f"given_weight_{i}",
+            )
+
+        self.solver.set_objective(
+            self.solver.quicksum(self.edge_vars[(u, v, i)] for u, v in self.G.edges() for i in range(self.k)),
+            sense="minimize",
+        )
+
 
     def _remove_empty_walks(self, solution):
         """

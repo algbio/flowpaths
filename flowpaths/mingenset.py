@@ -6,8 +6,9 @@ class MinGenSet():
     def __init__(
             self, 
             numbers: list,
-            total,
-            weight_type: type = float,
+            total: int | float,
+            weight_type: int | float = float,
+            max_multiplicity: int = 1,
             lowerbound: int = 1,
             partition_constraints: list = None,
             remove_complement_values: bool = True,
@@ -20,7 +21,10 @@ class MinGenSet():
         
         - the sum of the elements in `generating_set` equals `total`, and
         - every element in `a` can be expressed as the sum of some elements in `generating_set`.
-        
+
+        This class solves a more general problem, in which we are also given `max_multiplicity`, 
+        the maximum number of times each element in `generating_set` can be used to represent elements in `a`.
+
         Parameters
         ----------
 
@@ -36,6 +40,10 @@ class MinGenSet():
 
             The type of the numbers in `generating_set`. Default is `float`. The other option is `int`.
 
+        - `max_multiplicity` : int
+
+            The maximum number of times each element in the generating set can be used to represent elements in `a`. Default is 1.
+
         - `lowerbound` : int
 
             The minimum number of elements in the generating set. Default is 1.
@@ -47,6 +55,8 @@ class MinGenSet():
             These constraints are imposed as:
             - each number in an inner list must be obtained by summing up a subset of numbers in the generating set, and
             - each number in the generating set must be used exactly once to obtain the numbers in the inner list.
+
+            You cannot set this if `max_multiplicity > 1`.
 
         - `remove_complement_values` : bool
 
@@ -60,6 +70,8 @@ class MinGenSet():
             This is not always correct to do, as it might lead to a smaller generating set. For example, suppose the generating set is $g_1, g_2, g_3, g_4$, with $g_1$ different from $g_4$ 
             Suppose $x = g_1 + g_2$, $y = g_1 + g_3$ and $x+y \in a$. Then $x+y$ is expressed as $2 g_1 + g_2 + g_3$, 
             thus it needs repeating $g_1$ **twice**. So $x+y$ cannot be expressed as a sum of elements in the generating set. 
+
+            You cannot set this to `True` if `max_multiplicity > 1`.
             
             !!! note "Note"
                 Setting this to `True` always gives a generating set smaller or of the same size (i.e., not larger) as setting it to `False`. 
@@ -76,8 +88,15 @@ class MinGenSet():
         self.total = total
         utils.logger.debug(f"{__name__}: Generating set sum = {self.total}")
         self.weight_type = weight_type
+        self.max_multiplicity = max_multiplicity
+        if self.max_multiplicity < 1:
+            utils.logger.error(f"{__name__}: `max_multiplicity` must be at least 1.")
+            raise ValueError("`max_multiplicity` must be at least 1.")
         self.lowerbound = lowerbound
         self.partition_constraints = partition_constraints
+        if self.partition_constraints is not None and self.max_multiplicity > 1:
+            utils.logger.error(f"{__name__}: `partition_constraints` is set, but `max_multiplicity > 1`. This is not allowed.")
+            raise ValueError("`partition_constraints` is not allowed when `max_multiplicity > 1`.")
 
         self._is_solved = False
         self._solution = None
@@ -98,6 +117,10 @@ class MinGenSet():
                 raise ValueError("The sum of the numbers inside each subset constraint must equal the total value.")
 
         if remove_sums_of_two:
+            if self.max_multiplicity > 1:
+                utils.logger.error(f"{__name__}: `remove_sums_of_two` is set to True, but `max_multiplicity > 1`. This is not allowed.")
+                raise ValueError("`remove_sums_of_two` is not allowed when `max_multiplicity > 1`.")
+
             elements_to_remove = set()
             for val1 in self.numbers:
                 for val2 in self.numbers:
@@ -133,13 +156,25 @@ class MinGenSet():
             var_type="integer" if self.weight_type == int else "continuous"
         )
 
-        self.x_vars = self.solver.add_variables(
-            self.x_indexes, 
-            name_prefix="x", 
-            lb=0, 
-            ub=1, 
-            var_type="integer"
-        )
+        # x_vars[(i, j)] is the number of times the i-th element of the generating set is used to express the j-th number in a
+        if self.max_multiplicity == 1:            
+            # If max_multiplicity is 1, x_vars[(i, j)] is binary
+            self.x_vars = self.solver.add_variables(
+                self.x_indexes, 
+                name_prefix="x", 
+                lb=0, 
+                ub=1, 
+                var_type="integer"
+            )
+        else:
+            # Otherwise, it is an arbitrary integer
+            self.x_vars = self.solver.add_variables(
+                self.x_indexes, 
+                name_prefix="x", 
+                lb=0, 
+                ub=self.max_multiplicity, 
+                var_type="integer"
+            )
 
         self.pi_vars = self.solver.add_variables(
             self.x_indexes, 
@@ -164,15 +199,27 @@ class MinGenSet():
         for j in range(len(self.numbers)):              
 
             # pi_vars[(i, j)] = x_vars[(i, j)] * genset_vars[i]
-            for i in range(k):
-                self.solver.add_binary_continuous_product_constraint(
-                    binary_var=self.x_vars[(i, j)],
-                    continuous_var=self.genset_vars[(i)],
-                    product_var=self.pi_vars[(i, j)],
-                    lb=0,
-                    ub=self.total,
-                    name=f"pi_i={i}_j={j}",
-                )
+            if self.max_multiplicity == 1:
+                # If max_multiplicity is 1, we can use binary constraints
+                for i in range(k):
+                    self.solver.add_binary_continuous_product_constraint(
+                        binary_var=self.x_vars[(i, j)],
+                        continuous_var=self.genset_vars[(i)],
+                        product_var=self.pi_vars[(i, j)],
+                        lb=0,
+                        ub=self.total,
+                        name=f"pi_i={i}_j={j}",
+                    )
+            else:  
+                for i in range(k):
+                    self.solver.add_integer_continuous_product_constraint(
+                            integer_var=self.x_vars[(i, j)],
+                            continuous_var=self.genset_vars[(i)],
+                            product_var=self.pi_vars[(i, j)],
+                            lb=0,
+                            ub=self.total,
+                            name=f"pi_i={i}_j={j}",
+                        )
 
             # Sum of pi_vars[(i, j)] for all i is self.numbers[j]
             self.solver.add_constraint(

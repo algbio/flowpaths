@@ -587,8 +587,10 @@ class AbstractWalkModelDiGraph(ABC):
         # Remove source and sink from the walk
         if len(walk) >= 2 and walk[0] == self.G.source and walk[-1] == self.G.sink:
             return walk[1:-1]
+        elif walk == [self.G.source]:
+            return []
         else:
-            utils.logger.error(f"{__name__}: Layer {layer_i}: Walk does not start with source or end with sink")
+            utils.logger.error(f"{__name__}: Layer {layer_i}: Walk {walk} does not start with source or end with sink")
             return walk
 
     def _build_closed_walk_from_vertex(self, graph: dict, start_vertex, stack: list) -> list:
