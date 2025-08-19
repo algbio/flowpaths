@@ -2,10 +2,11 @@
 
 !!! info inline end "See also"
 
+    - [k-Minimum Path Error in General Graphs](k-min-path-error-cycles.md)
     - [An Optimization Routine for the Number k of Paths](numpathsoptimization.md)
     - [Handling graphs with flows / weights on nodes](node-expanded-digraph.md)
 
-In the k-Minimum Path Error problem tries to model problems where the weight along a path is not constant. As such, edges that appear in more solution paths will be allowed to have a higher error (i.e. difference between their input weight/flow value and the sum of the weights of the paths that use them). More formally, paths now receive also a *slack*, which intuitively models how much the weight along a path can vary. Ideally, we can decompose the weighted graphs with $k$ paths that overall have small slack values.
+The k-Minimum Path Error problem tries to model cases where the weight along a path is not constant. As such, edges that appear in more solution paths will be allowed to have a higher error (i.e. difference between their input weight/flow value and the sum of the weights of the paths that use them). More formally, paths now receive also a *slack*, which intuitively models how much the weight along a path can vary. Ideally, we can decompose the weighted graphs with $k$ paths that overall have small slack values.
 
 ## 1. Definition
 
@@ -14,7 +15,7 @@ The k-Minimum Path Error problem on a directed **acyclic** graph (*DAG*) is defi
 - **INPUT**: 
 
     - A directed graph $G = (V,E)$, and a *weight function* on $G$, namely weights $f(u,v)$ for every edge $(u,v)$ of $G$. The weights are arbitrary non-negative numbers and do not need to satisfy flow conservation.
-    - $k \in \mathbb{Z}$
+    - $k \in \mathbb{Z}_+$
 
 - **OUTPUT**: A list of $k$ of source-to-sink paths, $P_1,\dots,P_k$, with a weight $w_i$, and a slack $\rho_i$ associated to each $P_i$, that satisfy the constraint
 $$

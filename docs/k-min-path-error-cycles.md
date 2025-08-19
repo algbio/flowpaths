@@ -2,23 +2,26 @@
 
 !!! info inline end "See also"
 
+    - [k-Minimum Path Error in DAGs](k-min-path-error.md)
     - [An Optimization Routine for the Number k of Paths](numpathsoptimization.md)
     - [Handling graphs with flows / weights on nodes](node-expanded-digraph.md)
 
-In the k-Minimum Path Error problem tries to model problems where the weight along a path is not constant. As such, edges that appear in more solution paths will be allowed to have a higher error (i.e. difference between their input weight/flow value and the sum of the weights of the paths that use them). More formally, paths now receive also a *slack*, which intuitively models how much the weight along a path can vary. Ideally, we can decompose the weighted graphs with $k$ paths that overall have small slack values.
+The k-Minimum Path Error problem tries to model cases where the weight along a walk is not constant. As such, edges that appear in more solution walks will be allowed to have a higher error (i.e. difference between their input weight/flow value and the sum of the weights of the walks that use them). More formally, walks now receive also a *slack*, which intuitively models how much the weight along a walk can vary. Ideally, we can decompose the weighted graphs with $k$ walks that overall have small slack values.
 
 ## 1. Definition
 
-The k-Minimum Path Error problem on a directed **acyclic** graph (*DAG*) is defined as follows:
+The k-Minimum Path Error problem on a directed graphs, possibly with cycles, is defined as follows. For a walk $W$ and an edge $(u,v)$, we denote by $W(u,v)$ the number of times that the walk goes through the edge $(u,v)$. If $W(u,v)$ does not contain $(u,v)$ , then $W(u,v) = 0$.
 
 - **INPUT**: 
 
-    - A directed graph $G = (V,E)$, and a *weight function* on $G$, namely weights $f(u,v)$ for every edge $(u,v)$ of $G$. The weights are arbitrary non-negative numbers and do not need to satisfy flow conservation.
-    - $k \in \mathbb{Z}$
+    - A directed graph $G = (V,E)$.
+    - Node subsets $S \subseteq V$ and $T \subseteq V$, where the walks are allowed to start and allowed to end, respectively.
+    - A *weight function* on $G$, namely weights $f(u,v)$ for every edge $(u,v)$ of $G$. The weights are arbitrary non-negative numbers and do not need to satisfy flow conservation.
+    - $k \in \mathbb{Z}_+$.
 
-- **OUTPUT**: A list of $k$ of source-to-sink paths, $P_1,\dots,P_k$, with a weight $w_i$, and a slack $\rho_i$ associated to each $P_i$, that satisfy the constraint
+- **OUTPUT**: A list of $k$ of walks $W_1,\dots,W_k$, starting in some node in $S$ and ending in some node in $T$, with a weight $w_i$, and a slack $\rho_i$ associated to each $W_i$, that satisfy the constraint
 $$
-\left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right| \leq \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }\rho_i, ~\forall (u,v) \in E,
+\left|f(u,v) - \sum_{i \in \\{1,\dots,k\\}} w_i \cdot W_i(u,v)\right| \leq \sum_{i \in \\{1,\dots,k\\}}\rho_i\cdot W_i(u,v), ~\forall (u,v) \in E,
 $$
 and minimize the objective function
 $$
@@ -27,26 +30,25 @@ $$
 
 !!! success "Note"
     - This class support also graphs with **flow values on nodes**. Set the parameter `flow_attr_origin = "node"`. For details on how these are handled internally, see [Handling graphs with flows / weights on nodes](node-expanded-digraph.md).
-    - The graph may have more than one source or sink nodes, in which case the solution paths are just required to start in any source node, and end in any sink node.
+    - The graph may have more than one source or sink nodes, in which case the solution walks are just required to start in any source node, and end in any sink node.
 
 ## 2. Generalizations
 
 This class implements a more general version, as follows:
 
-1. The paths can start/end not only in source/sink nodes, but also in given sets of start/end nodes (set parameters `additional_starts` and `additional_ends`). See also [Additional start/end nodes](additional-start-end-nodes.md).
-2. This class supports adding subpath constraints, that is, lists of edges that must appear in some solution path. See [Subpath constraints](subpath-constraints.md) for details.
+1. The walks can start/end not only in source/sink nodes, but also in given sets of start/end nodes (set parameters `additional_starts` and `additional_ends`). See also [Additional start/end nodes](additional-start-end-nodes.md).
+2. This class supports adding subset constraints, that is, lists of edges that must appear in some solution walks. See [Subset constraints](subset-constraints.md) for details.
 3. The above constraint can happen only over a given subset $E' \subseteq E$ of the edges (set parameter `elements_to_ignore` to be $E \setminus E'$). See also [ignoring edges documentation](ignoring-edges.md).
 4. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ will add the edge $(u,v)$ to `elements_to_ignore`, because the constraint for $(u,v)$ becomes always true. See also [ignoring edges documentation](ignoring-edges.md).
-5. Another way to relax the constraint is to allow also some looseness in the slack value, based on the length of the solution path. Intuitively, suppose that longer paths have even higher variance in their weight across the edges of the path, while shorter paths less. Formally, suppose that we have a function $\alpha : \mathbb{N} \rightarrow \mathbb{R}^+$ that for every solution path length $\ell$, it returns a multiplicative factor $\alpha(\ell)$. Then, we can multiply each path slack $\rho_i$ by $\alpha(|P_i|)$ in the constraint of the problem (where $|P_i|$ denotes the length of solution path $P_i$). In the above example, we could set $\alpha(\ell) > 1$ for "large" lengths $\ell$. Note that in this model we keep the same objective function (i.e. sum of slacks), and thus this multiplier has no effect on the objective value. You can pass the function $\alpha$ to the class as a piecewise encoding, via parameters `path_length_ranges` and `path_length_factors`, see [kMinPathError()](k-min-path-error.md#flowpaths.kminpatherror.kMinPathError).
 
 !!! info "Generalized constraint"
     Formally, the constraint generalized as in 3., 4. and 5. above is:
     $$
-    \lambda_{(u,v)} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right| \leq \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }\rho_i \cdot \alpha(|P_i|), ~\forall (u,v) \in E'.
+    \lambda_{(u,v)} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\}}w_i \cdot W_i(u,v)\right| \leq \sum_{i \in \\{1,\dots,k\\}}\rho_i \cdot W_i(u,v), ~\forall (u,v) \in E'.
     $$
 
 !!! warning "A lowerbound on $k$"
-    The value of $k$ must be at least the edge width of graph, meaning the minimum number of paths to cover all the edges in $E'$, except those edges $(u,v)$ for which $\lambda_{u,v} = 0$. This value always gives a feasible model. 
+    The value of $k$ must be at least the edge width of graph, meaning the minimum number of walks to cover all the edges in $E'$, except those edges $(u,v)$ for which $\lambda_{u,v} = 0$. This value always gives a feasible model. 
     
     If you do not know this lower bound, you can pass `k = None` and the model will automatically set `k` to this lowerbound value.
 

@@ -108,9 +108,11 @@ def process_solution(graph, filename, model: fp.kLeastAbsErrors):
 def main():
     # test1()
     # test2()
-    # test3(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
-    # test3(filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
+    test3(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    test3(filename = "tests/cyclic_graphs/gt4.kmer15.(2898000.2900000).V29.E40.cyc448.graph")
+    test3(filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
     test3(filename = "tests/cyclic_graphs/gt6.kmer15.(4208000.4210000).V33.E50.cyc157.graph")
+    
 
 if __name__ == "__main__":
     # Configure logging

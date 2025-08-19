@@ -24,7 +24,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         solver_options: dict = {},
     ):
         """
-        This class implements the k-MinPathError problem. Given an edge-weighted DAG, this model looks for k walks, with associated weights and slacks, such that for every edge (u,v), 
+        This class implements the k-MinPathError problem on general directed graphs. Given an edge-weighted DAG, this model looks for k walks, with associated weights and slacks, such that for every edge (u,v), 
         the sum of the weights of the walks going through (u,v) minus the flow value of (u,v) is at most 
         the sum of the slacks of the walks going through (u,v). The objective is to minimize the sum of the slacks.
 
