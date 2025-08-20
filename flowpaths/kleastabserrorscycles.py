@@ -4,7 +4,7 @@ import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 import copy
-
+import numpy as np
 
 class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
@@ -23,6 +23,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         optimization_options: dict = None,
         solver_options: dict = {},
         trusted_edges_for_safety: list = None,
+        trusted_edges_for_safety_percentile: float = None,
     ):
         """
         This class implements the k-LeastAbsoluteErrors problem, namely it looks for a decomposition of a weighted general directed graph, possibly with cycles, into 
@@ -105,6 +106,10 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
             See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
 
+        - `trusted_edges_for_safety_percentile: float`, optional
+
+            The percentile value to use for selecting trusted edges for safety. Default is `None`. This is ignored if `trusted_edges_for_safety` is set.
+
         Raises
         ------
         - `ValueError`
@@ -159,10 +164,21 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self.subset_constraints = subset_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
         self.trusted_edges_for_safety = trusted_edges_for_safety_internal
+
+        if len(self.trusted_edges_for_safety) == 0 and trusted_edges_for_safety_percentile is not None:            
+            # Select edges where the flow_attr value is >= trusted_edges_for_safety_percentile (using self.G)
+            flow_values = [self.G.edges[edge][flow_attr] for edge in self.G.edges() if flow_attr in self.G.edges[edge]]
+            percentile = np.percentile(flow_values, trusted_edges_for_safety_percentile) if flow_values else 0
+            self.trusted_edges_for_safety = list(edge for edge in self.G.edges() if flow_attr in self.G.edges[edge] and self.G.edges[edge][flow_attr] >= percentile)
+            utils.logger.info(f"{__name__}: trusted_edges_for_safety set using using percentile {trusted_edges_for_safety_percentile} = {percentile} to {self.trusted_edges_for_safety}")
+
         self.edge_error_scaling = error_scaling_internal
         # If the error scaling factor is 0, we ignore the edge
         self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
-        
+
+        # Remove from trusted_edges_for_safety the edges in edges_to_ignore
+        self.trusted_edges_for_safety = [edge for edge in self.trusted_edges_for_safety if edge not in self.edges_to_ignore]
+
         # Checking that every entry in self.error_scaling is between 0 and 1
         for key, value in error_scaling.items():
             if value < 0 or value > 1:
@@ -173,7 +189,6 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             utils.logger.error(f"{__name__}: weight_type must be either int or float, not {weight_type}")
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
-
 
         self.k = k
         # If k is not specified, we set k to the edge width of the graph

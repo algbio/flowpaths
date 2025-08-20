@@ -164,10 +164,17 @@ class stDiGraph(nx.DiGraph):
         self._condensation: nx.DiGraph = nx.condensation(self)
         # We add the dict `member_edges` storing for each node in the condensation, the edges in that SCC
         self._condensation.graph["member_edges"] = {str(node): set() for node in self._condensation.nodes()}
+        # We add the dict `edge_multiplicity` for each edge in the condensation to store the number of 
+        # original graph edges that are between the corresponding SCCs (and these SCCs are different, i.e. we don't store this for self-loops)
+        self._condensation.graph["edge_multiplicity"] = {e: 0 for e in self._condensation.edges() if e[0] != e[1]}
 
         for u, v in self.edges():
+            # If u and v are in the same SCC, we add it to the member edges
             if self._condensation.graph['mapping'][u] == self._condensation.graph['mapping'][v]:
                 self._condensation.graph["member_edges"][str(self._condensation.graph['mapping'][u])].add((u, v))
+            else:
+                # Otherwise, we increase the multiplicity of the condensation edge between the different SCCs
+                self._condensation.graph["edge_multiplicity"][self._edge_to_condensation_edge(u, v)] += 1
         utils.logger.debug(f"{__name__}: Condensation graph: {self._condensation.edges()}")
         utils.logger.debug(f"{__name__}: Condensation member edges: {self._condensation.graph['member_edges']}")
         utils.logger.debug(f"{__name__}: Condensation mapping: {self._condensation.graph['mapping']}")
@@ -176,6 +183,7 @@ class stDiGraph(nx.DiGraph):
         # self._condensation has int nodes 
         # self._condensation.graph['mapping'][u] : str (i.e. original nodes) -> int (i.e. condensation nodes)
         # self._condensation.graph["member_edges"] : str (i.e. str(condensation nodes)) -> set(str,str) (i.e. set of original edges, which are (str,str))
+        # self._condensation.graph["edge_multiplicity"] : tuple(int, int) (i.e. condensation edge between SCCs) -> int (i.e. multiplicity of edges between SCCs)
 
         # self._condensation_expanded has str nodes
         # self._condensation_expanded has nodes of the form 
@@ -232,6 +240,30 @@ class stDiGraph(nx.DiGraph):
             raise ValueError(f"Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
 
         return (edge_source, edge_target)
+
+    def _condensation_edge_to_condensation_expanded_edge(self, u, v) -> tuple:
+        """
+        Maps an edge (u,v) in the condensation graph to an edge in the condensation_expanded graph.
+        """
+
+        if (u,v) not in self._condensation.edges() and u != v:
+            utils.logger.error(f"{__name__}: Edge ({u}, {v}) not found in condensation graph.")
+            raise ValueError(f"Edge ({u}, {v}) not found in condensation graph.")
+
+        if u != v:
+            # If an edge between SCCs, then check if the source of the edge is a trivial SCC or not
+            edge_source = str(u) if len(self._condensation.graph["member_edges"][str(u)]) == 0 else self._expanded(str(u))
+            edge_target = str(v)
+        else:
+            # If an edge inside an SCC, then that SCC is non-trivial, and we return the expanded edge corresponding to that SCC
+            edge_source = str(u)
+            edge_target = self._expanded(str(u))
+
+        if (edge_source, edge_target) not in self._condensation_expanded.edges():
+            utils.logger.error(f"{__name__}: Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
+            raise ValueError(f"Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
+
+        return (edge_source, edge_target)
     
     def _edge_to_condensation_node(self, u, v) -> str:
         """
@@ -244,11 +276,23 @@ class stDiGraph(nx.DiGraph):
         - `ValueError` if the edge (u,v) is not inside an SCC.
         """
 
-        if not self.is_scc_edge(u, v):
+        if not self._is_scc_edge(u, v):
             utils.logger.error(f"{__name__}: Edge ({u},{v}) is not an edge inside an SCC.")
             raise ValueError(f"Edge ({u},{v}) is not an edge inside an SCC.")
         
         return str(self._condensation.graph['mapping'][u])
+
+    def _edge_to_condensation_edge(self, u, v) -> tuple:
+        """
+        Maps an edge `(u,v)` of the original graph 
+        to the edge of the condensation graph.
+
+        Raises:
+        -------
+        - `ValueError` if the edge (u,v) is not an edge of the graph.
+        """
+
+        return (self._condensation.graph['mapping'][u], self._condensation.graph['mapping'][v])
 
     def get_width(self, edges_to_ignore: list = None) -> int:
         """
@@ -282,16 +326,23 @@ class stDiGraph(nx.DiGraph):
         # into an edge in the expanded graph
         edges_to_ignore_expanded = []
         member_edges = copy.deepcopy(self._condensation.graph['member_edges'])
+        edge_multiplicity = copy.deepcopy(self._condensation.graph["edge_multiplicity"])
+        utils.logger.debug(f"{__name__}: edge_multiplicity for edges in the condensation: {edge_multiplicity}")
 
         for u, v in (edges_to_ignore or []):
             # If (u,v) is an edge between different SCCs
             # Then the corresponding edge to ignore is between the two SCCs
-            if not self.is_scc_edge(u, v):
-                edges_to_ignore_expanded.append(self._edge_to_condensation_expanded_edge(u, v))
+            if not self._is_scc_edge(u, v):
+                edge_multiplicity[self._edge_to_condensation_edge(u, v)] -= 1
             else:
                 # (u,v) is an edge within the same SCC
                 # and thus we remove the edge (u,v) from the member edges
                 member_edges[self._edge_to_condensation_node(u, v)].discard((u, v))
+
+        weight_function_condensation_expanded = {e: 0 for e in self._condensation_expanded.edges()}
+
+        for u,v in self._condensation.edges:
+            weight_function_condensation_expanded[self._condensation_edge_to_condensation_expanded_edge(u,v)] = edge_multiplicity[(u,v)]
 
         # We also add to edges_to_ignore_expanded the expanded edges arising from non-trivial SCCs
         # (i.e. SCCs with more than one node, which are expanded into an edge, 
@@ -299,19 +350,38 @@ class stDiGraph(nx.DiGraph):
         # and for which there are no longer member edges (because all were in edges_to_ignore)
         for node in self._condensation.nodes():
             if len(member_edges[str(node)]) == 0 and len(self._condensation.graph['member_edges'][str(node)]) > 0:
-                edges_to_ignore_expanded.append((str(node), self._expanded(node)))
+                weight_function_condensation_expanded[(str(node), self._expanded(node))] = 0
+            else:
+                weight_function_condensation_expanded[(str(node), self._expanded(node))] = 1
 
         utils.logger.debug(f"{__name__}: Edges to ignore in the expanded graph: {edges_to_ignore_expanded}")
 
         utils.logger.debug(f"{__name__}: Condensation expanded graph: {self._condensation_expanded.edges()}")
-        width = self._condensation_expanded.get_width(edges_to_ignore=edges_to_ignore_expanded)
+        # width = self._condensation_expanded.get_width(edges_to_ignore=edges_to_ignore_expanded)
+
+        width = self._condensation_expanded.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function_condensation_expanded)
+
+        utils.logger.debug(f"{__name__}: Width of the condensation expanded graph: {width}")
 
         if (edges_to_ignore is None or len(edges_to_ignore) == 0):
             self.condensation_width = width
 
+        # DEBUG code
+        # utils.draw(
+        #         G=self._condensation_expanded,
+        #         filename="condensation_expanded.pdf",
+        #         flow_attr="flow",
+        #         draw_options={
+        #         "show_graph_edges": True,
+        #         "show_edge_weights": False,
+        #         "show_path_weights": False,
+        #         "show_path_weight_on_first_edge": True,
+        #         "pathwidth": 2,
+        #     })
+
         return width
     
-    def is_scc_edge(self, u, v) -> bool:
+    def _is_scc_edge(self, u, v) -> bool:
         """
         Returns True if (u,v) is an edge inside an SCCs, False otherwise.
         """
@@ -329,16 +399,35 @@ class stDiGraph(nx.DiGraph):
 
         large_constant = 0 #self.number_of_edges() + 1
 
-        weight_function = {edge: 0 for edge in self._condensation_expanded.edges} # edge in self._condensation_expanded -> length of a longest sequence using that edge (whn interpreting the sequence as a set)
-        sequence_function = dict() # edge in self._condensation_expanded -> id of a longest sequence using that edge
+        sequence_function = {e: [] for e in self._condensation_expanded.edges} # edge in self._condensation_expanded -> list of ids of all sequences using that edge
 
         for seq_index, sequence in enumerate(sequences):
-            seq_length_as_set = large_constant + len(set(sequence))
             for u, v in sequence:
                 condensation_expanded_edge = self._edge_to_condensation_expanded_edge(u, v)
-                if seq_length_as_set > weight_function[condensation_expanded_edge]:
-                    weight_function[condensation_expanded_edge] = seq_length_as_set
-                    sequence_function[condensation_expanded_edge] = seq_index
+                sequence_function[condensation_expanded_edge].append(seq_index)
+
+        # for each edge, sort sequence function by the length of the sequences
+        for edge in sequence_function:
+            sequence_function[edge] = sorted(sequence_function[edge], key=lambda x: len(sequences[x]), reverse=True)
+
+        # get the edge_multiplicity of each edge
+        for e in self._condensation.edges():
+            condensation_expanded_edge = self._condensation_edge_to_condensation_expanded_edge(e[0], e[1])
+            # If the edge is between SCCs, we have a multiplicity associated to it
+            # if we also have sequences associated to it, then we keep only the largest multiplicity-many
+            if len(sequence_function[condensation_expanded_edge]) > 0:
+                edge_multiplicity = self._condensation.graph["edge_multiplicity"][e]
+                sequence_function[condensation_expanded_edge] = sequence_function[condensation_expanded_edge][:edge_multiplicity]
+
+        for v in self._condensation.nodes():
+            # If the SCC v has at least one edge,
+            # then we keep only the largest sequence associated with it, because this edge 
+            # cannot be used multiple times in the antichain
+            if len(self._condensation.graph["member_edges"][str(v)]) > 0:
+                condensation_expanded_edge = self._condensation_edge_to_condensation_expanded_edge(v, v)
+                sequence_function[condensation_expanded_edge] = sequence_function[condensation_expanded_edge][:1]
+
+        weight_function = {edge: large_constant + len(sequence_function[edge]) for edge in self._condensation_expanded.edges()}
 
         utils.logger.debug(f"{__name__}: Weight function for incompatible sequences: {weight_function}")
 
@@ -349,7 +438,16 @@ class stDiGraph(nx.DiGraph):
 
         incompatible_sequences = []
 
+        seq_idx_set = set()
         for u, v in antichain:
-            incompatible_sequences.append(sequences[sequence_function[(u, v)]])
+            # extend incompatible_sequences with
+            for seq_idx in sequence_function[(u, v)]:
+                incompatible_sequences.append(sequences[seq_idx])
+                # Checking that we don't report duplicates, which should never happen
+                if seq_idx in seq_idx_set:
+                    utils.logger.error(f"{__name__}: Sequence {seq_idx} is already in the incompatible sequences, skipping it.")
+                    raise ValueError(f"{__name__}: CRITICAL BUG: Sequence {seq_idx} is already in the incompatible sequences")
+                seq_idx_set.add(seq_idx)
 
         return incompatible_sequences
+    

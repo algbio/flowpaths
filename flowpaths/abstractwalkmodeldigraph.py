@@ -359,7 +359,7 @@ class AbstractWalkModelDiGraph(ABC):
                 # print("Fixing variables for safe list #", i)
                 # iterate over the edges in the safe list to fix variables to 1
                 for u, v in self.walks_to_fix[i]:
-                    if self.G.is_scc_edge(u, v):
+                    if self.G._is_scc_edge(u, v):
                         self.solver.add_constraint(
                             self.edge_vars[(u, v, i)] >= 1,
                             name=f"safe_list_u={u}_v={v}_i={i}",
@@ -373,11 +373,9 @@ class AbstractWalkModelDiGraph(ABC):
                         self.solve_statistics["edge_variables=1"] += 1
 
     def _get_walks_to_fix_from_safe_lists(self) -> list:
-
-        # TODO: fix this for graphs with cycles
-        
-        # Returns the paths to fix based on the safe lists.
-        # The method finds the longest safe list for each edge and returns the paths to fix based on the longest safe list.
+     
+        # Returns the walks to fix based on the safe lists.
+        # The method finds the longest safe list for each edge and returns the walks to fix based on the longest safe list.
 
         # If we have no safe lists, we return an empty list
         if self.safe_lists is None or len(self.safe_lists) == 0:

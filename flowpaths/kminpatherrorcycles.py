@@ -4,6 +4,7 @@ import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 import copy
+import numpy as np
 
 
 class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
@@ -22,6 +23,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         additional_ends: list = [],
         optimization_options: dict = None,
         solver_options: dict = {},
+        trusted_edges_for_safety_percentile: float = None,
     ):
         """
         This class implements the k-MinPathError problem on general directed graphs. Given an edge-weighted DAG, this model looks for k walks, with associated weights and slacks, such that for every edge (u,v), 
@@ -97,6 +99,10 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
             Dictionary with the solver options. Default is `{}`. See [solver options documentation](solver-options-optimizations.md).
 
+        - `trusted_edges_for_safety_percentile: float`, optional
+
+            The percentile value to use for selecting trusted edges for safety. Default is `None`, which here means that all edges are considered safe (unless added to edges to ignore or having 0 error_scaling)
+
         Raises
         ------
         - `ValueError`
@@ -163,12 +169,12 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
-
         self.k = k
         # If k is not specified, we set k to the edge width of the graph
         if self.k is None:
-            self.k = self.G.get_width(list(self.edges_to_ignore))
-        self.optimization_options = optimization_options or {}        
+            self.k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
+            utils.logger.info(f"{__name__}: k received as None, we set it to {self.k} (edge width of the graph)")
+        self.optimization_options = optimization_options or {}
 
         self.subset_constraints_coverage = subset_constraints_coverage
         
@@ -191,10 +197,21 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.solve_statistics = {}
         
-        # We trust for safety all edges with non-zero flow and which are not in edges_to_ignore
-        self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
-            flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
-        ).difference(self.edges_to_ignore)
+        if trusted_edges_for_safety_percentile is not None:
+            # Select edges where the flow_attr value is >= trusted_edges_for_safety_percentile (using self.G)
+            flow_values = [self.G.edges[edge][flow_attr] for edge in self.G.edges() if flow_attr in self.G.edges[edge]]
+            percentile = np.percentile(flow_values, trusted_edges_for_safety_percentile) if flow_values else 0
+            self.trusted_edges_for_safety = list(edge for edge in self.G.edges() if flow_attr in self.G.edges[edge] and self.G.edges[edge][flow_attr] >= percentile)
+            # Remove from trusted_edges_for_safety the edges in edges_to_ignore
+            self.trusted_edges_for_safety = [edge for edge in self.trusted_edges_for_safety if edge not in self.edges_to_ignore]
+            utils.logger.info(f"{__name__}: trusted_edges_for_safety set using using percentile {trusted_edges_for_safety_percentile} = {percentile} to {self.trusted_edges_for_safety}")
+        else:
+            # We trust for safety all edges with non-zero flow and which are not in edges_to_ignore
+            self.trusted_edges_for_safety = self.G.get_non_zero_flow_edges(
+                flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
+            ).difference(self.edges_to_ignore)
+
+        self.optimization_options["trusted_edges_for_safety"] = self.trusted_edges_for_safety
         
         # If we get subset constraints, and the coverage fraction is 1
         # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety

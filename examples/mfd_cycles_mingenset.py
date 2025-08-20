@@ -62,7 +62,7 @@ def main():
 if __name__ == "__main__":
     # Configure logging
     fp.utils.configure_logging(
-        level=fp.utils.logging.INFO,
+        level=fp.utils.logging.DEBUG,
         log_to_console=True,
     )
     main()
