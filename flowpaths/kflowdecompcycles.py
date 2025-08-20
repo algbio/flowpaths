@@ -24,7 +24,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
     ):
         """
         This class implements the k-Flow Decomposition problem, namely it looks for a decomposition of a weighted general directed graph, possibly with cycles, into 
-        $k$ weighted walks such that the flow on each edge of the graph equals the sum of the weights of the walks going through that edge.
+        $k$ weighted walks such that the flow on each edge of the graph equals the sum of the weights of the walks going through that edge (multiplied by the number of times the walk goes through it).
 
         Parameters
         ----------

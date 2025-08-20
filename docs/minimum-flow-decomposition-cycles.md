@@ -7,7 +7,7 @@
 
 ## 1. Definition
 
-The Minimum Flow Decomposition problem on a directed graph (**possibly with cycles**) is defined as follows:
+The Minimum Flow Decomposition problem on a directed graph (**possibly with cycles**) is defined as follows. For a walk $W$ and an edge $(u,v)$, we denote by $W(u,v)$ the number of times that the walk goes through the edge $(u,v)$. If $W(u,v)$ does not contain $(u,v)$ , then $W(u,v) = 0$.
 
 - **INPUT**: 
 
@@ -18,7 +18,7 @@ The Minimum Flow Decomposition problem on a directed graph (**possibly with cycl
 
 - **OUTPUT**: A minimum number $k$ of walks $W_1,\dots,W_k$, starting in some node in $S$ and ending in some node in $T$, and a weight $w_i$ associated to each $W_i$, such that for every edge of the graph it holds that its flow value equals the sum of the weights of the walks going through the edge. Formally, 
 $$
-f(u,v) = \sum_{i \in \\{1,\dots,k\\} : (u,v) \in W_i }w_i, ~~\forall (u,v) \in E.
+f(u,v) = \sum_{i \in \\{1,\dots,k\\}}w_i \cdot W_i(u,v), ~~\forall (u,v) \in E.
 $$
 
 !!! success "Note"

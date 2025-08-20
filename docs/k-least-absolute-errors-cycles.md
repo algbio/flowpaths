@@ -7,16 +7,16 @@
 
 ## 1. Definition
 
-The k-Least Absolute Errors problem on a directed **acyclic** graph (*DAG*) is defined as follows:
+The k-Least Absolute Errors problem on a directed **acyclic** graph (*DAG*) is defined as follows. For a walk $W$ and an edge $(u,v)$, we denote by $W(u,v)$ the number of times that the walk goes through the edge $(u,v)$. If $W(u,v)$ does not contain $(u,v)$ , then $W(u,v) = 0$.
 
 - **INPUT**: 
 
     - A directed graph $G = (V,E)$, and a *weight function* on $G$, namely weights $f(u,v)$ for every edge $(u,v)$ of $G$. The weights are arbitrary non-negative numbers and do not need to satisfy flow conservation.
     - $k \in \mathbb{Z}$
 
-- **OUTPUT**: A list of $k$ of source-to-sink paths, $P_1,\dots,P_k$, with a weight $w_i$ associated to each $P_i$, that minimize the objective function:
+- **OUTPUT**: A number $k$ of walks $W_1,\dots,W_k$, starting in some node in $S$ and ending in some node in $T$, with a weight $w_i$ associated to each $P_i$, that minimize the objective function:
 $$
-\sum_{(u,v) \in E} \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right|.
+\sum_{(u,v) \in E} \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\}}w_i \cdot W_i(u,v)\right|.
 $$
 
 !!! success "Note"

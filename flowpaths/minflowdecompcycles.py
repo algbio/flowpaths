@@ -19,6 +19,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
     use_min_gen_set_lowerbound = False
     optimize_with_given_weights = False
     optimize_with_given_weights_num_free_walks = 0
+    add_min_gen_set_to_given_weights = False
 
     def __init__(
         self,
@@ -179,6 +180,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         # Internal variables
         self._generating_set = None
         self._given_weights_model: kflowdecompcycles.kFlowDecompCycles | None = None
+        self._mingenset_model: mgs.MinGenSet | None = None
         self._source_flow = None
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}")
@@ -244,6 +246,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                 self.set_solved()
                 self.solve_statistics = fd_model.solve_statistics
                 self.solve_statistics["mfd_solve_time"] = time.perf_counter() - self.solve_time_start
+                self.solve_statistics["min_gen_set_solve_time"] = self._mingenset_model.solve_statistics.get("total_solve_time", 0) if self._mingenset_model is not None else 0
                 self.fd_model = fd_model
                 return True
             elif fd_model.solver.get_model_status() == sw.SolverWrapper.infeasible_status:
@@ -283,31 +286,33 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         if "time_limit" in mingenset_solver_options:
             mingenset_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
 
-        mingenset_model = mgs.MinGenSet(
+        self._mingenset_model = mgs.MinGenSet(
             numbers = all_weights, 
             total = source_flow, 
             weight_type = self.weight_type,
             max_multiplicity=self.w_max,
             lowerbound = current_lowerbound_k,
             remove_complement_values=True,
+            remove_sums_of_two=True,
             solver_options = mingenset_solver_options,
             )
-        mingenset_model.solve()
+        self._mingenset_model.solve()
     
         # If we solved the min gen set problem, we store it and the model, and return the number of elements in the generating set
-        if mingenset_model.is_solved():        
-            self._generating_set = mingenset_model.get_solution()
+        if self._mingenset_model.is_solved():        
+            self._generating_set = self._mingenset_model.get_solution()
             min_gen_set_lowerbound = len(self._generating_set)
             utils.logger.info(f"{__name__}: found a min gen set solution with {min_gen_set_lowerbound} elements ({self._generating_set})")
+            self._mingenset_model.solve_statistics["total_solve_time"] = time.perf_counter() - min_gen_set_start_time
         else:
-            utils.logger.info(f"{__name__}: did NOT find a min gen set solution")
-            exit(0)
-        
-        self.solve_statistics["min_gen_set_solve_time"] = time.perf_counter() - min_gen_set_start_time
-        
+            utils.logger.error(f"{__name__}: did NOT find a min gen set solution")
+            self._mingenset_model = None
+
         return min_gen_set_lowerbound
 
     def _solve_with_given_weights(self) -> bool:
+
+        given_weights_start_time = time.perf_counter()
 
         all_weights = set({self.G.edges[e][self.flow_attr] for e in self.G.edges() if self.flow_attr in self.G.edges[e]})
         all_weights_list = list(all_weights)
@@ -316,12 +321,14 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         _ = self.get_lowerbound_k()
 
         if self._generating_set is not None:
-            all_weights.update(self._generating_set)
+            if self.optimization_options.get("add_min_gen_set_to_given_weights", MinFlowDecompCycles.add_min_gen_set_to_given_weights):
+                all_weights.update(self._generating_set)
             all_weights_list = list(all_weights)
 
         given_weights_optimization_options = copy.deepcopy(self.optimization_options)
         given_weights_optimization_options["optimize_with_safe_sequences"] = False
         given_weights_optimization_options["optimize_with_safety_as_subset_constraints"] = False
+        given_weights_optimization_options["optimize_with_max_safe_antichain_as_subset_constraints"] = True
         given_weights_optimization_options["allow_empty_walks"] = True
         given_weights_optimization_options["given_weights"] = all_weights_list
         utils.logger.info(f"{__name__}: Solving with given weights = {sorted(given_weights_optimization_options['given_weights'])}")
@@ -347,6 +354,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             self._given_weights_model = given_weights_kfd_solver
             sol = self._given_weights_model.get_solution(remove_empty_walks=True)
             utils.logger.info(f"{__name__}: found an MFD solution with given weights in {len(sol['walks'])} walks weights {sol['weights']}")
+            self._given_weights_model.solve_statistics["given_weights_solve_time"] = time.perf_counter() - given_weights_start_time
         else:
             utils.logger.info(f"{__name__}: did NOT found an MFD solution with given weights")
 

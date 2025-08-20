@@ -11,6 +11,7 @@ class AbstractWalkModelDiGraph(ABC):
     optimize_with_safe_sequences = True
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
+    optimize_with_max_safe_antichain_as_subset_constraints = False
     allow_empty_walks = False
 
     def __init__(
@@ -118,23 +119,10 @@ class AbstractWalkModelDiGraph(ABC):
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.allow_empty_walks = optimization_options.get("allow_empty_walks", AbstractWalkModelDiGraph.allow_empty_walks)
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
+        self.optimize_with_max_safe_antichain_as_subset_constraints = optimization_options.get("optimize_with_max_safe_antichain_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_max_safe_antichain_as_subset_constraints)
 
         self._is_solved = None
                 
-        self.safe_lists = []
-
-        if self.optimize_with_safe_sequences or self.optimize_with_safety_as_subset_constraints:
-            start_time = time.perf_counter()
-            self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
-                G=self.G,
-                X=self.trusted_edges_for_safety,
-            )
-            utils.logger.debug(f"{__name__}: Found {len(self.safe_lists)} safe sequences in {time.perf_counter() - start_time} seconds.")
-            self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
-
-        if self.optimize_with_safety_as_subset_constraints:
-            self.subset_constraints += self.safe_lists
-
     def create_solver_and_walks(self):
         """
         Creates a solver instance and encodes the walks in the graph.
@@ -151,9 +139,13 @@ class AbstractWalkModelDiGraph(ABC):
 
         self._encode_walks()
         
+        self._apply_safety_optimizations()
+
         self._encode_subset_constraints()
 
-        self._fix_variables_based_on_safe_sequences()
+        self.solve_statistics["graph_width"] = self.G.get_width()
+        self.solve_statistics["edge_number"] = self.G.number_of_edges()
+        self.solve_statistics["node_number"] = self.G.number_of_nodes()
 
     def _encode_walks(self):
 
@@ -165,6 +157,8 @@ class AbstractWalkModelDiGraph(ABC):
         self.edge_indexes = [
             (u, v, i) for i in range(self.k) for (u, v) in self.G.edges()
         ]
+        self.solve_statistics["edge_variables_total"] = len(self.edge_indexes)
+
         self.path_indexes = [(i) for i in range(self.k)]
         self.vertex_indexes = [
             (v, i) for i in range(self.k) for v in self.G.nodes()
@@ -328,35 +322,55 @@ class AbstractWalkModelDiGraph(ABC):
                 name=f"7b_j={j}",
             )
 
-    def _fix_variables_based_on_safe_sequences(self):
+    def _apply_safety_optimizations(self):
 
-        ########################################
-        #                                      #
-        # Fixing variables based on safe lists #
-        #                                      #
-        ########################################
+        self.safe_lists = []
 
-        if not self.optimize_with_safe_sequences:
+        if self.optimize_with_safe_sequences or self.optimize_with_safety_as_subset_constraints or self.optimize_with_max_safe_antichain_as_subset_constraints:
+            start_time = time.perf_counter()
+            self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
+                G=self.G,
+                X=self.trusted_edges_for_safety,
+            )
+            utils.logger.debug(f"{__name__}: Found {len(self.safe_lists)} safe sequences in {time.perf_counter() - start_time} seconds.")
+            self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
+
+        if self.safe_lists is None:
             return
 
-        if self.safe_lists is not None:
-            walks_to_fix = self._get_walks_to_fix_from_safe_lists()
+        # In this case, we use all maximal safe sequences as subset constraints
+        if self.optimize_with_safety_as_subset_constraints:
+            self.subset_constraints += self.safe_lists
+            return
+        
+        self.walks_to_fix = self._get_walks_to_fix_from_safe_lists()
+        self.solve_statistics["edge_variables=1"] = 0
+        self.solve_statistics["edge_variables>=1"] = 0
 
-        # iterating over safe lists
-        for i in range(min(len(walks_to_fix), self.k)):
-            # print("Fixing variables for safe list #", i)
-            # iterate over the edges in the safe list to fix variables to 1
-            for u, v in walks_to_fix[i]:
-                if self.G.is_scc_edge(u, v):
-                    self.solver.add_constraint(
-                        self.edge_vars[(u, v, i)] >= 1,
-                        name=f"safe_list_u={u}_v={v}_i={i}",
-                    )
-                else:
-                    self.solver.add_constraint(
-                        self.edge_vars[(u, v, i)] == 1,
-                        name=f"safe_list_u={u}_v={v}_i={i}",
-                    )
+        # In this case, we use only the maximum antichain of maximal safe sequences as subset constraints
+        if self.optimize_with_max_safe_antichain_as_subset_constraints:
+            self.subset_constraints += self.walks_to_fix
+            return
+
+        # Otherwise, we fix variables using the walks to fix
+        if self.optimize_with_safe_sequences:
+            # iterating over safe lists
+            for i in range(min(len(self.walks_to_fix), self.k)):
+                # print("Fixing variables for safe list #", i)
+                # iterate over the edges in the safe list to fix variables to 1
+                for u, v in self.walks_to_fix[i]:
+                    if self.G.is_scc_edge(u, v):
+                        self.solver.add_constraint(
+                            self.edge_vars[(u, v, i)] >= 1,
+                            name=f"safe_list_u={u}_v={v}_i={i}",
+                        )
+                        self.solve_statistics["edge_variables>=1"] += 1
+                    else:
+                        self.solver.add_constraint(
+                            self.edge_vars[(u, v, i)] == 1,
+                            name=f"safe_list_u={u}_v={v}_i={i}",
+                        )
+                        self.solve_statistics["edge_variables=1"] += 1
 
     def _get_walks_to_fix_from_safe_lists(self) -> list:
 
@@ -442,6 +456,9 @@ class AbstractWalkModelDiGraph(ABC):
         )
 
         self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = (
+            self.solver.get_model_status()
+        )
+        self.solve_statistics[f"model_status"] = (
             self.solver.get_model_status()
         )
 

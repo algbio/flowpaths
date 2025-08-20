@@ -116,7 +116,7 @@ class MinGenSet():
                 utils.logger.error(f"{__name__}: The sum of the numbers inside each subset constraint must equal the total value.")
                 raise ValueError("The sum of the numbers inside each subset constraint must equal the total value.")
 
-        if remove_sums_of_two:
+        if False and remove_sums_of_two:
             if self.max_multiplicity > 1:
                 utils.logger.error(f"{__name__}: `remove_sums_of_two` is set to True, but `max_multiplicity > 1`. This is not allowed.")
                 raise ValueError("`remove_sums_of_two` is not allowed when `max_multiplicity > 1`.")
