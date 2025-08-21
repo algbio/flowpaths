@@ -427,7 +427,9 @@ class stDiGraph(nx.DiGraph):
                 condensation_expanded_edge = self._condensation_edge_to_condensation_expanded_edge(v, v)
                 sequence_function[condensation_expanded_edge] = sequence_function[condensation_expanded_edge][:1]
 
-        weight_function = {edge: large_constant + len(sequence_function[edge]) for edge in self._condensation_expanded.edges()}
+        print("sequence_function", sequence_function)
+
+        weight_function = {edge: large_constant + sum(len(sequences[seq_idx]) for seq_idx in sequence_function[edge]) for edge in self._condensation_expanded.edges()}
 
         utils.logger.debug(f"{__name__}: Weight function for incompatible sequences: {weight_function}")
 

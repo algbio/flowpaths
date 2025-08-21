@@ -41,11 +41,11 @@ def test1():
         [('s', 'c')],
         [('a', 't')],
         [('s', 'a')],
-        [('g', 'e')],
+        [('g', 'e'), ('e', 'f')],
     ]
     incompatible_sequences = stDiGraph.get_longest_incompatible_sequences(sequences)
     print(f"Incompatible sequences: {incompatible_sequences}")
-    assert len(incompatible_sequences) == 2
+    assert len(incompatible_sequences) == 3
 
 def main():
     test1()
@@ -53,7 +53,7 @@ def main():
 if __name__ == "__main__":
     # Configure logging
     fp.utils.configure_logging(
-        level=fp.utils.logging.INFO,
+        level=fp.utils.logging.DEBUG,
         log_to_console=True,
     )
     main()
