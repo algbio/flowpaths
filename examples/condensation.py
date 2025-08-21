@@ -47,8 +47,52 @@ def test1():
     print(f"Incompatible sequences: {incompatible_sequences}")
     assert len(incompatible_sequences) == 3
 
+def test2():
+    # Create a simple graph
+    graph = nx.DiGraph()
+    graph.graph["id"] = "simple_graph"
+    graph.add_edge("s", "a")
+    graph.add_edge("a", "t")
+
+    graph.add_edge("a", "a")
+
+    graph.add_edge("s", "b")
+    graph.add_edge("b", "c")
+    graph.add_edge("c", "b")
+
+    graph.add_edge("b", "t")
+    graph.add_edge("c", "t")
+
+    graph.add_edge("b", "a")
+    graph.add_edge("c", "a")
+    
+    stDiGraph = fp.stDiGraph(graph)
+    assert stDiGraph.get_width() == 5
+
+    edges_to_ignore = [ ("s", "a"), ("a", "t") ]
+    assert stDiGraph.get_width(edges_to_ignore=edges_to_ignore) == 4
+
+    sequences = [ 
+        [('s', 'a'), ('a', 'a'), ('a', 't')],
+    ]
+    incompatible_sequences = stDiGraph.get_longest_incompatible_sequences(sequences)
+    print(f"Incompatible sequences: {incompatible_sequences}")
+    assert len(incompatible_sequences) == 1
+
+    sequences = [ 
+        [('s', 'a'), ('a', 'a'), ('a', 't')],
+        [('b','a'), ('a', 't')],
+        [('b','a'), ('a','a'), ('a', 't')],
+        [('c','a'), ('a', 't')],
+        [('b', 'c'), ('c', 'b')]
+    ]
+    incompatible_sequences = stDiGraph.get_longest_incompatible_sequences(sequences)
+    print(f"Incompatible sequences: {incompatible_sequences}")
+    assert len(incompatible_sequences) == 3
+
 def main():
-    test1()
+    # test1()
+    test2()
 
 if __name__ == "__main__":
     # Configure logging
