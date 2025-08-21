@@ -91,7 +91,7 @@ def test2():
     assert len(incompatible_sequences) == 3
 
 def main():
-    # test1()
+    test1()
     test2()
 
 if __name__ == "__main__":
