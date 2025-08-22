@@ -11,7 +11,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self,
         G: nx.DiGraph,
         flow_attr: str,
-        k: int = None,
+        k: int,
         flow_attr_origin: str = "edge",
         weight_type: type = float,
         subset_constraints: list = [],
@@ -219,12 +219,12 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                     product_var=self.pi_vars[(u, v, i)],
                     lb=0,
                     ub=self.w_max,
-                    name=f"10_i={i}_u={u}_v={v}",
+                    name=f"i={i}_u={u}_v={v}_10",
                 )
 
             self.solver.add_constraint(
                 self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
-                name=f"10d_i={i}_u={u}_v={v}",
+                name=f"i={i}_u={u}_v={v}_10d",
             )
 
     def _encode_given_weights(self):

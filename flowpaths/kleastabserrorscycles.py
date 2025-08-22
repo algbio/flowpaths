@@ -290,21 +290,20 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
                     product_var=self.pi_vars[(u, v, i)],
                     lb=0,
                     ub=self.w_max,
-                    name=f"10_u={u}_v={v}_i={i}",
+                    name=f"u={u}_v={v}_i={i}_10",
                 )
-
 
             # Encoding the error on the edge (u, v) as the difference between 
             # the flow value of the edge and the sum of the weights of the walks that go through it (pi variables)
             # If we minimize the sum of edge_errors_vars, then we are minimizing the sum of the absolute errors.
             self.solver.add_constraint(
                 f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= self.edge_errors_vars[(u, v)],
-                name=f"9aa_u={u}_v={v}_i={i}",
+                name=f"u={u}_v={v}_i={i}_9aa",
             )
 
             self.solver.add_constraint(
                 self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) - f_u_v <= self.edge_errors_vars[(u, v)],
-                name=f"9ab_u={u}_v={v}_i={i}",
+                name=f"u={u}_v={v}_i={i}_9ab",
             )
 
     def _encode_objective(self):
