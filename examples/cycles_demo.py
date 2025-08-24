@@ -51,6 +51,24 @@ def test(filename: str):
     klae_model.solve()
     process_solution(klae_model)
 
+    # here we also pass the percentile
+    klae_percentile_model = fp.kLeastAbsErrorsCycles(
+        G=graph,
+        flow_attr="flow",
+        weight_type=int,
+        subset_constraints=graph.graph["constraints"], # try with and without
+        optimization_options={
+            "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+        },
+        solver_options={
+            "external_solver": "gurobi", # we can try also "highs" at some point
+            "time_limit": 300, # 300s = 5min, is it ok?
+        },
+        trusted_edges_for_safety_percentile=25, # we trust for safety edges whose weight in >= 25 percentile, remove this if not using the safety optimization
+    )
+    klae_percentile_model.solve()
+    process_solution(klae_percentile_model)
+
     # note that here below we are not passing k, as it will be chosen as the graph width
     kmpe_model = fp.kMinPathErrorCycles(
         G=graph,
@@ -67,6 +85,24 @@ def test(filename: str):
     )
     kmpe_model.solve()
     process_solution(kmpe_model)
+
+    # we use percentile also here, which overrides the default behavior of trusting all edges
+    kmpe_percentile_model = fp.kMinPathErrorCycles(
+        G=graph,
+        flow_attr="flow",
+        weight_type=int,
+        subset_constraints=graph.graph["constraints"], # try with and without
+        optimization_options={
+            "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+        },
+        solver_options={
+            "external_solver": "gurobi", # we can try also "highs" at some point
+            "time_limit": 300, # 300s = 5min, is it ok?
+        },
+        trusted_edges_for_safety_percentile=25, # we trust for safety edges whose weight in >= 25 percentile, remove this if not using the safety optimization
+    )
+    kmpe_percentile_model.solve()
+    process_solution(kmpe_percentile_model)
 
 def process_solution(model):
     if model.is_solved():

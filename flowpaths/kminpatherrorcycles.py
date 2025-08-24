@@ -203,7 +203,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             percentile = np.percentile(flow_values, trusted_edges_for_safety_percentile) if flow_values else 0
             self.trusted_edges_for_safety = list(edge for edge in self.G.edges() if flow_attr in self.G.edges[edge] and self.G.edges[edge][flow_attr] >= percentile)
             # Remove from trusted_edges_for_safety the edges in edges_to_ignore
-            self.trusted_edges_for_safety = [edge for edge in self.trusted_edges_for_safety if edge not in self.edges_to_ignore]
+            self.trusted_edges_for_safety = set(edge for edge in self.trusted_edges_for_safety if edge not in self.edges_to_ignore)
             utils.logger.info(f"{__name__}: trusted_edges_for_safety set using using percentile {trusted_edges_for_safety_percentile} = {percentile} to {self.trusted_edges_for_safety}")
         else:
             # We trust for safety all edges with non-zero flow and which are not in edges_to_ignore
@@ -218,6 +218,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         if self.subset_constraints is not None:
             if self.subset_constraints_coverage == 1.0:
                 for constraint in self.subset_constraints:
+                    # Convert to set if it's a list
                     self.optimization_options["trusted_edges_for_safety"].update(constraint)
 
         # Call the constructor of the parent class AbstractWalkModelDiGraph

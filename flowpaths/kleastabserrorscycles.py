@@ -163,13 +163,13 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subset_constraints = subset_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
-        self.trusted_edges_for_safety = trusted_edges_for_safety_internal
+        self.trusted_edges_for_safety = set(trusted_edges_for_safety_internal)
 
         if len(self.trusted_edges_for_safety) == 0 and trusted_edges_for_safety_percentile is not None:            
             # Select edges where the flow_attr value is >= trusted_edges_for_safety_percentile (using self.G)
             flow_values = [self.G.edges[edge][flow_attr] for edge in self.G.edges() if flow_attr in self.G.edges[edge]]
             percentile = np.percentile(flow_values, trusted_edges_for_safety_percentile) if flow_values else 0
-            self.trusted_edges_for_safety = list(edge for edge in self.G.edges() if flow_attr in self.G.edges[edge] and self.G.edges[edge][flow_attr] >= percentile)
+            self.trusted_edges_for_safety = set(edge for edge in self.G.edges() if flow_attr in self.G.edges[edge] and self.G.edges[edge][flow_attr] >= percentile)
             utils.logger.info(f"{__name__}: trusted_edges_for_safety set using using percentile {trusted_edges_for_safety_percentile} = {percentile} to {self.trusted_edges_for_safety}")
 
         self.edge_error_scaling = error_scaling_internal
@@ -177,7 +177,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
 
         # Remove from trusted_edges_for_safety the edges in edges_to_ignore
-        self.trusted_edges_for_safety = [edge for edge in self.trusted_edges_for_safety if edge not in self.edges_to_ignore]
+        self.trusted_edges_for_safety -= self.edges_to_ignore
 
         # Checking that every entry in self.error_scaling is between 0 and 1
         for key, value in error_scaling.items():
@@ -218,7 +218,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         
         # If we get subset constraints, and the coverage fraction is 1
         # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
-        self.optimization_options["trusted_edges_for_safety"] = set(self.trusted_edges_for_safety or [])
+        self.optimization_options["trusted_edges_for_safety"] = self.trusted_edges_for_safety or set()
         if self.subset_constraints is not None:
             if self.subset_constraints_coverage == 1.0:
                 for constraint in self.subset_constraints:

@@ -7,7 +7,6 @@ def test_decomposition_models():
     fp.utils.configure_logging(
         level=fp.utils.logging.DEBUG,
         log_to_console=True,
-        log_file="log_internal_node_weights.log",
     )
 
     ##############
@@ -73,7 +72,6 @@ def test_min_error_flow():
     fp.utils.configure_logging(
         level=fp.utils.logging.DEBUG,
         log_to_console=True,
-        log_file="log_internal_node_weights.log",
     )
 
     ##############
@@ -119,7 +117,6 @@ def test_min_path_cover():
     fp.utils.configure_logging(
         level=fp.utils.logging.DEBUG,
         log_to_console=True,
-        log_file="log_internal_node_weights.log",
     )
 
     ##############

@@ -38,3 +38,7 @@ MANIFEST
 test_graph*.pdf
 tests/cyclic_graphs/*.pdf
 tests/cyclic_graphs/*.dot
+least-abs_errors_cycles_example.pdf
+tests/cyclic_graphs/gt5.kmer27.(630000.660000).V111.E154.mincyc100.graph.pdf
+tests/cyclic_graphs/gt5.kmer27.(630000.660000).V111.E154.mincyc100.graph.pdf
+tests/cyclic_graphs/gt5.kmer27.(630000.660000).V111.E154.mincyc100.graph.pdf
