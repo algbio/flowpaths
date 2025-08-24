@@ -449,21 +449,12 @@ class AbstractWalkModelDiGraph(ABC):
         # self.write_model(f"model-{self.id}.lp")
         start_time = time.perf_counter()
         self.solver.optimize()
-        self.solve_statistics[f"milp_solve_time_for_num_paths_{self.k}"] = (
-            time.perf_counter() - start_time
-        )
+        self.solve_statistics[f"solve_time"] = time.perf_counter() - start_time
+        self.solve_statistics[f"model_status"] = self.solver.get_model_status()
+        self.solve_statistics[f"number_of_nontrivial_SCCs"] = self.G.get_number_of_nontrivial_SCCs()
+        self.solve_statistics[f"size_of_largest_SCC"] = self.G.get_size_of_largest_SCC()
 
-        self.solve_statistics[f"milp_solver_status_for_num_paths_{self.k}"] = (
-            self.solver.get_model_status()
-        )
-        self.solve_statistics[f"model_status"] = (
-            self.solver.get_model_status()
-        )
-
-        if (
-            self.solver.get_model_status() == "kOptimal"
-            or self.solver.get_model_status() == 2
-        ):
+        if self.solver.get_model_status() == "kOptimal" or self.solver.get_model_status() == 2:
             self._is_solved = True
             utils.logger.info(f"{__name__}: solved successfully. Objective value: {self.get_objective_value()}")
             return True

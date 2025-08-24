@@ -245,7 +245,8 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                     self._solution["walks"] = self.G_internal.get_condensed_paths(self._solution["walks"])
                 self.set_solved()
                 self.solve_statistics = fd_model.solve_statistics
-                self.solve_statistics["mfd_solve_time"] = time.perf_counter() - self.solve_time_start
+                # we overwrite solve_time with the total time MFD has taken
+                self.solve_statistics["solve_time"] = time.perf_counter() - self.solve_time_start
                 self.solve_statistics["min_gen_set_solve_time"] = self._mingenset_model.solve_statistics.get("total_solve_time", 0) if self._mingenset_model is not None else 0
                 self.fd_model = fd_model
                 return True

@@ -393,6 +393,19 @@ class stDiGraph(nx.DiGraph):
 
         return self._condensation.graph['mapping'][u] == self._condensation.graph['mapping'][v]
 
+    def get_number_of_nontrivial_SCCs(self) -> int:
+        """
+        Returns the number of non-trivial SCCs (i.e. SCCs with at least one edge).
+        """
+
+        return sum(1 for v in self._condensation.nodes() if len(self._condensation.graph['member_edges'][str(v)]) > 0)
+
+    def get_size_of_largest_SCC(self) -> int:
+        """
+        Returns the size of the largest SCC (in terms of number of edges).
+        """
+        return max((len(self._condensation.graph['member_edges'][str(v)]) for v in self._condensation.nodes()), default=0)
+
     def get_longest_incompatible_sequences(self, sequences: list) -> list:
 
         # We map the edges in sequences to edges in self._condensation_expanded
@@ -426,8 +439,6 @@ class stDiGraph(nx.DiGraph):
             if len(self._condensation.graph["member_edges"][str(v)]) > 0:
                 condensation_expanded_edge = self._condensation_edge_to_condensation_expanded_edge(v, v)
                 sequence_function[condensation_expanded_edge] = sequence_function[condensation_expanded_edge][:1]
-
-        print("sequence_function", sequence_function)
 
         weight_function = {edge: large_constant + sum(len(sequences[seq_idx]) for seq_idx in sequence_function[edge]) for edge in self._condensation_expanded.edges()}
 

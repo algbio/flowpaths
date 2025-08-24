@@ -68,15 +68,18 @@ def test3(filename: str):
             "pathwidth": 2,
         })
 
-    mfd_model = fp.MinFlowDecompCycles(
+    mfd_model = fp.kLeastAbsErrorsCycles(
         G=graph,
         flow_attr="flow",
-        weight_type=int,
+        weight_type=float,
         optimization_options={
-            "optimize_with_safe_sequences": False,
+            "optimize_with_safe_sequences": True,
             "optimize_with_safety_as_subset_constraints": False,
         },
-        solver_options={"external_solver": "highs"},
+        solver_options={
+            "external_solver": "gurobi",
+            "time_limit": 300,
+        },
     )
     mfd_model.solve()
     process_solution(graph, filename, mfd_model)
@@ -104,10 +107,11 @@ def process_solution(graph, filename = None, model: fp.MinFlowDecompCycles = Non
         print("Model could not be solved.")
 
 def main():
-    test1()
-    test2()
-    test3(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
-    test3(filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
+    # test1()
+    # test2()
+    # test3(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    # test3(filename = "tests/cyclic_graphs/gt5.kmer15.(92000.94000).V76.E104.cyc64.graph")
+    test3(filename = "tests/cyclic_graphs/gt5.kmer27.(1300000.1400000).V809.E1091.mincyc1000.graph")
 
 if __name__ == "__main__":
     # Configure logging
