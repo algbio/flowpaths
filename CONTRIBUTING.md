@@ -32,6 +32,16 @@ pip install -e .
 
 # 4) Install test tooling
 pip install pytest
+
+# 5) (Optional) Install Gurobi solver support
+# Only needed if you want to run examples/tests with solver_options selecting "gurobi".
+# (Default HiGHS support already works via highspy installed in step 3.)
+pip install gurobipy
+# Obtain a (free for academic) license: https://www.gurobi.com/downloads/
+# After placing your license file (e.g. ~/gurobi.lic) set this if not auto-detected:
+# export GRB_LICENSE_FILE=~/gurobi.lic
+# Quick check:
+# python -c "import gurobipy as gp; m = gp.Model(); print('Gurobi OK', gp.gurobi.version())"
 ```
 
 Tips:
@@ -60,6 +70,7 @@ mkdocs.yml                 # Docs site configuration and navigation
 pyproject.toml             # Package metadata and runtime deps
 requirements.txt           # Pinned runtime deps for local installs
 README.md, LICENSE         # Project overview and license
+CONTRIBUTING.md            # Contribution guide (this file)
 
 ```
 
@@ -75,11 +86,11 @@ The test suite lives in `tests/` and uses `pytest`.
 
 ```bash
 # Run all tests
-pytest -q
+pytest -vv -ra --durations=10
 
 # Run a specific file or test expression
-pytest -q tests/test_min_flow_decomp.py
-pytest -q -k "least_abs_errors and not cycles"
+pytest -vv tests/test_min_flow_decomp.py
+pytest -vv -k "least_abs_errors and not cycles"
 ```
 
 Make sure new code is covered by tests and that tests are deterministic and fast. Prefer tiny graphs in unit tests and keep example-driven tests in `examples/` lightweight (these are run as part of the test `tests/test_examples.py`).
@@ -100,7 +111,7 @@ python examples/min_flow_decomp_cycles.py
 python examples/least_abs_errors.py
 ```
 
-If an example requires an external solver (e.g., Gurobi), it will mention it via `solver_options`. By default, the package uses the HiGHS solver (via `highspy`), which is installed with `pip install -e .`.
+If an example requires an external solver (e.g., Gurobi), it will mention it via `solver_options`. By default, the package uses the HiGHS solver (via `highspy`), which is installed when installing flowpaths.
 
 ## Coding guidelines
 
