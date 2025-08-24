@@ -1,7 +1,7 @@
 import flowpaths as fp
 import networkx as nx
 
-def test(filename: str):
+def test_min_flow_decomp(filename: str):
     graph = fp.graphutils.read_graphs(filename)[0]
     print("graph id", graph.graph["id"])
     # print("subset_constraints", graph.graph["constraints"])
@@ -34,6 +34,11 @@ def test(filename: str):
     mfd_model.solve()
     process_solution(mfd_model)
 
+def test_least_abs_errors(filename):
+    graph = fp.graphutils.read_graphs(filename)[0]
+    print("graph id", graph.graph["id"])
+    # print("subset_constraints", graph.graph["constraints"])
+
     # note that here below we are not passing k, as it will be chosen as the graph width
     klae_model = fp.kLeastAbsErrorsCycles(
         G=graph,
@@ -47,6 +52,7 @@ def test(filename: str):
             "external_solver": "gurobi", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
+        trusted_edges_for_safety_percentile=0, # we trust for safety edges whose weight in >= 0 percentile, that is, all edges
     )
     klae_model.solve()
     process_solution(klae_model)
@@ -68,6 +74,11 @@ def test(filename: str):
     )
     klae_percentile_model.solve()
     process_solution(klae_percentile_model)
+
+def test_min_path_error(filename):
+    graph = fp.graphutils.read_graphs(filename)[0]
+    print("graph id", graph.graph["id"])
+    # print("subset_constraints", graph.graph["constraints"])
 
     # note that here below we are not passing k, as it will be chosen as the graph width
     kmpe_model = fp.kMinPathErrorCycles(
@@ -107,27 +118,30 @@ def test(filename: str):
 def process_solution(model):
     if model.is_solved():
         solution = model.get_solution()
-        solve_statistics = model.solve_statistics
-        print(solve_statistics)
         print("solution walks:", solution['walks'])
         print("solution weights:", solution['weights'])
         print("model.is_valid_solution()", model.is_valid_solution()) # Keep this to verify the solution
-        print("node_number:", solve_statistics['node_number'])
-        print("edge_number:", solve_statistics['edge_number'])
-        print("safe_sequences_time:", solve_statistics.get('safe_sequences_time', 0)) # the time to compute safe sequences. use get(), as this is not set if not using safe sequences
-        print("edge_variables_total:", solve_statistics['edge_variables_total']) # number of edges * number of solution walks in the last iteration
-        print("edge_variables=1:", solve_statistics['edge_variables=1'])
-        print("edge_variables>=1:", solve_statistics['edge_variables>=1'])
-        print("graph_width:", solve_statistics['graph_width']) # the the minimum number of s-t walks needed to cover all edges
-        print("model_status:", solve_statistics['model_status'])
-        print("solve_time:", solve_statistics['solve_time']) # time taken by the ILP for a given k, or by MFD to iterate through k and do small internal things
-        print("number_of_nontrivial_SCCs:", solve_statistics['number_of_nontrivial_SCCs']) # trivial = at least one edge
-        print("size_of_largest_SCC:", solve_statistics['size_of_largest_SCC']) # size = number of edges
     else:
         print("Model could not be solved.")
 
+    solve_statistics = model.solve_statistics
+    print(solve_statistics)
+    print("node_number:", solve_statistics['node_number'])
+    print("edge_number:", solve_statistics['edge_number'])
+    print("safe_sequences_time:", solve_statistics.get('safe_sequences_time', 0)) # the time to compute safe sequences. use get(), as this is not set if not using safe sequences
+    print("edge_variables_total:", solve_statistics['edge_variables_total']) # number of edges * number of solution walks in the last iteration
+    print("edge_variables=1:", solve_statistics['edge_variables=1'])
+    print("edge_variables>=1:", solve_statistics['edge_variables>=1'])
+    print("graph_width:", solve_statistics['graph_width']) # the the minimum number of s-t walks needed to cover all edges
+    print("model_status:", solve_statistics['model_status'])
+    print("solve_time:", solve_statistics['solve_time']) # time taken by the ILP for a given k, or by MFD to iterate through k and do small internal things
+    print("number_of_nontrivial_SCCs:", solve_statistics['number_of_nontrivial_SCCs']) # trivial = at least one edge
+    print("size_of_largest_SCC:", solve_statistics['size_of_largest_SCC']) # size = number of edges
+
 def main():
-    test(filename = "tests/cyclic_graphs/gt5.kmer27.(630000.660000).V111.E154.mincyc100.graph")
+    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.graph")
+    test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
+    test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
 
 if __name__ == "__main__":
     # Configure logging

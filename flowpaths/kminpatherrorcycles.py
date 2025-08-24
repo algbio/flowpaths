@@ -101,7 +101,9 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
         - `trusted_edges_for_safety_percentile: float`, optional
 
-            The percentile value to use for selecting trusted edges for safety. Default is `None`, which here means that all edges are considered safe (unless added to edges to ignore or having 0 error_scaling)
+            If set to a value different than `None`, this will be used to select edges to trust for safety (i.e. they are guaranteed to appear in any optimal solution). 
+            Edges whose weight (`flow_attr`) is greater than or equal to the percentile value will be trusted for safety. Default is `None`. This is ignored if `trusted_edges_for_safety` is set.
+
 
         Raises
         ------
@@ -429,7 +431,6 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
                 "weights": self.path_weights_sol,
                 "slacks": self.path_slacks_sol
                 }
-
 
         return self._remove_empty_walks(self._solution) if remove_empty_walks else self._solution
 

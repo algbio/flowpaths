@@ -108,7 +108,8 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
         - `trusted_edges_for_safety_percentile: float`, optional
 
-            The percentile value to use for selecting trusted edges for safety. Default is `None`. This is ignored if `trusted_edges_for_safety` is set.
+            If set to a value different than `None`, this will be used to select edges to trust for safety (i.e. they are guaranteed to appear in any optimal solution). 
+            Edges whose weight (`flow_attr`) is greater than or equal to the percentile value will be trusted for safety. Default is `None`. This is ignored if `trusted_edges_for_safety` is set.
 
         Raises
         ------
