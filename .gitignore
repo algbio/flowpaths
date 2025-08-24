@@ -36,3 +36,5 @@ MANIFEST
 .DS_Store
 *.log
 test_graph*.pdf
+tests/cyclic_graphs/*.pdf
+tests/cyclic_graphs/*.dot
