@@ -1,48 +1,38 @@
 import networkx as nx
 from flowpaths.utils import graphutils
 import flowpaths.utils as utils
+from flowpaths.basestgraph import BaseSTGraph
 
-class stDAG(nx.DiGraph):
+
+class stDAG(BaseSTGraph):
+    """Augmented DAG with global source/sink.
+
+    This class now derives from :class:`BaseSTGraph`, which centralises the creation of a
+    unique global source and sink and the shared flow utility helpers. Only DAG specific
+    validation (acyclicity) and derived DAG-only structures (topological orders and
+    reachability caches) remain here.
+
+    Public API impact
+    -----------------
+    No behavioural changes are intended: constructor arguments and exposed attributes
+    stay the same. The refactor purely deduplicates internal code that used to live in
+    both ``stDAG`` and ``stDiGraph``.
+    """
     def __init__(
         self,
         base_graph: nx.DiGraph,
-        additional_starts: list = [],
-        additional_ends: list = [],
+        additional_starts: list | None = None,
+        additional_ends: list | None = None,
     ):
-        if not all(isinstance(node, str) for node in base_graph.nodes()):
-            utils.logger.error(f"{__name__}: Every node of the graph must be a string.")
-            raise ValueError("Every node of the graph must be a string.")
+        super().__init__(
+            base_graph=base_graph,
+            additional_starts=additional_starts,
+            additional_ends=additional_ends,
+        )
 
-        super().__init__()
-        self.base_graph = base_graph
-        if "id" in base_graph.graph:
-            self.id = base_graph.graph["id"]
-        else:
-            self.id = id(self)
-        self.additional_starts = set(additional_starts)
-        self.additional_ends = set(additional_ends)
-        self.source = f"source_{id(self)}"
-        self.sink = f"sink_{id(self)}"
-
-        self._build_graph()
-
-        nx.freeze(self)
-
-    def _build_graph(self):
+    def _pre_build_validate(self):
         """
-        Builds the graph by adding nodes and edges from the base graph, and
-        connecting source and sink nodes.
-
-        This method performs the following steps:
-        1. Checks if the base graph is a directed acyclic graph (DAG). If not,
-           raises a ValueError.
-        2. Adds all nodes and edges from the base graph to the current graph.
-        3. Connects nodes with no incoming edges or specified as additional
-           start nodes to the source node.
-        4. Connects nodes with no outgoing edges or specified as additional
-           end nodes to the sink node.
-        5. Stores the edges connected to the source and sink nodes.
-        6. Initializes the width attribute to None.
+        Checks that `base_graph` is acyclic.
 
         Raises
         ----------
@@ -53,31 +43,13 @@ class stDAG(nx.DiGraph):
             utils.logger.error(f"{__name__}: The base graph must be a directed acyclic graph.")
             raise ValueError("The base graph must be a directed acyclic graph.")
 
-        self.add_nodes_from(self.base_graph.nodes(data=True))
-        self.add_edges_from(self.base_graph.edges(data=True))
-
-        for u in self.base_graph.nodes:
-            if self.base_graph.in_degree(u) == 0 or u in self.additional_starts:
-                self.add_edge(self.source, u)
-            if self.base_graph.out_degree(u) == 0 or u in self.additional_ends:
-                self.add_edge(u, self.sink)
-
-        self.source_edges = list(self.out_edges(self.source))
-        self.sink_edges = list(self.in_edges(self.sink))
-
-        self.source_sink_edges = set(self.source_edges + self.sink_edges)
-
+    def _post_build(self):
         self.width = None
         self.flow_width = None
-
         self.topological_order = list(nx.topological_sort(self))
         self.topological_order_rev = list(reversed(self.topological_order))
-
-        # These two dict store the set of node (resp. edges) reachable from each node, including the node itself
         self._reachable_nodes_from = None
         self._reachable_edges_from = None
-        
-        # These two dict store the set of node (resp. edges) reverse reachable from each node
         self._reachable_nodes_rev_from = None
         self._reachable_edges_rev_from = None
 
@@ -367,68 +339,4 @@ class stDAG(nx.DiGraph):
 
         return (paths, weights)
 
-    def get_non_zero_flow_edges(
-        self, flow_attr: str, edges_to_ignore: set = set()
-    ) -> set:
-        """
-        Get all edges with non-zero flow values.
-
-        Returns
-        -------
-        set
-            A set of edges (tuples) that have non-zero flow values.
-        """
-
-        non_zero_flow_edges = set()
-        for u, v, data in self.edges(data=True):
-            if (u, v) not in edges_to_ignore and data.get(flow_attr, 0) != 0:
-                non_zero_flow_edges.add((u, v))
-
-        return non_zero_flow_edges
-
-    def get_max_flow_value_and_check_non_negative_flow(
-        self, flow_attr: str, edges_to_ignore: set
-    ) -> float:
-        """
-        Determines the maximum flow value in the graph and checks for positive flow values.
-
-        This method iterates over all edges in the graph, ignoring edges specified in
-        `self.edges_to_ignore`. It checks if each edge has the required flow attribute
-        specified by `self.flow_attr`. If an edge does not have this attribute, a
-        ValueError is raised. If an edge has a negative flow value, a ValueError is
-        raised. The method returns the maximum flow value found among all edges.
-
-        Returns
-        -------
-        - float: The maximum flow value among all edges in the graph.
-
-        Raises
-        -------
-        - ValueError: If an edge does not have the required flow attribute.
-        - ValueError: If an edge has a negative flow value.
-        """
-
-        w_max = float("-inf")
-        if edges_to_ignore is None:
-            edges_to_ignore = set()
-
-        for u, v, data in self.edges(data=True):
-            if (u, v) in edges_to_ignore:
-                continue
-            if not flow_attr in data:
-                utils.logger.error(
-                    f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
-                )
-                raise ValueError(
-                    f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
-                )
-            if data[flow_attr] < 0:
-                utils.logger.error(
-                    f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0."
-                )
-                raise ValueError(
-                    f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0."
-                )
-            w_max = max(w_max, data[flow_attr])
-
-        return w_max
+    # Flow helper methods now inherited from BaseSTGraph
