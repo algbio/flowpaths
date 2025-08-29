@@ -27,11 +27,12 @@ cd flowpaths
 python3 -m venv .venv
 source .venv/bin/activate  # zsh/bash
 
-# 3) Install the package in editable mode (installs runtime deps from pyproject)
-pip install -e .
+# 3) Install the package in editable mode with dev tools (tests, coverage helpers)
+# (Uses the "dev" extra defined in pyproject optional-dependencies.)
+pip install -e ".[dev]"
 
-# 4) Install test tooling
-pip install pytest
+# If you only want runtime deps, you can instead do:
+# pip install -e .
 
 # 5) (Optional) Install Gurobi solver support
 # Only needed if you want to run examples/tests with solver_options selecting "gurobi".
@@ -95,9 +96,8 @@ pytest -vv -k "least_abs_errors and not cycles"
 
 Make sure new code is covered by tests and that tests are deterministic and fast. Prefer tiny graphs in unit tests and keep example-driven tests in `examples/` lightweight (these are run as part of the test `tests/test_examples.py`).
 
-Optional coverage locally:
+Optional coverage locally (pytest-cov is already included in the dev extra):
 ```bash
-pip install pytest-cov
 pytest --cov=flowpaths --cov-report=term-missing
 ```
 

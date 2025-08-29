@@ -30,3 +30,10 @@ build-backend = "setuptools.build_meta"
 Homepage = "https://github.com/algbio/flowpaths"
 Issues = "https://github.com/algbio/flowpaths/issues"
 Documentation = "https://algbio.github.io/flowpaths/"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-xdist",
+]
