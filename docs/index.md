@@ -64,7 +64,7 @@ if mfd_solver.is_solved():
     - For DAGs, use the abstract class `AbstractPathModelDAG`, which encodes a given number of paths. See docs: [Abstract Path Model](https://algbio.github.io/flowpaths/abstract-path-model/).
     - For general directed graphs with cycles, use `AbstractWalkModelDiGraph`, which encodes a given number of walks. See docs: [Abstract Walk Model](https://algbio.github.io/flowpaths/abstract-walk-model/).
     
-    You can inherit from these classes to add weights and model-specific constraints/objectives. See [a basic example](examples/inexact_flow_solver.py). These abstract classes interface with a wrapper for popular MILP solvers, so you don't need to worry about solver-specific details.
+    You can inherit from these classes to add weights and model-specific constraints/objectives. See [a basic example](https://github.com/algbio/flowpaths/blob/main/examples/inexact_flow_solver.py). These abstract classes interface with a wrapper for popular MILP solvers, so you don't need to worry about solver-specific details.
 
 4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` means that any optimization to the path-finding mechanisms benefits **all** solvers that inherit from this class. We implement some "safety optimizations" described in [this paper](https://doi.org/10.48550/arXiv.2411.03871), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
 

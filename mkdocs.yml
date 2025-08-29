@@ -35,6 +35,7 @@ nav:
     - stDAG: stdag.md
     - Abstract Walk Model: abstract-walk-model.md
     - stDiGraph: stdigraph.md
+    - Abstract Source Sink Graph: abstractsourcesinkgraph.md
     - Minimum Generating Set: minimum-generating-set.md
     - Minimum Set Cover: minimum-set-cover.md
 

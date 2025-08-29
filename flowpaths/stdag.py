@@ -1,22 +1,17 @@
 import networkx as nx
 from flowpaths.utils import graphutils
 import flowpaths.utils as utils
-from flowpaths.basestgraph import BaseSTGraph
+from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
 
 
-class stDAG(BaseSTGraph):
+class stDAG(AbstractSourceSinkGraph):
     """Augmented DAG with global source/sink.
 
-    This class now derives from :class:`BaseSTGraph`, which centralises the creation of a
+    This class derives from [`AbstractSourceSinkGraph`](abstractsourcesinkgraph.md), which centralises the creation of a
     unique global source and sink and the shared flow utility helpers. Only DAG specific
     validation (acyclicity) and derived DAG-only structures (topological orders and
     reachability caches) remain here.
 
-    Public API impact
-    -----------------
-    No behavioural changes are intended: constructor arguments and exposed attributes
-    stay the same. The refactor purely deduplicates internal code that used to live in
-    both ``stDAG`` and ``stDiGraph``.
     """
     def __init__(
         self,
@@ -338,5 +333,3 @@ class stDAG(BaseSTGraph):
             weights.append(bottleneck)
 
         return (paths, weights)
-
-    # Flow helper methods now inherited from BaseSTGraph

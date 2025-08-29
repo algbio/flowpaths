@@ -67,7 +67,7 @@ class AbstractWalkModelDiGraph(ABC):
                     In order for the optimizations to still guarantee a global optimum, you must guarantee that:
 
                     1. The solution is made up of source-to-sink walks, and
-                    2. Every edge in `trusted_edges_for_safety` appears in some solution walk, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decomposition](minimum-flow-decomposition-cycles.md) or [k-Minimum Path Error](k-minimum-path-error-cycles.md) where in fact, under default settings, **all** edges appear in all solutions.
+                    2. Every edge in `trusted_edges_for_safety` appears in some solution walk, for all solutions. This naturally holds for several problems, for example [Minimum Flow Decomposition](minimum-flow-decomposition-cycles.md) or [k-Minimum Path Error](k-min-path-error-cycles.md) where in fact, under default settings, **all** edges appear in all solutions.
 
         - `solver_options: dict`, optional
             

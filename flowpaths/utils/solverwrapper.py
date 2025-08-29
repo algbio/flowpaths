@@ -455,7 +455,7 @@ class SolverWrapper:
         Enforces that variable `y` equals a constant from `constants` depending on the range that `x` falls into.
         
         For each piece i:
-            if x in [ranges[i][0], ranges[i][1]] then y = constants[i].
+            `if x in [ranges[i][0], ranges[i][1]] then y = constants[i].`
 
         Assumptions:
             - The ranges must be non-overlapping. Otherwise, if x belongs to more ranges, the solver will choose one arbitrarily.
@@ -464,11 +464,11 @@ class SolverWrapper:
         This is modeled by:
         - introducing binary variables z[i] with sum(z) = 1,
         - for each piece i:
-                x >= L_i - M*(1 - z[i])
-                x <= U_i + M*(1 - z[i])
-                y <= constant[i] + M*(1 - z[i])
-                y >= constant[i] - M*(1 - z[i])
-        
+                `x >= L_i - M*(1 - z[i])`
+                `x <= U_i + M*(1 - z[i])`
+                `y <= constant[i] + M*(1 - z[i])`
+                `y >= constant[i] - M*(1 - z[i])`
+
         Parameters
         ----------
         x: The continuous variable (created earlier) whose value determines the segment.

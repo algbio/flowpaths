@@ -1,7 +1,7 @@
 import networkx as nx
 import flowpaths.utils as utils
 
-class BaseSTGraph(nx.DiGraph):
+class AbstractSourceSinkGraph(nx.DiGraph):
     """Base class for s-t augmented graphs (internal).
 
     This class (introduced when unifying :class:`stDAG` and :class:`stDiGraph`) factors out
@@ -27,8 +27,8 @@ class BaseSTGraph(nx.DiGraph):
 
     Backwards compatibility
     -----------------------
-    External code should keep instantiating :class:`stDAG` or :class:`stDiGraph`; their public APIs
-    are unchanged. ``BaseSTGraph`` is an internal implementation detail and may change without notice.
+    External code should keep instantiating [`stDAG`](stdag.md) or [`stDiGraph`](stdigraph.md); their public APIs
+    are unchanged. ``AbstractSourceSinkGraph`` is an internal implementation detail and may change without notice.
     """
 
     def __init__(

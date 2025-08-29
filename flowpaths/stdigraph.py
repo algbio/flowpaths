@@ -3,21 +3,17 @@ import copy
 from flowpaths.utils import graphutils
 from flowpaths.stdag import stDAG
 import flowpaths.utils as utils
-from flowpaths.basestgraph import BaseSTGraph
+from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
 
 
-class stDiGraph(BaseSTGraph):
+class stDiGraph(AbstractSourceSinkGraph):
     """General directed graph with global source/sink and SCC condensation helpers.
 
-    This class now subclasses :class:`BaseSTGraph`, which performs the common augmentation
+    This class now subclasses [`AbstractSourceSinkGraph`](abstractsourcesinkgraph.md), which performs the common augmentation
     (adding global source/sink and validating additional boundary nodes). The remaining
     logic here focuses on strongly connected component (SCC) handling and the condensation
     expansion used for width and incompatible sequence computations.
 
-    Public API impact
-    -----------------
-    External usage is unchanged; the refactor only removes previously duplicated code.
-    Any code instantiating ``stDiGraph`` will continue to work without modification.
     """
     def __init__(
         self,
