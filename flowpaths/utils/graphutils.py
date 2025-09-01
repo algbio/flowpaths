@@ -113,7 +113,7 @@ def read_graph(graph_raw) -> nx.DiGraph:
         u, v, w_str = elements
         try:
             w = float(w_str)
-        except Exception:
+        except ValueError:
             utils.logger.error(f"{__name__}: Invalid weight value in edge: {line.rstrip()}")
             raise
         G.add_edge(u.strip(), v.strip(), flow=w)
