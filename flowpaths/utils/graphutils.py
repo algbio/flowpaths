@@ -15,48 +15,160 @@ def fpid(G) -> str:
     return str(id(G))
 
 def read_graph(graph_raw) -> nx.DiGraph:
-    # Input format is: ['#Graph id\n', 'n\n', 'u_1 v_1 w_1\n', ..., 'u_k v_k w_k\n']
-    id = graph_raw[0].strip("# ").strip()
-    n = int(graph_raw[1])
+    """
+    Parse a single graph block from a list of lines.
+
+    Accepts one or more header lines at the beginning (each prefixed by '#'),
+    followed by a line containing the number of vertices (n), then any number
+    of edge lines of the form: "u v w" (whitespace-separated).
+
+    Subpath constraint lines:
+        Lines starting with "#S" define a (directed) subpath constraint as a
+        sequence of nodes: "#S n1 n2 n3 ...". For each such line we build the
+        list of consecutive edge tuples [(n1,n2), (n2,n3), ...] and append this
+        edge-list (the subpath) to G.graph["constraints"]. Duplicate filtering
+        is applied on the whole node sequence: if an identical sequence of
+        nodes has already appeared in a previous "#S" line, the entire subpath
+        line is ignored (its edges are not added again). Different subpaths may
+    share edges; they are kept as separate entries. After all graph edges
+    are parsed, every constraint edge is validated to ensure it exists in
+    the graph; a missing edge raises ValueError.
+
+    Example block:
+        # graph number = 1 name = foo
+        # any other header line
+        #S a b c d          (adds subpath [(a,b),(b,c),(c,d)])
+        #S b c e            (adds subpath [(b,c),(c,e)])
+        #S a b c d          (ignored: exact node sequence already seen)
+        5
+        a b 1.0
+        b c 2.5
+        c d 3.0
+        c e 4.0
+    """
+
+    # Collect leading header lines (prefixed by '#') and parse constraint lines prefixed by '#S'
+    idx = 0
+    header_lines = []
+    constraint_subpaths = []       # list of subpaths, each a list of (u,v) edge tuples
+    subpaths_seen = set()          # set of full node sequences (tuples) to filter duplicate subpaths
+    while idx < len(graph_raw) and graph_raw[idx].lstrip().startswith("#"):
+        stripped = graph_raw[idx].lstrip()
+        # Subpath constraint line: starts with '#S'
+        if stripped.startswith("#S"):
+            # Remove leading '#S' and split remaining node sequence
+            nodes_part = stripped[2:].strip()  # drop '#S'
+            if nodes_part:
+                nodes_seq = nodes_part.split()
+                seq_key = tuple(nodes_seq)
+                # Skip if this exact subpath sequence already processed
+                if seq_key not in subpaths_seen:
+                    subpaths_seen.add(seq_key)
+                    edges_list = [(u, v) for u, v in zip(nodes_seq, nodes_seq[1:])]
+                    # Only append if there is at least one edge (>=2 nodes)
+                    if edges_list:
+                        constraint_subpaths.append(edges_list)
+        else:
+            # Regular header line (remove leading '#') for metadata / id extraction
+            header_lines.append(stripped.lstrip("#").strip())
+        idx += 1
+
+    # Determine graph id from the first (non-#S) header line if present
+    graph_id = header_lines[0] if header_lines else str(id(graph_raw))
+
+    # Skip blank lines before the vertex-count line
+    while idx < len(graph_raw) and graph_raw[idx].strip() == "":
+        idx += 1
+
+    if idx >= len(graph_raw):
+        error_msg = "Graph block missing vertex-count line."
+        utils.logger.error(f"{__name__}: {error_msg}")
+        raise ValueError(error_msg)
+    # Parse number of vertices (kept for information; not used to count edges here)
+    try:
+        n = int(graph_raw[idx].strip())
+    except ValueError:
+        utils.logger.error(f"{__name__}: Invalid vertex-count line: {graph_raw[idx].rstrip()}.")
+        raise
+
+    idx += 1
 
     G = nx.DiGraph()
-    G.graph["id"] = id
+    G.graph["id"] = graph_id
+    # Store (possibly empty) list of subpaths (each a list of edge tuples)
+    G.graph["constraints"] = constraint_subpaths
 
     if n == 0:
-        print("Graph %s has 0 vertices.", id)
+        utils.logger.info(f"Graph {graph_id} has 0 vertices.")
         return G
 
-    for edge in graph_raw[2:]:
-        elements = edge.split(" ")
+    # Parse edges: skip blanks and comment/header lines defensively
+    for line in graph_raw[idx:]:
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        elements = line.split()
         if len(elements) != 3:
-            utils.logger.error(f"{__name__}: Invalid edge format: %s", edge)
-            raise ValueError("Invalid edge format: %s", edge)
-        # print(elements)
-        u = elements[0].strip()
-        v = elements[1].strip()
-        w = float(elements[2].strip(" \n"))
-        # print(u, v, w)
-        G.add_edge(u, v, flow=w)
+            utils.logger.error(f"{__name__}: Invalid edge format: {line.rstrip()}")
+            raise ValueError(f"Invalid edge format: {line.rstrip()}")
+        u, v, w_str = elements
+        try:
+            w = float(w_str)
+        except ValueError:
+            utils.logger.error(f"{__name__}: Invalid weight value in edge: {line.rstrip()}")
+            raise
+        G.add_edge(u.strip(), v.strip(), flow=w)
+
+    # Validate that every constraint edge exists in the graph
+    for subpath in constraint_subpaths:
+        for (u, v) in subpath:
+            if not G.has_edge(u, v):
+                utils.logger.error(f"{__name__}: Constraint edge ({u}, {v}) not found in graph {graph_id} edges.")
+                raise ValueError(f"Constraint edge ({u}, {v}) not found in graph edges.")
 
     return G
 
 
 def read_graphs(filename):
-    f = open(filename, "r")
-    lines = f.readlines()
-    f.close()
-    graphs = []
+    """
+    Read one or more graphs from a file.
 
-    # Assume: every file contains at least one graph
-    i, j = 0, 1
-    while True:
-        if lines[j].startswith("#"):
-            graphs.append(read_graph(lines[i:j]))
-            i = j
-        j += 1
-        if j == len(lines):
-            graphs.append(read_graph(lines[i:j]))
+    Supports graphs whose header consists of one or multiple consecutive lines
+    prefixed by '#'. Each graph block is:
+        - one or more header lines starting with '#'
+        - one line with the number of vertices (n)
+        - zero or more edge lines "u v w"
+
+    Graphs are delimited by the start of the next header (a line starting with '#')
+    or the end of file.
+    """
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    graphs = []
+    n_lines = len(lines)
+    i = 0
+
+    # Iterate through the file, capturing blocks that start with one or more '#' lines
+    while i < n_lines:
+        # Move to the start of the next graph header
+        while i < n_lines and not lines[i].lstrip().startswith('#'):
+            i += 1
+        if i >= n_lines:
             break
+
+        start = i
+
+        # Consume all consecutive header lines for this graph
+        while i < n_lines and lines[i].lstrip().startswith('#'):
+            i += 1
+
+        # Advance until the next header line (start of next graph) or EOF
+        j = i
+        while j < n_lines and not lines[j].lstrip().startswith('#'):
+            j += 1
+
+        graphs.append(read_graph(lines[start:j]))
+        i = j
 
     return graphs
 
@@ -169,7 +281,7 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
     ----------
     - `G`: nx.DiGraph
     
-        The input directed acyclic graph, as networkx DiGraph.
+        The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
     - `flow_attr`: str
     
@@ -258,7 +370,7 @@ def draw(
 
         - `G`: nx.DiGraph 
         
-            The input directed acyclic graph, as networkx DiGraph. 
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html). 
 
         - `filename`: str
         
@@ -318,9 +430,8 @@ def draw(
 
         """
 
-        if len(paths) != len(weights):
-            raise ValueError(f"{__name__}: Paths and weights must have the same length.")
-            raise ValueError("Paths and weights must have the same length, if provided.")
+        if len(paths) != len(weights) and len(weights) > 0:
+            raise ValueError(f"{__name__}: Paths and weights must have the same length, if provided.")
 
         try:
             import graphviz as gv
@@ -404,7 +515,7 @@ def draw(
                             fontcolor=pathColor,
                             color=pathColor,
                             penwidth=str(draw_options.get("pathwidth", 3.0)),
-                            label=str(weights[index]),
+                            label=str(weights[index]) if len(weights) > 0 else "",
                             fontname="Arial",
                         )
                     else:
@@ -414,6 +525,8 @@ def draw(
                             color=pathColor,
                             penwidth=str(draw_options.get("pathwidth", 3.0)),
                             )
+                if len(path) == 1:
+                    dot.node(str(path[0]), color=pathColor, penwidth=str(draw_options.get("pathwidth", 3.0)))        
                 
             for index, path in enumerate(subpath_constraints):
                 pathColor = colors[index % len(colors)]
@@ -429,9 +542,6 @@ def draw(
                         penwidth="2.0"
                         )
                     
-                if len(path) == 1:
-                    dot.node(str(path[0]), color=pathColor, penwidth=str(draw_options.get("pathwidth", 3.0)))
-
             dot.render(outfile=filename, view=False, cleanup=True)
         
         except ImportError:

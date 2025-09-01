@@ -52,7 +52,7 @@ def run_test(graph, test_index, params):
         print("-------------------------------------------")
         print("Solving with optimization options:", {key for key in optimization_options if optimization_options[key]})
 
-        width = fp.stDiGraph(graph).get_width()
+        width = fp.stDAG(graph).get_width()
 
         mpe_model = fp.kLeastAbsErrors(
             G=graph,

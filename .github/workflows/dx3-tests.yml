@@ -5,12 +5,12 @@ name: Run tests on dx3
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "cycles" ]
     paths:
       - 'flowpaths/**'
       - 'tests/**'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "cycles" ]
     paths:
       - 'flowpaths/**'
       - 'tests/**'

@@ -1,6 +1,8 @@
 Flowpaths implements various helper functions on graphs. They can be access with the prefix `flowpaths.utils.`
 
-For example, you can create drawing as this one
+## Graph visualization and drawing
+
+You can create drawing as this one
 
 ![An example of the graph drawing](example_drawing.png)
 
@@ -45,5 +47,42 @@ if mpe_model.is_solved():
 ```
 
 This produces a file with extension `.pdf` storing the PDF image of the graph.
+
+## Logging
+
+flowpaths exposes a simple logging helper via `fp.utils.configure_logging`. Use it to control verbosity, enable console/file logging, and set file mode.
+
+Basic usage (console logging at INFO level):
+
+```python
+import flowpaths as fp
+
+fp.utils.configure_logging(
+    level=fp.utils.logging.INFO,
+    log_to_console=True,
+)
+```
+
+Also log to a file (append mode):
+
+```python
+fp.utils.configure_logging(
+    level=fp.utils.logging.DEBUG,      # default is DEBUG
+    log_to_console=True,               # show logs in terminal
+    log_file="flowpaths.log",         # write logs to this file
+    file_mode="a",                    # "a" append (or "w" overwrite)
+)
+```
+
+Notes:
+- Levels available: `fp.utils.logging.DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+- Default level is DEBUG. If you prefer quieter output, use INFO or WARNING.
+- Internally, the package logs through its own logger; `configure_logging` sets handlers/formatters accordingly.
+
+API reference:
+
+::: flowpaths.utils.logging.configure_logging
+
+---
 
 ::: flowpaths.utils.graphutils

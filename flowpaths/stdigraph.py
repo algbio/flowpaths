@@ -1,431 +1,370 @@
 import networkx as nx
+import copy
 from flowpaths.utils import graphutils
+from flowpaths.stdag import stDAG
 import flowpaths.utils as utils
+from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
 
-class stDiGraph(nx.DiGraph):
+
+class stDiGraph(AbstractSourceSinkGraph):
+    """General directed graph with global source/sink and SCC condensation helpers.
+
+    This class now subclasses [`AbstractSourceSinkGraph`](abstractsourcesinkgraph.md), which performs the common augmentation
+    (adding global source/sink and validating additional boundary nodes). The remaining
+    logic here focuses on strongly connected component (SCC) handling and the condensation
+    expansion used for width and incompatible sequence computations.
+
+    """
     def __init__(
         self,
         base_graph: nx.DiGraph,
-        additional_starts: list = [],
-        additional_ends: list = [],
+        additional_starts: list | None = None,
+        additional_ends: list | None = None,
     ):
-        if not all(isinstance(node, str) for node in base_graph.nodes()):
-            utils.logger.error(f"{__name__}: Every node of the graph must be a string.")
-            raise ValueError("Every node of the graph must be a string.")
+        """
+        This class inherits from networkx.DiGraph. The graph equals `base_graph` plus:
 
-        super().__init__()
-        self.base_graph = base_graph
-        if "id" in base_graph.graph:
-            self.id = base_graph.graph["id"]
+        - a global source connected to all sources of `base_graph` and to all nodes in `additional_starts`;
+        - a global sink connected from all sinks of `base_graph` and from all nodes in `additional_ends`.
+
+        !!! warning Warning
+
+            The graph `base_graph` must satisfy the following properties:
+            
+            - the nodes must be strings; 
+            - `base_graph` must have at least one source (i.e. node without incoming edges), or at least one node in `additional_starts`;
+            - `base_graph` must have at least one sink (i.e. node without outgoing edges), or at least one node in `additional_ends`.
+
+        Raises:
+        -------
+        - `ValueError`: If any of the above three conditions are not satisfied.
+        - `ValueError`: If any node in `additional_starts` is not in the base graph.
+        - `ValueError`: If any node in `additional_ends` is not in the base graph.
+
+        """
+        self._condensation_expanded = None
+        super().__init__(
+            base_graph=base_graph,
+            additional_starts=additional_starts,
+            additional_ends=additional_ends,
+        )
+
+    def _post_build(self):
+        if len(self.source_edges) == 0:
+            utils.logger.error(f"{__name__}: The graph passed to stDiGraph must have at least one source, or at least one node in `additional_starts`.")
+            raise ValueError("The graph passed to stDiGraph must have at least one source, or at least one node in `additional_starts`.")
+        if len(self.sink_edges) == 0:
+            utils.logger.error(f"{__name__}: The graph passed to stDiGraph must have at least one sink, or at least one node in `additional_ends`.")
+            raise ValueError("The graph passed to stDiGraph must have at least one sink, or at least one node in `additional_ends`.")
+        self.condensation_width = None
+        self._build_condensation_expanded()
+
+    def _expanded(self, v: int) -> str:
+
+        return str(v) + "_expanded"
+
+    def _build_condensation_expanded(self):
+
+        self._condensation: nx.DiGraph = nx.condensation(self)
+        # We add the dict `member_edges` storing for each node in the condensation, the edges in that SCC
+        self._condensation.graph["member_edges"] = {str(node): set() for node in self._condensation.nodes()}
+        # We add the dict `edge_multiplicity` for each edge in the condensation to store the number of 
+        # original graph edges that are between the corresponding SCCs (and these SCCs are different, i.e. we don't store this for self-loops)
+        self._condensation.graph["edge_multiplicity"] = {e: 0 for e in self._condensation.edges() if e[0] != e[1]}
+
+        for u, v in self.edges():
+            # If u and v are in the same SCC, we add it to the member edges
+            if self._condensation.graph['mapping'][u] == self._condensation.graph['mapping'][v]:
+                self._condensation.graph["member_edges"][str(self._condensation.graph['mapping'][u])].add((u, v))
+            else:
+                # Otherwise, we increase the multiplicity of the condensation edge between the different SCCs
+                self._condensation.graph["edge_multiplicity"][self._edge_to_condensation_edge(u, v)] += 1
+        utils.logger.debug(f"{__name__}: Condensation graph: {self._condensation.edges()}")
+        utils.logger.debug(f"{__name__}: Condensation member edges: {self._condensation.graph['member_edges']}")
+        utils.logger.debug(f"{__name__}: Condensation mapping: {self._condensation.graph['mapping']}")
+
+        # Conventions
+        # self._condensation has int nodes 
+        # self._condensation.graph['mapping'][u] : str (i.e. original nodes) -> int (i.e. condensation nodes)
+        # self._condensation.graph["member_edges"] : str (i.e. str(condensation nodes)) -> set(str,str) (i.e. set of original edges, which are (str,str))
+        # self._condensation.graph["edge_multiplicity"] : tuple(int, int) (i.e. condensation edge between SCCs) -> int (i.e. multiplicity of edges between SCCs)
+
+        # self._condensation_expanded has str nodes
+        # self._condensation_expanded has nodes of the form 
+        # - str(int), if the SCC node is trivial (having no edges)
+        # - str(int) and str(int) + "_expanded", if the SCC node is non-trivial
+
+        # cond_expanded is a copy of self._condensation, with the difference
+        # that all nodes v corresponding to non-trivial SCCs (i.e. with at least one edge)
+        # are expanded into an edge (v, self._expanded(v))
+        condensation_expanded = nx.DiGraph()
+        for v in self._condensation.nodes:
+            # If v belongs to a trivial SCC (having no edges),
+            # then we don't expand the node
+            if len(self._condensation.graph["member_edges"][str(v)]) == 0:
+                condensation_expanded.add_node(str(v))
+            else:
+                # Otherwise, if the SCC of the node is non-trivial, then we expand the node into the edge (v, self._expanded(v))
+                condensation_expanded.add_node(str(v))
+                condensation_expanded.add_node(self._expanded(v))
+                condensation_expanded.add_edge(str(v), self._expanded(v))
+
+        for u, v in self._condensation.edges():
+            edge_source = str(u) if len(self._condensation.graph["member_edges"][str(u)]) == 0 else self._expanded(str(u))
+            edge_target = str(v)
+            condensation_expanded.add_edge(edge_source,edge_target)
+
+        self._condensation_expanded = stDAG(condensation_expanded)
+
+        utils.logger.debug(f"{__name__}: Condensation expanded graph: {self._condensation_expanded.edges()}")
+
+    def _edge_to_condensation_expanded_edge(self, u, v) -> tuple:
+        """
+        Maps an edge (u,v) in the original graph to an edge in the condensation_expanded graph.
+        """
+
+        if (u,v) not in self.edges():
+            utils.logger.error(f"{__name__}: Edge ({u}, {v}) not found in original graph.")
+            raise ValueError(f"Edge ({u}, {v}) not found in original graph.")
+
+        mapping_u = self._condensation.graph['mapping'][u]
+        mapping_v = self._condensation.graph['mapping'][v]
+        
+        if mapping_u != mapping_v:
+            # If an edge between SCCs, then check if the source of the edge is a trivial SCC or not
+            edge_source = str(mapping_u) if len(self._condensation.graph["member_edges"][str(mapping_u)]) == 0 else self._expanded(str(mapping_u))
+            edge_target = str(mapping_v)
         else:
-            self.id = id(self)
-        self.additional_starts = set(additional_starts)
-        self.additional_ends = set(additional_ends)
-        self.source = f"source_{id(self)}"
-        self.sink = f"sink_{id(self)}"
+            # If an edge inside an SCC, then that SCC is non-trivial, and we return the expanded edge corresponding to that SCC
+            edge_source = str(mapping_u)
+            edge_target = self._expanded(str(mapping_u))
 
-        self._build_graph()
+        if (edge_source, edge_target) not in self._condensation_expanded.edges():
+            utils.logger.error(f"{__name__}: Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
+            raise ValueError(f"Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
 
-        nx.freeze(self)
+        return (edge_source, edge_target)
 
-    def _build_graph(self):
+    def _condensation_edge_to_condensation_expanded_edge(self, u, v) -> tuple:
         """
-        Builds the graph by adding nodes and edges from the base graph, and
-        connecting source and sink nodes.
-
-        This method performs the following steps:
-        1. Checks if the base graph is a directed acyclic graph (DAG). If not,
-           raises a ValueError.
-        2. Adds all nodes and edges from the base graph to the current graph.
-        3. Connects nodes with no incoming edges or specified as additional
-           start nodes to the source node.
-        4. Connects nodes with no outgoing edges or specified as additional
-           end nodes to the sink node.
-        5. Stores the edges connected to the source and sink nodes.
-        6. Initializes the width attribute to None.
-
-        Raises
-        ----------
-        - ValueError: If the base graph is not a directed acyclic graph (DAG).
+        Maps an edge (u,v) in the condensation graph to an edge in the condensation_expanded graph.
         """
 
-        if not nx.is_directed_acyclic_graph(self.base_graph):
-            utils.logger.error(f"{__name__}: The base graph must be a directed acyclic graph.")
-            raise ValueError("The base graph must be a directed acyclic graph.")
+        if (u,v) not in self._condensation.edges() and u != v:
+            utils.logger.error(f"{__name__}: Edge ({u}, {v}) not found in condensation graph.")
+            raise ValueError(f"Edge ({u}, {v}) not found in condensation graph.")
 
-        self.add_nodes_from(self.base_graph.nodes(data=True))
-        self.add_edges_from(self.base_graph.edges(data=True))
+        if u != v:
+            # If an edge between SCCs, then check if the source of the edge is a trivial SCC or not
+            edge_source = str(u) if len(self._condensation.graph["member_edges"][str(u)]) == 0 else self._expanded(str(u))
+            edge_target = str(v)
+        else:
+            # If an edge inside an SCC, then that SCC is non-trivial, and we return the expanded edge corresponding to that SCC
+            edge_source = str(u)
+            edge_target = self._expanded(str(u))
 
-        for u in self.base_graph.nodes:
-            if self.base_graph.in_degree(u) == 0 or u in self.additional_starts:
-                self.add_edge(self.source, u)
-            if self.base_graph.out_degree(u) == 0 or u in self.additional_ends:
-                self.add_edge(u, self.sink)
+        if (edge_source, edge_target) not in self._condensation_expanded.edges():
+            utils.logger.error(f"{__name__}: Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
+            raise ValueError(f"Edge ({edge_source}, {edge_target}) not found in condensation expanded graph.")
 
-        self.source_edges = list(self.out_edges(self.source))
-        self.sink_edges = list(self.in_edges(self.sink))
-
-        self.source_sink_edges = set(self.source_edges + self.sink_edges)
-
-        self.width = None
-        self.flow_width = None
-
-        self.topological_order = list(nx.topological_sort(self))
-        self.topological_order_rev = list(reversed(self.topological_order))
-
-        # These two dict store the set of node (resp. edges) reachable from each node, including the node itself
-        self._reachable_nodes_from = None
-        self._reachable_edges_from = None
-        
-        # These two dict store the set of node (resp. edges) reverse reachable from each node
-        self._reachable_nodes_rev_from = None
-        self._reachable_edges_rev_from = None
-
-    @property
-    def reachable_nodes_from(self):
-
-        if self._reachable_nodes_from is None:
-            # Initialize by traversing the nodes in reverse topological order.
-            self._reachable_nodes_from = {node:{node} for node in self.nodes()}
-            for node in self.topological_order_rev:
-                for v in self.successors(node):
-                    self._reachable_nodes_from[node] |= self._reachable_nodes_from[v]
-        
-        return self._reachable_nodes_from
+        return (edge_source, edge_target)
     
-    @property
-    def reachable_edges_from(self):
+    def _edge_to_condensation_node(self, u, v) -> str:
+        """
+        Maps an edge `(u,v)` inside an SCC of the original graph 
+        to the node corresponding to the SCC (as `str`) in the condensation graph
+
+        Raises:
+        -------
+        - `ValueError` if the edge (u,v) is not an edge of the graph.
+        - `ValueError` if the edge (u,v) is not inside an SCC.
+        """
+
+        if not self._is_scc_edge(u, v):
+            utils.logger.error(f"{__name__}: Edge ({u},{v}) is not an edge inside an SCC.")
+            raise ValueError(f"Edge ({u},{v}) is not an edge inside an SCC.")
         
-        if self._reachable_edges_from is None:
-            # Initialize by traversing the nodes in reverse topological order.
-            self._reachable_edges_from = {node:set() for node in self.nodes()}
-            for node in self.topological_order_rev:
-                for v in self.successors(node):
-                    self._reachable_edges_from[node] |= self._reachable_edges_from[v]
-                    self._reachable_edges_from[node] |= {(node, v)}
-        
-        return self._reachable_edges_from
+        return str(self._condensation.graph['mapping'][u])
 
-    @property
-    def reachable_nodes_rev_from(self):
+    def _edge_to_condensation_edge(self, u, v) -> tuple:
+        """
+        Maps an edge `(u,v)` of the original graph 
+        to the edge of the condensation graph.
 
-        if self._reachable_nodes_rev_from is None:
-            # Initialize by traversing the nodes in topological order.
-            self._reachable_nodes_rev_from = {node:{node} for node in self.nodes()}
-            for node in self.topological_order:
-                for v in self.predecessors(node):
-                    self._reachable_nodes_rev_from[node] |= self._reachable_nodes_rev_from[v]
+        Raises:
+        -------
+        - `ValueError` if the edge (u,v) is not an edge of the graph.
+        """
 
-        return self._reachable_nodes_rev_from
-
-    @property
-    def reachable_edges_rev_from(self):
-
-        if self._reachable_edges_rev_from is None:
-            # Initialize by traversing the nodes in topological order.
-            self._reachable_edges_rev_from = {node:set() for node in self.nodes()}
-            for node in self.topological_order:
-                for v in self.predecessors(node):
-                    self._reachable_edges_rev_from[node] |= self._reachable_edges_rev_from[v]
-                    self._reachable_edges_rev_from[node] |= {(v, node)}
-
-        return self._reachable_edges_rev_from
+        return (self._condensation.graph['mapping'][u], self._condensation.graph['mapping'][v])
 
     def get_width(self, edges_to_ignore: list = None) -> int:
         """
-        Calculate and return the width of the graph.
-        The width is computed as the minimum number of paths needed to cover all the edges of the graph, 
-        except those in the `edges_to_ignore` list. 
-        
-        If the width has already been computed and `edges_to_ignore` is empty,
-        the stored value is returned.
+        Returns the width of the graph, which we define as the minimum number of $s$-$t$ walks needed to cover all edges.
 
-        Returns
-        ----------
-        - int: The width of the graph.
+        This is computed as the width of the condensation DAGs (minimum number of $s$-$t$ paths to cover all edges), with the following modification.
+        Nodes `v` in the condensation corresponding to non-trivial SCCs (i.e. SCCs with more than one node, equivalent to having at least one edge) 
+        are subdivided into a edge `(v, v_expanded)`, all condensation in-neighbors of `v` are connected to `v`,
+        and all condensation out-neighbors of `v` are connected from `v_expanded`.
+
+        Parameters:
+        -----------
+        - `edges_to_ignore`: A list of edges in the original graph to ignore when computing the width.
+
+            The width is then computed as as above, with the exception that:
+
+            - If an edge `(u,v)` in `edges_to_ignore` is between different SCCs, 
+                then the corresponding edge to ignore is between the two SCCs in the condensation graph, 
+                and we can ignore it when computing the normal width of the condensation.
+
+            - If an edge `(u,v)` in `edges_to_ignore` is inside the same SCC, 
+                then we remove the edge `(u,v)` from (a copy of) the member edges of the SCC in the condensation. 
+                If an SCC `v` has no more member edges left, we can also add the condensation edge `(v, v_expanded)` to
+                the list of edges to ignore when computing the width of the condensation.
         """
 
-        if self.width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
-            return self.width
-        
-        edges_to_ignore_set = set(edges_to_ignore or [])
+        if self.condensation_width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
+            return self.condensation_width
 
-        weight_function = {e: 1 for e in self.edges() if e not in edges_to_ignore_set}
-        self.width = self.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+        # We transform each edge in edges_to_ignore (which are edges of self)
+        # into an edge in the expanded graph
+        edges_to_ignore_expanded = []
+        member_edges = copy.deepcopy(self._condensation.graph['member_edges'])
+        edge_multiplicity = copy.deepcopy(self._condensation.graph["edge_multiplicity"])
+        utils.logger.debug(f"{__name__}: edge_multiplicity for edges in the condensation: {edge_multiplicity}")
 
-        return self.width
-
-    def get_flow_width(self, flow_attr: str, edges_to_ignore: list = None) -> int:
-        """
-        Calculate, store, and return the [flow-width](https://arxiv.org/abs/2409.20278) of the graph.
-        The flow width is computed as the minimum number to cover all the edges, with the constraint 
-        that an edge cannot be covered more time than the flow value given as `flow_attr` in the edge data.
-        
-        If the flow-width has already been computed, the stored value is returned.
-
-        Returns
-        ----------
-        - int: The flow-width of the graph.
-        """
-
-        if self.flow_width != None:
-            return self.flow_width
-        
-        G_nx = nx.DiGraph()
-
-        edges_to_ignore_set = set(edges_to_ignore or [])
-
-        G_nx.add_nodes_from(self.nodes())
-
-        for u, v in self.edges():
-            # the cost of each path is 1
-            cost = 1 if u == self.source else 0
-
-            edge_demand = int(u != self.source and v != self.sink)
-            if (u, v) in edges_to_ignore_set:
-                edge_demand = 0
-            edge_capacity = self[u][v].get(flow_attr, float('inf'))
-
-            # adding the edge
-            G_nx.add_edge(u, v, l=edge_demand, u=edge_capacity, c=cost)
-
-        minFlowCost, _ = graphutils.min_cost_flow(G_nx, self.source, self.sink)
-
-        self.flow_width = minFlowCost
-
-        return self.flow_width
-
-    def compute_max_edge_antichain(self, get_antichain=False, weight_function=None):
-        """
-        Computes the maximum edge antichain in a directed graph.
-
-        Parameters
-        ----------
-        - get_antichain (bool): If True, the function also returns the antichain along with its cost. Default is False.
-        - weight_function (dict): A dictionary where keys are edges (tuples) and values are weights.
-                If None, weights 1 are used for original graph edges, and weights 0 are used for global source / global sink edges.
-                If given, the antichain weight is computed as the sum of the weights of the edges in the antichain,
-                where edges that have some missing weight again get weight 0.
-                Default is None.
-
-        Returns
-        ----------
-        - If get_antichain is False, returns the size of maximum edge antichain.
-        - If get_antichain is True, returns a tuple containing the
-                size of maximum edge antichain and the antichain.
-        """
-
-        G_nx = nx.DiGraph()
-        demand = dict()
-
-        G_nx.add_nodes_from(self.nodes())
-
-        for u, v in self.edges():
-            # the cost of each path is 1
-            cost = 1 if u == self.source else 0
-
-            edge_demand = int(u != self.source and v != self.sink)
-            if weight_function:
-                edge_demand = weight_function.get((u, v), 0)
-
-            demand[(u, v)] = edge_demand
-            # adding the edge
-            G_nx.add_edge(u, v, l=demand[(u, v)], u=graphutils.bigNumber, c=cost)
-
-        minFlowCost, minFlow = graphutils.min_cost_flow(G_nx, self.source, self.sink)
-
-        # def DFS_find_reachable_from_source(u, visited):
-        #     if visited[u] != 0:
-        #         return
-        #     assert u != self.sink
-        #     visited[u] = 1
-        #     for v in self.successors(u):
-        #         if minFlow[u][v] > demand[(u, v)]:
-        #             if visited[v] == 0:
-        #                 DFS_find_reachable_from_source(v, visited)
-        #     for v in self.predecessors(u):
-        #         if visited[v] == 0:
-        #             DFS_find_reachable_from_source(v, visited)
-        
-        # The following code was created by Claude 3.7 Sonnet to avoid recursion and uses a stack instead.
-        def DFS_find_reachable_from_source(start_node, visited):
-            stack = [start_node]
-            
-            while stack:
-                u = stack.pop()
-                if visited[u] != 0:
-                    continue
-                    
-                assert u != self.sink
-                visited[u] = 1
-                
-                for v in self.successors(u):
-                    if minFlow[u][v] > demand[(u, v)] and visited[v] == 0:
-                        stack.append(v)
-                        
-                for v in self.predecessors(u):
-                    if visited[v] == 0:
-                        stack.append(v)
-
-        # def DFS_find_saturating(u, visited):
-        #     if visited[u] != 1:
-        #         return
-        #     visited[u] = 2
-        #     for v in self.successors(u):
-        #         if minFlow[u][v] > demand[(u, v)]:
-        #             DFS_find_saturating(v, visited)
-        #         elif (
-        #             minFlow[u][v] == demand[(u, v)]
-        #             and demand[(u, v)] >= 1
-        #             and visited[v] == 0
-        #         ):
-        #             antichain.append((u, v))
-        #     for v in self.predecessors(u):
-        #         DFS_find_saturating(v, visited)
-
-        # The following code was created by Claude 3.7 Sonnet to avoid recursion and uses a stack instead.
-        def DFS_find_saturating(start_node, visited):
-            stack = [start_node]
-            
-            while stack:
-                u = stack.pop()
-                
-                if visited[u] != 1:
-                    continue
-                    
-                visited[u] = 2
-                
-                # Process successors
-                for v in self.successors(u):
-                    if minFlow[u][v] > demand[(u, v)]:
-                        if visited[v] == 1:  # Only visit nodes marked as reachable (1)
-                            stack.append(v)
-                    elif (minFlow[u][v] == demand[(u, v)] 
-                        and demand[(u, v)] >= 1 
-                        and visited[v] == 0):
-                        antichain.append((u, v))
-                
-                # Process predecessors
-                for v in self.predecessors(u):
-                    if visited[v] == 1:  # Only visit nodes marked as reachable (1)
-                        stack.append(v)
-
-        if get_antichain:
-            antichain = []
-            visited = {node: 0 for node in self.nodes()}
-            DFS_find_reachable_from_source(self.source, visited)
-            DFS_find_saturating(self.source, visited)
-            if weight_function:
-                assert minFlowCost == sum(
-                    map(lambda edge: weight_function[edge], antichain)
-                )
+        for u, v in (edges_to_ignore or []):
+            # If (u,v) is an edge between different SCCs
+            # Then the corresponding edge to ignore is between the two SCCs
+            if not self._is_scc_edge(u, v):
+                edge_multiplicity[self._edge_to_condensation_edge(u, v)] -= 1
             else:
-                assert minFlowCost == len(antichain)
-            return minFlowCost, antichain
+                # (u,v) is an edge within the same SCC
+                # and thus we remove the edge (u,v) from the member edges
+                member_edges[self._edge_to_condensation_node(u, v)].discard((u, v))
 
-        return minFlowCost
+        weight_function_condensation_expanded = {e: 0 for e in self._condensation_expanded.edges()}
 
-    def decompose_using_max_bottleneck(self, flow_attr: str):
+        for u,v in self._condensation.edges:
+            weight_function_condensation_expanded[self._condensation_edge_to_condensation_expanded_edge(u,v)] = edge_multiplicity[(u,v)]
+
+        # We also add to edges_to_ignore_expanded the expanded edges arising from non-trivial SCCs
+        # (i.e. SCCs with more than one node, which are expanded into an edge, 
+        # i.e. len(self._condensation['member_edges'][node]) > 0)
+        # and for which there are no longer member edges (because all were in edges_to_ignore)
+        for node in self._condensation.nodes():
+            if len(member_edges[str(node)]) == 0 and len(self._condensation.graph['member_edges'][str(node)]) > 0:
+                weight_function_condensation_expanded[(str(node), self._expanded(node))] = 0
+            else:
+                weight_function_condensation_expanded[(str(node), self._expanded(node))] = 1
+
+        utils.logger.debug(f"{__name__}: Edges to ignore in the expanded graph: {edges_to_ignore_expanded}")
+
+        utils.logger.debug(f"{__name__}: Condensation expanded graph: {self._condensation_expanded.edges()}")
+        # width = self._condensation_expanded.get_width(edges_to_ignore=edges_to_ignore_expanded)
+
+        width = self._condensation_expanded.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function_condensation_expanded)
+
+        utils.logger.debug(f"{__name__}: Width of the condensation expanded graph: {width}")
+
+        if (edges_to_ignore is None or len(edges_to_ignore) == 0):
+            self.condensation_width = width
+
+        # DEBUG code
+        # utils.draw(
+        #         G=self._condensation_expanded,
+        #         filename="condensation_expanded.pdf",
+        #         flow_attr="flow",
+        #         draw_options={
+        #         "show_graph_edges": True,
+        #         "show_edge_weights": False,
+        #         "show_path_weights": False,
+        #         "show_path_weight_on_first_edge": True,
+        #         "pathwidth": 2,
+        #     })
+
+        return width
+    
+    def _is_scc_edge(self, u, v) -> bool:
         """
-        Decomposes the flow greedily into paths using the maximum bottleneck algorithm.
-        This method iteratively finds the path with the maximum bottleneck capacity
-        in the graph and decomposes the flow along that path. The process continues
-        until no more paths can be found.
-
-        !!! note "Note"
-            The decomposition path do not contain the global source nor sink.
-
-        Returns
-        ----------
-        - tuple: A tuple containing two lists:
-            - paths (list of lists): A list of paths, where each path is represented
-                as a list of nodes.
-            - weights (list): A list of weights (bottleneck capacities) corresponding to each path.
-        """
-
-        paths = list()
-        weights = list()
-
-        temp_G = nx.DiGraph()
-        temp_G.add_nodes_from(self.nodes())
-        temp_G.add_edges_from(self.edges(data=True))
-        temp_G.remove_nodes_from([self.source, self.sink])
-
-        while True:
-            bottleneck, path = graphutils.max_bottleneck_path(temp_G, flow_attr)
-            if path is None:
-                break
-
-            for i in range(len(path) - 1):
-                temp_G[path[i]][path[i + 1]][flow_attr] -= bottleneck
-
-            paths.append(path)
-            weights.append(bottleneck)
-
-        return (paths, weights)
-
-    def get_non_zero_flow_edges(
-        self, flow_attr: str, edges_to_ignore: set = set()
-    ) -> set:
-        """
-        Get all edges with non-zero flow values.
-
-        Returns
-        -------
-        set
-            A set of edges (tuples) that have non-zero flow values.
+        Returns True if (u,v) is an edge inside an SCCs, False otherwise.
         """
 
-        non_zero_flow_edges = set()
-        for u, v, data in self.edges(data=True):
-            if (u, v) not in edges_to_ignore and data.get(flow_attr, 0) != 0:
-                non_zero_flow_edges.add((u, v))
+        # Check if (u,v) is an edge of the graph
+        if (u,v) not in self.edges():
+            utils.logger.error(f"{__name__}: Edge ({u},{v}) is not in the graph.")
+            raise ValueError(f"Edge ({u},{v}) is not in the graph.")
 
-        return non_zero_flow_edges
+        return self._condensation.graph['mapping'][u] == self._condensation.graph['mapping'][v]
 
-    def get_max_flow_value_and_check_non_negative_flow(
-        self, flow_attr: str, edges_to_ignore: set
-    ) -> float:
+    def get_number_of_nontrivial_SCCs(self) -> int:
         """
-        Determines the maximum flow value in the graph and checks for positive flow values.
-
-        This method iterates over all edges in the graph, ignoring edges specified in
-        `self.edges_to_ignore`. It checks if each edge has the required flow attribute
-        specified by `self.flow_attr`. If an edge does not have this attribute, a
-        ValueError is raised. If an edge has a negative flow value, a ValueError is
-        raised. The method returns the maximum flow value found among all edges.
-
-        Returns
-        -------
-        - float: The maximum flow value among all edges in the graph.
-
-        Raises
-        -------
-        - ValueError: If an edge does not have the required flow attribute.
-        - ValueError: If an edge has a negative flow value.
+        Returns the number of non-trivial SCCs (i.e. SCCs with at least one edge).
         """
 
-        w_max = float("-inf")
-        if edges_to_ignore is None:
-            edges_to_ignore = set()
+        return sum(1 for v in self._condensation.nodes() if len(self._condensation.graph['member_edges'][str(v)]) > 0)
 
-        for u, v, data in self.edges(data=True):
-            if (u, v) in edges_to_ignore:
-                continue
-            if not flow_attr in data:
-                utils.logger.error(
-                    f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
-                )
-                raise ValueError(
-                    f"Edge ({u},{v}) does not have the required flow attribute '{flow_attr}'. Check that the attribute passed under 'flow_attr' is present in the edge data."
-                )
-            if data[flow_attr] < 0:
-                utils.logger.error(
-                    f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0."
-                )
-                raise ValueError(
-                    f"Edge ({u},{v}) has negative flow value {data[flow_attr]}. All flow values must be >=0."
-                )
-            w_max = max(w_max, data[flow_attr])
+    def get_size_of_largest_SCC(self) -> int:
+        """
+        Returns the size of the largest SCC (in terms of number of edges).
+        """
+        return max((len(self._condensation.graph['member_edges'][str(v)]) for v in self._condensation.nodes()), default=0)
 
-        return w_max
+    def get_longest_incompatible_sequences(self, sequences: list) -> list:
+
+        # We map the edges in sequences to edges in self._condensation_expanded
+
+        large_constant = 0 #self.number_of_edges() + 1
+
+        sequence_function = {e: [] for e in self._condensation_expanded.edges} # edge in self._condensation_expanded -> list of ids of all sequences using that edge
+
+        for seq_index, sequence in enumerate(sequences):
+            for u, v in sequence:
+                condensation_expanded_edge = self._edge_to_condensation_expanded_edge(u, v)
+                sequence_function[condensation_expanded_edge].append(seq_index)
+
+        # for each edge, sort sequence function by the length of the sequences
+        for edge in sequence_function:
+            sequence_function[edge] = sorted(sequence_function[edge], key=lambda x: len(sequences[x]), reverse=True)
+
+        # get the edge_multiplicity of each edge
+        for e in self._condensation.edges():
+            condensation_expanded_edge = self._condensation_edge_to_condensation_expanded_edge(e[0], e[1])
+            # If the edge is between SCCs, we have a multiplicity associated to it
+            # if we also have sequences associated to it, then we keep only the largest multiplicity-many
+            if len(sequence_function[condensation_expanded_edge]) > 0:
+                edge_multiplicity = self._condensation.graph["edge_multiplicity"][e]
+                sequence_function[condensation_expanded_edge] = sequence_function[condensation_expanded_edge][:edge_multiplicity]
+
+        for v in self._condensation.nodes():
+            # If the SCC v has at least one edge,
+            # then we keep only the largest sequence associated with it, because this edge 
+            # cannot be used multiple times in the antichain
+            if len(self._condensation.graph["member_edges"][str(v)]) > 0:
+                condensation_expanded_edge = self._condensation_edge_to_condensation_expanded_edge(v, v)
+                sequence_function[condensation_expanded_edge] = sequence_function[condensation_expanded_edge][:1]
+
+        weight_function = {edge: large_constant + sum(len(sequences[seq_idx]) for seq_idx in sequence_function[edge]) for edge in self._condensation_expanded.edges()}
+
+        utils.logger.debug(f"{__name__}: Weight function for incompatible sequences: {weight_function}")
+
+        _, antichain = self._condensation_expanded.compute_max_edge_antichain(
+            get_antichain=True,
+            weight_function=weight_function,
+        )
+
+        incompatible_sequences = []
+
+        seq_idx_set = set()
+        for u, v in antichain:
+            # extend incompatible_sequences with
+            for seq_idx in sequence_function[(u, v)]:
+                incompatible_sequences.append(sequences[seq_idx])
+                # Checking that we don't report duplicates, which should never happen
+                if seq_idx in seq_idx_set:
+                    utils.logger.error(f"{__name__}: Sequence {seq_idx} is already in the incompatible sequences, skipping it.")
+                    raise ValueError(f"{__name__}: CRITICAL BUG: Sequence {seq_idx} is already in the incompatible sequences")
+                seq_idx_set.add(seq_idx)
+
+        return incompatible_sequences
+    

@@ -5,6 +5,7 @@
     - [Minimum Flow Decomposition](minimum-flow-decomposition.md)
     - [An Optimization Routine for the Number k of Paths](numpathsoptimization.md)
     - [Handling graphs with flows / weights on nodes](node-expanded-digraph.md)
+    - [k-Flow Decomposition with cycles](k-flow-decomposition-cycles.md)
 
 This class implements a solver for the problem of decomposing a flow into a given number $k$ of paths (*$k$-flow decomposition*). This problem is a generalization of [Minimum Flow Decomposition](minimum-flow-decomposition.md), in the sense that we are also given the number of paths that we need to decompose the flow in.
 

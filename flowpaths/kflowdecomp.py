@@ -1,6 +1,6 @@
 import time
 import networkx as nx
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.safetyflowdecomp as sfd
@@ -8,9 +8,6 @@ import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 
 class kFlowDecomp(pathmodel.AbstractPathModelDAG):
-    """
-    Class to decompose a flow into a given number of weighted paths.
-    """
     # storing some defaults
     optimize_with_greedy = True
     optimize_with_flow_safe_paths = True
@@ -37,7 +34,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         ----------
         - `G : nx.DiGraph`
             
-            The input directed acyclic graph, as networkx DiGraph.
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
         - `flow_attr : str`
             
@@ -143,7 +140,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
 
-        self.G = stdigraph.stDiGraph(self.G_internal)
+        self.G = stdag.stDAG(self.G_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 
@@ -501,7 +498,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                     abs(flow_from_paths[(u, v)] - data[self.flow_attr])
                     > tolerance * num_paths_on_edges[(u, v)]
                 ):
-                    utils.logger.debug(f"Flow validation failed for edge ({u}, v): expected {data[self.flow_attr]}, got {flow_from_paths[(u, v)]}")
+                    utils.logger.error(f"Flow validation failed for edge ({u}, v): expected {data[self.flow_attr]}, got {flow_from_paths[(u, v)]}")
                     return False
 
         return True

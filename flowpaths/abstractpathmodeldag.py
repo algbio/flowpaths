@@ -1,4 +1,4 @@
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 from flowpaths.utils import safetypathcovers
 from flowpaths.utils import solverwrapper as sw
 import flowpaths.utils as utils
@@ -16,7 +16,7 @@ class AbstractPathModelDAG(ABC):
     - The class uses our custom [SolverWrapper](solver-wrapper.md) class, which is a wrapper around the solvers HiGHS (open source) and 
     Gurobi (free with academic license). In this way, both solvers can be used interchangeably.
 
-    More in detail, this class encodes `k` s-t paths in the DAG G, where s is the global source of the stDiGraph 
+    More in detail, this class encodes `k` s-t paths in the DAG G, where s is the global source of the stDAG 
     and t is the global sink. It also allows for subpath constraints that must appear in at least one of the s-t paths.
 
     The class creates the following variables:
@@ -25,7 +25,7 @@ class AbstractPathModelDAG(ABC):
     - **edge_position_vars**: `edge_position_vars[(u, v, i)]` = position of edge `(u, v)` in path `i`, starting from position 0
 
         - These variables are created only if `encode_edge_position` is set to `True`
-        - Note that positions are relative to the globals source `s` of the stDiGraph, thus the first edge in a path is 
+        - Note that positions are relative to the globals source `s` of the stDAG, thus the first edge in a path is 
         the edge from `s` to the first vertex in the original graph, and this first edge has position 0
         - If you set `length_attr`, then the positions are relative to the edge lengths, and not the number of edges
         The first edge still gets position 0, and other edges get positions equal to the sum of the lengths of the edges before them in the path
@@ -61,7 +61,7 @@ class AbstractPathModelDAG(ABC):
 
     def __init__(
         self,
-        G: stdigraph.stDiGraph,
+        G: stdag.stDAG,
         k: int,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1,
@@ -77,9 +77,9 @@ class AbstractPathModelDAG(ABC):
         Parameters
         ----------
 
-        - `G: stDiGraph.stDiGraph`  
+        - `G: stDAG.stDAG`  
             
-            The directed acyclic graph (DAG) to be used.
+            The directed acyclic graph (DAG) to be used. Create it using the [`stDAG` class](stdag.md).
 
         - `k: int`
             
@@ -705,9 +705,11 @@ class AbstractPathModelDAG(ABC):
                             break
                     path.append(vertex)
                 if len(path) < 2:
-                    utils.logger.error(f"{__name__}: Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
-                    raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDiGraph has no edge from global source {self.G.source} to global sink {self.G.sink}.")
-                
+                    utils.logger.error(f"{__name__}: Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDAG has no edge from global source {self.G.source} to global sink {self.G.sink}.")
+                    raise Exception(f"Something went wrong, solution path {path} has less than 2 vertices. This should not happen. Make sure the stDAG has no edge from global source {self.G.source} to global sink {self.G.sink}.")
+
+                # We remove the first and the last vertex, because
+                # these are the global source and the global sink introduced by stDAG
                 paths.append(path[1:-1])
 
         return paths

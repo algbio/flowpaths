@@ -1,4 +1,4 @@
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 from queue import Queue
 from copy import deepcopy
 
@@ -59,11 +59,11 @@ def find_all_bridges(adj_dict, s, t) -> list:
     return bridges
 
 
-def is_core(G : stdigraph.stDiGraph, u: int, v: int) -> bool:
+def is_core(G : stdag.stDAG, u: int, v: int) -> bool:
     return (G.out_degree(v) < 1 or G.in_degree(v) != 1) and (G.in_degree(u) < 1 or G.out_degree(u) != 1)
 
 
-def find_unitig_of_arc(G : stdigraph.stDiGraph, e : tuple):
+def find_unitig_of_arc(G : stdag.stDAG, e : tuple):
     u,v = e
     #assert(G.is_edge(e))
     unitig = [(u,v)]
@@ -79,50 +79,14 @@ def find_unitig_of_arc(G : stdigraph.stDiGraph, e : tuple):
 
 
 def safe_sequences_of_base_edges(
-    G: stdigraph.stDiGraph, no_duplicates=False, threads: int = 4
+    G: stdag.stDAG, no_duplicates=False, threads: int = 4
 ) -> list:
 
     return safe_sequences(G, G.base_graph.edges(), no_duplicates, threads=threads)
 
 
-def safe_maximal_sequences(
-    G : stdigraph.stDiGraph, arcs_to_cover = [], threads: int = 4
-) -> list :
-
-    sequences      = []
-    processed_arcs = set()
-    cores          = []
-
-    for e in arcs_to_cover:
-
-        if e in processed_arcs:
-            continue
-
-        L,R,unitig = find_unitig_of_arc(G,e) #every arc-unitig has an identifying pair of leftmost and rightmost nonunivocal vertices (or at least one of them is the source or the sink)
-        
-        for arc in unitig:
-            processed_arcs.add(arc)
-
-        if is_core(G,L,R):
-            cores.append( (L,R,unitig) )
-
-    for (L,R,unitig) in cores: #can paralelize this loop if we wish to
-        left_extension  = find_all_bridges(G.get_adj_list_R(), L, G.source)
-        right_extension = find_all_bridges(G.get_adj_list()  , R, G.sink  )
-
-        for i in range(len(left_extension)): #reverse edges of left extension (recall the definition of G^R)
-            x,y = left_extension[i]
-            left_extension[i] = (y,x)
-
-        seq = left_extension[::-1] + unitig + right_extension
-
-        sequences.append(seq)
-
-    return sequences
-
-
 def safe_sequences(
-    G: stdigraph.stDiGraph, 
+    G: stdag.stDAG, 
     edges_or_subpath_constraints_to_cover: list, 
     no_duplicates: bool = False, 
     threads: int = 4
@@ -186,13 +150,13 @@ def safe_sequences(
 
 
 def safe_paths_of_base_edges(
-    G: stdigraph.stDiGraph, no_duplicates=False, threads: int = 4
+    G: stdag.stDAG, no_duplicates=False, threads: int = 4
 ) -> list:
 
     return safe_paths(G, G.base_graph.edges(), no_duplicates, threads=threads)
 
 
-def safe_maximal_paths(G : stdigraph.stDiGraph, arcs_to_cover = []) -> list :
+def safe_maximal_paths(G : stdag.stDAG, arcs_to_cover = []) -> list :
     
     paths          = []
     processed_arcs = set()
@@ -232,7 +196,7 @@ def safe_maximal_paths(G : stdigraph.stDiGraph, arcs_to_cover = []) -> list :
 
 
 def safe_paths(
-    G: stdigraph.stDiGraph, edges_to_cover: list, no_duplicates=False, threads: int = 4
+    G: stdag.stDAG, edges_to_cover: list, no_duplicates=False, threads: int = 4
 ) -> list:
 
     paths = set() if no_duplicates else []

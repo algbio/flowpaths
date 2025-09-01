@@ -1,6 +1,7 @@
 !!! info inline end "See also"
 
     - [k-Flow Decomposition](k-flow-decomposition.md)
+    - [Minimum Flow Decomposition with Cycles](minimum-flow-decomposition-cycles.md)
 
 # Minimum Flow Decomposition
 
@@ -114,7 +115,8 @@ There are several works on this problem, for example.
 
 4. See also flowpaths [References](references.md), and the other papers cited by these works.
 
-::: flowpaths.minflowdecomp
+::: flowpaths.MinFlowDecomp
     options:
       filters: 
         - "!^_"
+        - "!solve_time_elapsed"

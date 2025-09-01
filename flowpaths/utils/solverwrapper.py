@@ -9,23 +9,83 @@ import flowpaths.utils as utils
 import numpy as np
 
 class SolverWrapper:
-    """
-    A wrapper class for the both the [HiGHS (highspy)](https://highs.dev) and 
-    [Gurobi](https://www.gurobi.com/solutions/gurobi-optimizer/) 
-    ([gurobipy](https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python)) solvers.
+    """Unified MILP/LP modelling convenience layer for HiGHS and Gurobi.
 
-    This supports the following functionalities:
+        This class provides *one* API that delegates to either the
+        [HiGHS (``highspy``)](https://highs.dev) or
+        [Gurobi (``gurobipy``)](https://www.gurobi.com/solutions/gurobi-optimizer/) back-end.
+        Only a very small, stable subset of features needed by *flowpaths* is
+        wrapped - it is **not** a general purpose replacement for the native APIs.
 
-    - Adding:
-        - Variables
-        - Constraints
-        - Product Constraints, encoding the product of a binary / integer variable and a positive continuous / integer variable
-        - Piecewise constant constraints
-    - Setting the objective
-    - Optimizing, and getting the model status
-    - Writing the model to a file
-    - Getting variable names and values
-    - Getting the objective value
+        Key capabilities
+        ----------------
+        - Create variables (continuous / integer) in bulk with name prefixing
+        - Add linear constraints
+        - Add specialized modelling shortcuts:
+                - binary * continuous (McCormick) product constraints
+                - integer * continuous product constraints (bit expansion + binaries)
+                - piecewise constant constraints (one-hot selection)
+        - Build linear objectives without triggering a solve (HiGHS) or with native
+            semantics (Gurobi)
+        - Optimize with optional *custom* wall clock timeout (in addition to the
+            solver internal time limit)
+        - Retrieve objective, variable names, variable values (optionally enforcing
+            integrality for binaries), status (mapped to HiGHS style codes)
+        - Persist model to disk (``.lp`` / ``.mps`` depending on backend support)
+
+        Design notes
+        ------------
+        - A minimal set of solver parameters is exposed via keyword arguments in
+            ``__init__`` to keep call sites clean.
+        - Status codes for Gurobi are mapped onto HiGHS style names where a clear
+            1-to-1 mapping exists (see ``gurobi_status_to_highs``).
+        - A *secondary* timeout based on POSIX signals can be enabled to guard
+            against situations where the native solver time limit is not obeyed
+            precisely. When this fires ``did_timeout`` is set and the reported status
+            becomes ``kTimeLimit``.
+
+        Parameters
+        ----------
+        **kwargs :
+            Flexible configuration. Recognised keys (all optional):
+            - ``external_solver`` (str): ``"highs"`` (default) or ``"gurobi"``.
+            - ``threads`` (int): Thread limit for solver (default: ``4``).
+            - ``time_limit`` (float): Internal solver time limit in seconds
+                (default: ``inf`` = no limit).
+            - ``use_also_custom_timeout`` (bool): If ``True`` activate an *extra*
+                signal based timeout equal to ``time_limit`` (default ``False``).
+            - ``presolve`` (str): HiGHS presolve strategy (default ``"choose"``).
+            - ``log_to_console`` (str): ``"true"`` / ``"false"`` (default
+                ``"false"``) - normalized to solver specific flags.
+            - ``tolerance`` (float): MIP gap, feasibility, integrality tolerance
+                applied uniformly (default ``1e-9``; must be >= 1e-9).
+            - ``optimization_sense`` (str): ``"minimize"`` or ``"maximize``
+                (default ``"minimize"``).
+
+        Attributes
+        ----------
+        external_solver : str
+                Active backend (``"highs"`` or ``"gurobi"``).
+        solver : object
+                Underlying solver object (``highspy.Highs`` or ``gurobipy.Model``).
+        time_limit : float
+                Configured internal solver time limit (seconds).
+        use_also_custom_timeout : bool
+                Whether the secondary POSIX signal timeout is enabled.
+        tolerance : float
+                Unified tolerance applied to various solver parameters.
+        optimization_sense : str
+                ``"minimize"`` or ``"maximize"`` as last set on the objective.
+        did_timeout : bool
+                Flag set to ``True`` only when the *custom* timeout fired.
+        variable_name_prefixes : list[str]
+                Record of prefixes used to detect accidental collisions.
+
+    Raises
+    ------
+    ValueError
+        If unsupported solver name, invalid optimization sense or an invalid
+        tolerance (< 1e-9) is supplied.
     """
     # storing some defaults
     threads = 4
@@ -109,6 +169,35 @@ class SolverWrapper:
         utils.logger.debug(f"{__name__}: solver_options (kwargs) = {kwargs}")
 
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
+        """Create a set of variables sharing a common name prefix.
+
+        A *collision* check ensures no prefix is a prefix of an existing one to
+        avoid ambiguous parsing later when values are retrieved.
+
+        Parameters
+        ----------
+        indexes : iterable
+            Iterable of index labels (numbers or hashables) used *only* to
+            suffix the variable names for uniqueness.
+        name_prefix : str
+            Prefix for each created variable (e.g. ``x_``). Must be unique with
+            respect to existing prefixes (no prefix / super-prefix relations).
+        lb, ub : float, default (0, 1)
+            Lower and upper bounds for every created variable.
+        var_type : {"integer", "continuous"}, default "integer"
+            Variable domain type.
+
+        Returns
+        -------
+        dict | list
+            Mapping from provided index to underlying solver variable objects
+            (HiGHS returns an internal structure; Gurobi returns a dict).
+
+        Raises
+        ------
+        ValueError
+            If ``name_prefix`` conflicts with an existing prefix.
+        """
         
         # Check if there is already a variable name prefix which has as prefix the current one
         # of if the current one has as prefix an existing one
@@ -153,6 +242,15 @@ class SolverWrapper:
             return vars
 
     def add_constraint(self, expr, name=""):
+        """Add a linear (in)equation to the model.
+
+        Parameters
+        ----------
+        expr : linear expression / bool
+            The solver specific constraint expression.
+        name : str, optional
+            Optional identifier for the constraint.
+        """
         if self.external_solver == "highs":
             self.solver.addConstr(expr, name=name)
         elif self.external_solver == "gurobi":
@@ -255,6 +353,18 @@ class SolverWrapper:
         )
 
     def quicksum(self, expr):
+        """Backend agnostic fast summation of linear terms.
+
+        Parameters
+        ----------
+        expr : iterable
+            Iterable of linear terms.
+
+        Returns
+        -------
+        linear expression
+            A solver specific linear expression representing the sum.
+        """
         if self.external_solver == "highs":
             return self.solver.qsum(expr)
         elif self.external_solver == "gurobi":
@@ -263,6 +373,24 @@ class SolverWrapper:
             return gurobipy.quicksum(expr)
 
     def set_objective(self, expr, sense="minimize"):
+        """Set (and replace) the linear objective.
+
+        For HiGHS this delegates to ``HighsCustom.set_objective_without_solving``
+        (i.e. does not trigger a solve). For Gurobi it uses the native
+        ``setObjective`` method.
+
+        Parameters
+        ----------
+        expr : linear expression
+            Objective linear expression.
+        sense : {"minimize", "min", "maximize", "max"}, default "minimize"
+            Optimization direction.
+
+        Raises
+        ------
+        ValueError
+            If ``sense`` is invalid.
+        """
 
         if sense not in ["minimize", "min", "maximize", "max"]:
             utils.logger.error(f"{__name__}: The objective sense must be either `minimize` or `maximize`.")
@@ -280,6 +408,16 @@ class SolverWrapper:
             )
 
     def optimize(self):
+        """Run the solver.
+
+        Behaviour:
+        - If ``time_limit`` is infinity OR ``use_also_custom_timeout`` is
+            ``False`` we rely solely on the backend's time limit handling.
+        - Otherwise we also arm a POSIX signal based timeout (coarse, whole
+            seconds) which, when firing, sets ``did_timeout``. The underlying
+            solver is not forcibly terminated beyond the signal alarm; we rely on
+            cooperative interruption.
+        """
         # Resetting the timeout flag
         self.did_timeout = False
 
@@ -293,12 +431,37 @@ class SolverWrapper:
             self._run_with_timeout(self.time_limit, self.solver.optimize)
     
     def write_model(self, filename):
+        """Persist model to a file supported by the backend.
+
+        Parameters
+        ----------
+        filename : str | os.PathLike
+            Target path. HiGHS chooses format based on extension; Gurobi uses
+            native ``write`` method behaviour.
+        """
         if self.external_solver == "highs":
             self.solver.writeModel(filename)
         elif self.external_solver == "gurobi":
             self.solver.write(filename)
 
     def get_model_status(self, raw = False):
+        """Return HiGHS style model status string (or raw Gurobi code).
+
+        If the *custom* timeout was triggered the synthetic status ``kTimeLimit``
+        is returned irrespective of the underlying solver state.
+
+        Parameters
+        ----------
+        raw : bool, default False
+            When using Gurobi: if ``True`` return the untouched integer status
+            code; otherwise attempt to map to a HiGHS style enum name.
+
+        Returns
+        -------
+        str | int
+            Status name (always a string for HiGHS). Integer code for Gurobi
+            only when ``raw=True``.
+        """
         
         # If the solver has timed out with our custom time limit, we return the timeout status
         # This is set in the __run_with_timeout function
@@ -312,18 +475,21 @@ class SolverWrapper:
             return SolverWrapper.gurobi_status_to_highs.get(self.solver.status, self.solver.status) if not raw else self.solver.status
 
     def get_all_variable_values(self):
+        """Return values for all variables in solver insertion order."""
         if self.external_solver == "highs":
             return self.solver.allVariableValues()
         elif self.external_solver == "gurobi":
             return [var.X for var in self.solver.getVars()]
 
     def get_all_variable_names(self):
+        """Return names for all variables in solver insertion order."""
         if self.external_solver == "highs":
             return self.solver.allVariableNames()
         elif self.external_solver == "gurobi":
             return [var.VarName for var in self.solver.getVars()]
 
     def print_variable_names_values(self):
+        """Print ``name = value`` lines for every variable (debug helper)."""
         varNames = self.get_all_variable_names()
         varValues = self.get_all_variable_values()
 
@@ -337,6 +503,31 @@ class SolverWrapper:
     #     return match.groups()
 
     def parse_var_name(self, string, name_prefix):
+        """Parse a variable name and extract indices inside parentheses.
+
+        Variable names follow one of two patterns:
+
+        1. ``<prefix>(i,j,...)`` - parenthesised, comma separated indices
+           where elements may be quoted strings or integers.
+        2. ``<prefix><i>`` - single suffix index (handled elsewhere).
+
+        Parameters
+        ----------
+        string : str
+            Full variable name.
+        name_prefix : str
+            Expected prefix.
+
+        Returns
+        -------
+        list[str]
+            Raw index components (still strings, quotes stripped).
+
+        Raises
+        ------
+        ValueError
+            If the name does not match the expected pattern.
+        """
         # Dynamic regex pattern to extract components inside parentheses
         pattern = rf"{name_prefix}\(\s*(.*?)\s*\)$"
         match = re.match(pattern, string)
@@ -443,6 +634,13 @@ class SolverWrapper:
         return values
 
     def get_objective_value(self):
+        """Return objective value of last solve.
+
+        Returns
+        -------
+        float
+            Objective value according to the configured optimization sense.
+        """
         if self.external_solver == "highs":
             return self.solver.getObjectiveValue()
         elif self.external_solver == "gurobi":
@@ -455,7 +653,7 @@ class SolverWrapper:
         Enforces that variable `y` equals a constant from `constants` depending on the range that `x` falls into.
         
         For each piece i:
-            if x in [ranges[i][0], ranges[i][1]] then y = constants[i].
+            `if x in [ranges[i][0], ranges[i][1]] then y = constants[i].`
 
         Assumptions:
             - The ranges must be non-overlapping. Otherwise, if x belongs to more ranges, the solver will choose one arbitrarily.
@@ -464,11 +662,11 @@ class SolverWrapper:
         This is modeled by:
         - introducing binary variables z[i] with sum(z) = 1,
         - for each piece i:
-                x >= L_i - M*(1 - z[i])
-                x <= U_i + M*(1 - z[i])
-                y <= constant[i] + M*(1 - z[i])
-                y >= constant[i] - M*(1 - z[i])
-        
+                `x >= L_i - M*(1 - z[i])`
+                `x <= U_i + M*(1 - z[i])`
+                `y <= constant[i] + M*(1 - z[i])`
+                `y >= constant[i] - M*(1 - z[i])`
+
         Parameters
         ----------
         x: The continuous variable (created earlier) whose value determines the segment.
@@ -514,10 +712,28 @@ class SolverWrapper:
             self.add_constraint(y >= c - M * (1 - z[i]), name=f"{name_prefix}_yL_{i}")
 
     def _timeout_handler(self, signum, frame):
+        """Internal: mark *custom* timeout occurrence.
+
+        Sets ``did_timeout`` which is later consulted by ``get_model_status``.
+        """
         self.did_timeout = True
         # raise TimeoutException("Function timed out!")
 
     def _run_with_timeout(self, timeout, func):
+        """Execute ``func`` with an additional coarse timeout.
+
+        A POSIX ``SIGALRM`` is armed for ``timeout`` (ceil) seconds. When it
+        triggers we simply set ``did_timeout`` and allow control to return.
+        Non-POSIX platforms currently fall back silently to just running the
+        function (because signals are not available under Windows).
+
+        Parameters
+        ----------
+        timeout : float
+            Seconds before alarm.
+        func : callable
+            Zero-argument function (typically ``self.solver.optimize``).
+        """
         # Use signal-based timeout on Unix-like systems
         if os.name == 'posix':
             signal.signal(signal.SIGALRM, self._timeout_handler)
@@ -533,18 +749,35 @@ class SolverWrapper:
 
 
 class HighsCustom(highspy.Highs):
+    """Thin subclass of ``highspy.Highs`` exposing a no-solve objective setter.
+
+    The stock ``Highs`` object couples ``minimize`` / ``maximize`` with an
+    immediate solve. For modelling convenience we sometimes want to *build* a
+    model incrementally and set/replace an objective multiple times before the
+    first solve. ``set_objective_without_solving`` mirrors the internal logic of
+    ``Highs.minimize`` / ``Highs.maximize`` sans the final call to ``solve``.
+    """
+
     def __init__(self):
         super().__init__()
-    
-    def set_objective_without_solving(self, obj, sense: str = "minimize") -> None:
-        """
-        This method is implemented is the same was as the [minimize()](https://github.com/ERGO-Code/HiGHS/blob/master/src/highspy/highs.py#L182) or 
-        [maximize()](https://github.com/ERGO-Code/HiGHS/blob/master/src/highspy/highs.py#L218) methods of the [Highs](https://github.com/ERGO-Code/HiGHS/blob/master/src/highspy/highs.py) class,
-        only that it does not call the solve() method. 
-        
-        That is, you can use it to set the objective value, without also running the solver.
 
-        **`obj` cannot be a single variable, but a linear expression.**
+    def set_objective_without_solving(self, obj, sense: str = "minimize") -> None:
+        """Set objective coefficients and sense without triggering ``solve``.
+
+        Parameters
+        ----------
+        obj : linear expression
+            Must be a linear expression (a single variable should be wrapped
+            by the caller). Inequality expressions are rejected.
+        sense : {"minimize", "min", "maximize", "max"}, default "minimize"
+            Optimization direction.
+
+        Raises
+        ------
+        Exception
+            If the provided expression encodes an inequality.
+        ValueError
+            If ``sense`` is invalid.
         """
 
         if obj is not None:

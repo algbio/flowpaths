@@ -1,13 +1,13 @@
 # Additional start/end nodes
 
-By default, solution paths must start in a source node of the graph (i.e. a node with no in-coming edges) and end in a sink node of the graph (i.e. a node with no out-going edges). However, in some use cases, solution paths can start/end "in the middle" of other solution paths, which means that they start in a non-source node/end in non-sink node. 
+By default, solution paths/walks must start in a source node of the graph (i.e. a node with no in-coming edges) and end in a sink node of the graph (i.e. a node with no out-going edges). However, in some use cases, solution paths/walks can start/end "in the middle" of other solution paths/walks, which means that they start in a non-source node/end in non-sink node. 
 
 ## 1. Implementation
 
-To allow for such scenarios, all decomposition models (except [Minimum Flow Decomposition](minimum-flow-decomposition.md)) offer the possibility of passing also:
+To allow for such scenarios, all decomposition models (except [Minimum Flow Decomposition](minimum-flow-decomposition.md) in DAGs) offer the possibility of passing also:
 
-- `additional_starts`: a list of nodes where paths are allowed to start; paths are still allowed to start in source nodes;
-- `additional_ends`: a list of nodes where paths are allowed to end; paths are still allowed to end in sink nodes.
+- `additional_starts`: a list of nodes where paths/walks are allowed to start; paths/walks are still allowed to start in source nodes;
+- `additional_ends`: a list of nodes where paths/walks are allowed to end; paths/walks are still allowed to end in sink nodes.
 
 !!! note "See also"
 

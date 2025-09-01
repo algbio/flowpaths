@@ -6,7 +6,6 @@ def main():
     fp.utils.configure_logging(
         level=fp.utils.logging.DEBUG,
         log_to_console=True,
-        log_file="log_mfd_example.log",
     )
     
     # Create a simple graph

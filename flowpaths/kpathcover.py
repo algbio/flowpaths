@@ -1,5 +1,5 @@
 import networkx as nx
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils.safetyflowdecomp as sfd
@@ -30,7 +30,7 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
         ----------
         - `G : nx.DiGraph`
             
-            The input directed acyclic graph, as networkx DiGraph.
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
         - `k: int`
             
@@ -135,7 +135,7 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
             utils.logger.error(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
             raise ValueError(f"cover_type must be either 'node' or 'edge', not {self.cover_type}")
 
-        self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
+        self.G = stdag.stDAG(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 
@@ -179,7 +179,6 @@ class kPathCover(pathmodel.AbstractPathModelDAG):
             for edge in zip(subpath_constraint[:-1], subpath_constraint[1:]):
                 subpath_constraint_edges.add(edge)
 
-        # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
         for u, v in self.G.edges():
             if (u, v) in self.edges_to_ignore:
                 continue
