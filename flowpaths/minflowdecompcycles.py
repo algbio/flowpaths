@@ -403,6 +403,8 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
     
     def get_lowerbound_k(self):
 
+        utils.logger.info(f"{__name__}: computing lowerbound_k")
+
         if self._lowerbound_k != None:
             return self._lowerbound_k
         
