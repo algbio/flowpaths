@@ -87,7 +87,7 @@ def read_graph(graph_raw) -> nx.DiGraph:
     # Parse number of vertices (kept for information; not used to count edges here)
     try:
         n = int(graph_raw[idx].strip())
-    except Exception:
+    except ValueError:
         utils.logger.error(f"{__name__}: Invalid vertex-count line: {graph_raw[idx].rstrip()}.")
         raise
 
