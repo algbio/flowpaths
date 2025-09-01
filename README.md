@@ -70,7 +70,7 @@ if mfd_solver.is_solved():
 
 ### Design principles
 
-1. **Easy to use**: You pass a directed graph (as a [networkx](https://networkx.org) [DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html)), and the solvers return optimal weighted paths (or walks for cyclic models). See the [examples](examples/) folder.
+1. **Easy to use**: You pass a directed graph (as a [networkx](https://networkx.org) [DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html)), and the solvers return optimal weighted paths (or walks for cyclic models). See the [examples/](https://github.com/algbio/flowpaths/tree/main/examples) folder.
  
 2. **It just works**: You do not need to install an (M)ILP solver. This is possible thanks to the fast open source solver [HiGHS](https://highs.dev), which gets installed once you install this package. 
     - If you have a [Gurobi](https://www.gurobi.com/solutions/gurobi-optimizer/) license ([free for academic users](https://www.gurobi.com/features/academic-named-user-license/)), you can install the [gurobipy Python package](https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python), and then you can run the Gurobi solver instead of the default HiGHS solver by just passing the entry `"external_solver": "gurobi"` in the `solver_options` dictionary.
@@ -88,17 +88,17 @@ if mfd_solver.is_solved():
 ### Models currently implemented
 - [**Minimum Flow Decomposition**](https://algbio.github.io/flowpaths/minimum-flow-decomposition.html): Given a graph with flow values on its edges (i.e. at every node different from source or sink the flow entering the node is equal to the flow exiting the node), find the minimum number of weighted paths / walks such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
     
-- [**$k$-Least Absolute Errors**](https://algbio.github.io/flowpaths/k-least-absolute-errors.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks such that the sum of the absolute errors of each edge is minimized. 
+- [**_k_-Least Absolute Errors**](https://algbio.github.io/flowpaths/k-least-absolute-errors.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks such that the sum of the absolute errors of each edge is minimized. 
     - The *error of an edge* is defined as the weight of the edge minus the sum of the weights of the paths / walks going through it.
-- [**$k$-Minimum Path Error**](https://algbio.github.io/flowpaths/k-min-path-error.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks, with associated *slack* values, such that:
+- [**_k_-Minimum Path Error**](https://algbio.github.io/flowpaths/k-min-path-error.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks, with associated *slack* values, such that:
     - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths / walks going through the edge, and
     - The sum of path / walk slacks is minimized.
 
 ### Contributing
 
-Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) guide for how to set up a dev environment, run tests locally, and build/preview the documentation with MkDocs.
+Contributions are welcome! Please read the [CONTRIBUTING.md](https://github.com/algbio/flowpaths/blob/main/CONTRIBUTING.md) guide for how to set up a dev environment, run tests locally, and build/preview the documentation with [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/).
 
 ### License and support
 
-- License: [MIT](LICENSE)
-- Issues: https://github.com/algbio/flowpaths/issues
+- License: MIT
+- Issues: [https://github.com/algbio/flowpaths/issues](https://github.com/algbio/flowpaths/issues)
