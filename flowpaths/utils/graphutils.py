@@ -81,9 +81,9 @@ def read_graph(graph_raw) -> nx.DiGraph:
         idx += 1
 
     if idx >= len(graph_raw):
-        utils.logger.error(f"{__name__}: Graph block missing vertex-count line.")
-        raise ValueError("Graph block missing vertex-count line.")
-
+        error_msg = "Graph block missing vertex-count line."
+        utils.logger.error(f"{__name__}: {error_msg}")
+        raise ValueError(error_msg)
     # Parse number of vertices (kept for information; not used to count edges here)
     try:
         n = int(graph_raw[idx].strip())
