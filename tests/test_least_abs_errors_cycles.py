@@ -1,6 +1,6 @@
 import pytest
 import itertools
-import flowpaths as fp      
+import flowpaths as fp
 import networkx as nx
 from pathlib import Path
 
