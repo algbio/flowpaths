@@ -404,3 +404,4 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self._lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
         return self._lowerbound_k
+    
