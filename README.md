@@ -76,23 +76,26 @@ if mfd_solver.is_solved():
     - If you have a [Gurobi](https://www.gurobi.com/solutions/gurobi-optimizer/) license ([free for academic users](https://www.gurobi.com/features/academic-named-user-license/)), you can install the [gurobipy Python package](https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python), and then you can run the Gurobi solver instead of the default HiGHS solver by just passing the entry `"external_solver": "gurobi"` in the `solver_options` dictionary.
 
 3. **Easy to implement other decomposition models**: 
-    - For DAGs, use the abstract class `AbstractPathModelDAG`, which encodes a given number of paths. See docs: [Abstract Path Model](https://algbio.github.io/flowpaths/abstract-path-model/).
-    - For general directed graphs with cycles, use `AbstractWalkModelDiGraph`, which encodes a given number of walks. See docs: [Abstract Walk Model](https://algbio.github.io/flowpaths/abstract-walk-model/).
+    - For DAGs, use the abstract class `AbstractPathModelDAG`, which encodes a given number of paths. See docs: [Abstract Path Model](https://algbio.github.io/flowpaths/abstract-path-model.html).
+    - For general directed graphs with cycles, use `AbstractWalkModelDiGraph`, which encodes a given number of walks. See docs: [Abstract Walk Model](https://algbio.github.io/flowpaths/abstract-walk-model.html).
     
     You can inherit from these classes to add weights and model-specific constraints/objectives. See [a basic example](examples/inexact_flow_solver.py). These abstract classes interface with a wrapper for popular MILP solvers, so you don't need to worry about solver-specific details.
 
-4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` means that any optimization to the path-finding mechanisms benefits **all** solvers that inherit from this class. We implement some "safety optimizations" described in [this paper](https://doi.org/10.48550/arXiv.2411.03871), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
+4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` or `AbstractWalkModelDiGraph` means that any optimization to the path-/walk-finding mechanisms benefits **all** solvers that inherit from these classes. We implement some "safety optimizations" described in [this paper](https://doi.org/10.48550/arXiv.2411.03871), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
 
-5. **Flexible inputs**: The models support graphs with flows/weights on either edges or nodes, and additional real use-case input features, such as subpath or subset constraints.
+5. **Flexible inputs**: The models support graphs with flows/weights on either edges or nodes, and additional real use-case input features, such as [subpathconstraints](https://algbio.github.io/flowpaths/subpath-constraints.html) or [subset constraints](https://algbio.github.io/flowpaths/subset-constraints.html).
 
 ### Models currently implemented
 - [**Minimum Flow Decomposition**](https://algbio.github.io/flowpaths/minimum-flow-decomposition.html): Given a graph with flow values on its edges (i.e. at every node different from source or sink the flow entering the node is equal to the flow exiting the node), find the minimum number of weighted paths / walks such that, for every edge, the sum of the weights of the paths going through the edge equals the flow value of the edge.
     
 - [**_k_-Least Absolute Errors**](https://algbio.github.io/flowpaths/k-least-absolute-errors.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks such that the sum of the absolute errors of each edge is minimized. 
     - The *error of an edge* is defined as the weight of the edge minus the sum of the weights of the paths / walks going through it.
+      
 - [**_k_-Minimum Path Error**](https://algbio.github.io/flowpaths/k-min-path-error.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks, with associated *slack* values, such that:
     - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths / walks going through the edge, and
     - The sum of path / walk slacks is minimized.
+ 
+- [**Minimum Path Cover**](https://algbio.github.io/flowpaths/minimum-path-cover.html): Given a graph and node sets _S_ and _T_, find a minimum number of _S-T_ paths (if the graph is acyclic) or _S-T_ walks (if the graph has cycles) such that every edge appears in in at least one path or walk.
 
 ### Contributing
 
