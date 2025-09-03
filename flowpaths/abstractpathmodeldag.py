@@ -214,7 +214,7 @@ class AbstractPathModelDAG(ABC):
         self.optimize_with_safety_as_subpath_constraints = optimization_options.get("optimize_with_safety_as_subpath_constraints", AbstractPathModelDAG.optimize_with_safety_as_subpath_constraints)
         self.optimize_with_safety_from_largest_antichain = optimization_options.get("optimize_with_safety_from_largest_antichain", AbstractPathModelDAG.optimize_with_safety_from_largest_antichain)
         
-        self._is_solved = None
+        self._is_solved = False
         if self.external_solution_paths is not None:
             self._is_solved = True
 

@@ -112,8 +112,6 @@ markdown_extensions:
 
 plugins:
   - search 
-  - macros:
-      module_name: docs/getversion
   - mkdocstrings:
       default_handler: python
       handlers:

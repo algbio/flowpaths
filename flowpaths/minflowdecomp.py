@@ -273,8 +273,10 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 # it means that the solver stopped because of an unexpected termination,
                 # thus we cannot conclude that the model is infeasible.
                 # In this case, we stop the search.
+                self.set_not_solved()
                 return False
 
+        self.set_not_solved()
         return False
 
     def _solve_with_given_weights(self) -> bool:

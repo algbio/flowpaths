@@ -177,7 +177,6 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             self.k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
             utils.logger.info(f"{__name__}: k received as None, we set it to {self.k} (edge width of the graph)")
         self.optimization_options = optimization_options or {}
-
         self.subset_constraints_coverage = subset_constraints_coverage
         
         self.flow_attr = flow_attr

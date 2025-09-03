@@ -90,6 +90,9 @@ class AbstractWalkModelDiGraph(ABC):
             raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
         self.id = self.G.id
         self.k = k
+        if k <= 0:
+            utils.logger.error(f"{__name__}: k must be positive, got {k}.")
+            raise ValueError(f"k must be positive, got {k}.")
         self.max_edge_repetition = max_edge_repetition
         
         self.subset_constraints = copy.deepcopy(subset_constraints)
@@ -121,7 +124,7 @@ class AbstractWalkModelDiGraph(ABC):
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
         self.optimize_with_max_safe_antichain_as_subset_constraints = optimization_options.get("optimize_with_max_safe_antichain_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_max_safe_antichain_as_subset_constraints)
 
-        self._is_solved = None
+        self._is_solved = False
                 
     def create_solver_and_walks(self):
         """

@@ -1,6 +1,6 @@
 #  ![](flowpaths-logo.svg){: style="height:30px"} _flowpaths_ Python Package
 
-This package implements solvers for decomposing weighted directed graphs into weighted paths or walks, based on (Mixed) Integer Linear Programming ((M)ILP) formulations. It supports both acyclic graphs (DAGs, decomposed into paths) and general graphs with cycles (decomposed into walks), and makes it easy to create new decomposition models. The current version **{{flowpaths_version_pyproject()}}**.
+This package implements solvers for decomposing weighted directed graphs into weighted paths or walks, based on (Mixed) Integer Linear Programming ((M)ILP) formulations. It supports both acyclic graphs (DAGs, decomposed into paths) and general graphs with cycles (decomposed into walks), and makes it easy to create new decomposition models.
 
 ![Overview](https://raw.githubusercontent.com/algbio/flowpaths/main/docs/overview.png)
 
