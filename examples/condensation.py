@@ -90,9 +90,23 @@ def test2():
     print(f"Incompatible sequences: {incompatible_sequences}")
     assert len(incompatible_sequences) == 3
 
+def test3():
+    graph = fp.graphutils.read_graphs("tests/cyclic_graphs/gt4.kmer15.(0.10000).V1096.E1622.mincyc100.e1.0.graph")[0]
+    print("graph id", graph.graph["id"])
+    stDiGraph = fp.stDiGraph(graph)
+    print("Graph width", stDiGraph.get_width())
+    print("Is acyclic", nx.is_directed_acyclic_graph(graph))
+    print("get_number_of_nontrivial_SCCs", stDiGraph.get_number_of_nontrivial_SCCs())
+    print("get_size_of_largest_SCC", stDiGraph.get_size_of_largest_SCC())
+
 def main():
     test1()
     test2()
+    test3()
+    
+
+
+
 
 if __name__ == "__main__":
     # Configure logging
