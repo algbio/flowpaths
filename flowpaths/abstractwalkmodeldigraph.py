@@ -455,6 +455,7 @@ class AbstractWalkModelDiGraph(ABC):
         self.solve_statistics[f"solve_time"] = time.perf_counter() - start_time
         self.solve_statistics[f"model_status"] = self.solver.get_model_status()
         self.solve_statistics[f"number_of_nontrivial_SCCs"] = self.G.get_number_of_nontrivial_SCCs()
+        self.solve_statistics[f"avg_size_of_non_trivial_SCC"] = self.G.get_avg_size_of_non_trivial_SCC()
         self.solve_statistics[f"size_of_largest_SCC"] = self.G.get_size_of_largest_SCC()
 
         if self.solver.get_model_status() == "kOptimal" or self.solver.get_model_status() == 2:

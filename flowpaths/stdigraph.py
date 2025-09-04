@@ -309,6 +309,13 @@ class stDiGraph(AbstractSourceSinkGraph):
         Returns the size of the largest SCC (in terms of number of edges).
         """
         return max((len(self._condensation.graph['member_edges'][str(v)]) for v in self._condensation.nodes()), default=0)
+    
+    def get_avg_size_of_non_trivial_SCC(self) -> int:
+        """
+        Returns the average size (in terms of number of edges) of non-trivial SCCs (i.e. SCCs with at least one edge).
+        """
+        sizes = [len(self._condensation.graph['member_edges'][str(v)]) for v in self._condensation.nodes() if len(self._condensation.graph['member_edges'][str(v)]) > 0]
+        return sum(sizes) // len(sizes) if sizes else 0
 
     def get_longest_incompatible_sequences(self, sequences: list) -> list:
 

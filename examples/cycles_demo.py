@@ -18,6 +18,8 @@ def test_min_flow_decomp(filename: str):
             "pathwidth": 2,
         })
 
+    print(graph.graph["n"], graph.graph["m"], graph.graph["w"])
+
     mfd_model = fp.MinFlowDecompCycles(
         G=graph,
         flow_attr="flow",
@@ -137,9 +139,11 @@ def process_solution(model):
     print("solve_time:", solve_statistics['solve_time']) # time taken by the ILP for a given k, or by MFD to iterate through k and do small internal things
     print("number_of_nontrivial_SCCs:", solve_statistics['number_of_nontrivial_SCCs']) # trivial = at least one edge
     print("size_of_largest_SCC:", solve_statistics['size_of_largest_SCC']) # size = number of edges
+    print("avg_size_of_non_trivial_SCC:", solve_statistics['avg_size_of_non_trivial_SCC']) # size = number of edges
 
 def main():
-    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.graph")
+    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
     test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
     test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
 

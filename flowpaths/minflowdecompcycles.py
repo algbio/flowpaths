@@ -231,6 +231,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                     solver_options=fd_solver_options,
                 )
                 fd_model.solve()
+                self.solve_statistics = fd_model.solve_statistics
 
                 # If the previous run exceeded the time limit, 
                 # we still stop the search, even if we might have managed to solve it
@@ -251,8 +252,10 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                 self.fd_model = fd_model
                 return True
             elif fd_model.solver.get_model_status() == sw.SolverWrapper.infeasible_status:
+                self.solve_statistics = fd_model.solve_statistics
                 utils.logger.info(f"{__name__}: model is infeasible for k = {i}")
             else:
+                self.solve_statistics = fd_model.solve_statistics
                 # If the model is not solved and the status is not infeasible,
                 # it means that the solver stopped because of an unexpected termination,
                 # thus we cannot conclude that the model is infeasible.
