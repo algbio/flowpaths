@@ -221,8 +221,8 @@ class AbstractWalkModelDiGraph(ABC):
 
         # Edge selected constraints
 
-        # 19a: If y[(u,v,i)] = 1, then x[(u,v,i)] = 1
-        # Equivalently, y[(u,v,i)] cannot be 1 without x[(u,v,i)] being 1
+        # 19a: If y[(u,v,i)] = 1, then x[(u,v,i)] >= 1
+        # Equivalently, y[(u,v,i)] cannot be 1 without x[(u,v,i)] being at least 1
         for i in range(self.k):
             for (u,v) in self.G.edges:
                 self.solver.add_constraint(

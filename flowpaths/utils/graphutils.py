@@ -1,6 +1,9 @@
 from itertools import count
 import networkx as nx
 import flowpaths.utils as utils
+# NOTE: Do NOT import flowpaths.stdigraph at module import time to avoid a circular
+# import chain: stdag -> graphutils -> stdigraph -> stdag. We instead lazily import
+# stdigraph inside functions that need it (e.g. read_graph) after this module is fully loaded.
 
 bigNumber = 1 << 32
 
@@ -124,6 +127,12 @@ def read_graph(graph_raw) -> nx.DiGraph:
             if not G.has_edge(u, v):
                 utils.logger.error(f"{__name__}: Constraint edge ({u}, {v}) not found in graph {graph_id} edges.")
                 raise ValueError(f"Constraint edge ({u}, {v}) not found in graph edges.")
+
+    G.graph["n"] = G.number_of_nodes()
+    G.graph["m"] = G.number_of_edges()
+    # Lazy import here to avoid circular import at module load time
+    from flowpaths import stdigraph as _stdigraph  # type: ignore
+    G.graph["w"] = _stdigraph.stDiGraph(G).get_width()
 
     return G
 
