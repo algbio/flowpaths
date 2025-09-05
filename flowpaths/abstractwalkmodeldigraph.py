@@ -9,9 +9,11 @@ from abc import ABC, abstractmethod
 class AbstractWalkModelDiGraph(ABC):
     # storing some defaults
     optimize_with_safe_sequences = True
+    optimize_with_safe_sequences_allow_geq_constraints = True
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
     optimize_with_max_safe_antichain_as_subset_constraints = False
+    allow_empty_walks = False
     allow_empty_walks = False
 
     def __init__(
@@ -123,6 +125,7 @@ class AbstractWalkModelDiGraph(ABC):
         self.allow_empty_walks = optimization_options.get("allow_empty_walks", AbstractWalkModelDiGraph.allow_empty_walks)
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
         self.optimize_with_max_safe_antichain_as_subset_constraints = optimization_options.get("optimize_with_max_safe_antichain_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_max_safe_antichain_as_subset_constraints)
+        self.optimize_with_safe_sequences_allow_geq_constraints = optimization_options.get("optimize_with_safe_sequences_allow_geq_constraints", AbstractWalkModelDiGraph.optimize_with_safe_sequences_allow_geq_constraints)
 
         self._is_solved = False
                 
@@ -362,7 +365,7 @@ class AbstractWalkModelDiGraph(ABC):
                 # print("Fixing variables for safe list #", i)
                 # iterate over the edges in the safe list to fix variables to 1
                 for u, v in self.walks_to_fix[i]:
-                    if self.G._is_scc_edge(u, v):
+                    if self.G._is_scc_edge(u, v) and self.optimize_with_safe_sequences_allow_geq_constraints:
                         self.solver.add_constraint(
                             self.edge_vars[(u, v, i)] >= 1,
                             name=f"safe_list_u={u}_v={v}_i={i}",
