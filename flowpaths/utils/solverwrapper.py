@@ -1,6 +1,7 @@
 from math import log2
 from math import ceil
 import highspy
+from typing import Union
 import re
 import os
 import signal
@@ -156,7 +157,7 @@ class SolverWrapper:
             self.env.setParam("MIPGap", self.tolerance)
             self.env.setParam("IntFeasTol", self.tolerance)
             self.env.setParam("FeasibilityTol", self.tolerance)
-            
+
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
             
@@ -718,6 +719,51 @@ class SolverWrapper:
         """
         self.did_timeout = True
         # raise TimeoutException("Function timed out!")
+
+    def fix_variable(self, var, value: Union[int, float]):
+        """Fix an existing variable to a constant value by tightening its bounds.
+
+        This avoids adding an explicit equality constraint (var == value) which can
+        slow down solving compared to changing bounds directly.
+
+        Parameters
+        ----------
+        var : backend variable object
+            The variable returned previously by ``add_variables``.
+        value : int | float
+            The value to which the variable should be fixed.
+        """
+        # Normalize to float for solvers expecting floating bounds
+        value = float(value)
+        if self.external_solver == "gurobi":
+            # Gurobi exposes direct LB / UB attributes
+            try:
+                var.LB = value
+                var.UB = value
+            except Exception as e:
+                utils.logger.error(f"{__name__}: Could not fix gurobi variable: {e}")
+                raise
+        elif self.external_solver == "highs":
+            # HiGHS: change column bounds using internal index of variable
+            try:
+                # Attempt a few common attribute names to locate the column index
+                idx = None
+                for cand in ["index", "col", "idx"]:
+                    if hasattr(var, cand):
+                        idx = getattr(var, cand)
+                        break
+                if idx is None:
+                    raise AttributeError("Variable has no index attribute among ['index','col','idx']")
+                # Ensure numpy imported (already imported as np at top)
+                self.solver.changeColsBounds(
+                    1,
+                    np.array([idx], dtype=np.int32),
+                    np.array([value], dtype=np.float64 if isinstance(value, float) else np.int32),
+                    np.array([value], dtype=np.float64 if isinstance(value, float) else np.int32),
+                )
+            except Exception as e:
+                utils.logger.error(f"{__name__}: Could not fix highs variable: {e}")
+                raise
 
     def _run_with_timeout(self, timeout, func):
         """Execute ``func`` with an additional coarse timeout.

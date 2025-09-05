@@ -10,6 +10,7 @@ class AbstractWalkModelDiGraph(ABC):
     # storing some defaults
     optimize_with_safe_sequences = True
     optimize_with_safe_sequences_allow_geq_constraints = False
+    optimize_with_safe_sequences_fix_via_bounds = False
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
     optimize_with_max_safe_antichain_as_subset_constraints = False
@@ -126,6 +127,7 @@ class AbstractWalkModelDiGraph(ABC):
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
         self.optimize_with_max_safe_antichain_as_subset_constraints = optimization_options.get("optimize_with_max_safe_antichain_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_max_safe_antichain_as_subset_constraints)
         self.optimize_with_safe_sequences_allow_geq_constraints = optimization_options.get("optimize_with_safe_sequences_allow_geq_constraints", AbstractWalkModelDiGraph.optimize_with_safe_sequences_allow_geq_constraints)
+        self.optimize_with_safe_sequences_fix_via_bounds = optimization_options.get("optimize_with_safe_sequences_fix_via_bounds", AbstractWalkModelDiGraph.optimize_with_safe_sequences_fix_via_bounds)
 
         self._is_solved = False
                 
@@ -373,10 +375,17 @@ class AbstractWalkModelDiGraph(ABC):
                             )
                             self.solve_statistics["edge_variables>=1"] += 1
                     else:
-                        self.solver.add_constraint(
-                            self.edge_vars[(u, v, i)] == 1,
-                            name=f"safe_list_u={u}_v={v}_i={i}",
-                        )
+                        # Instead of adding an equality constraint x==1 we tighten bounds directly.
+                        try:
+                            if not self.optimize_with_safe_sequences_fix_via_bounds:
+                                raise Exception("throw")
+                            self.solver.fix_variable(self.edge_vars[(u, v, i)], 1)
+                        except Exception:
+                            # Fallback: keep old behaviour if fixing fails for some backend edge case
+                            self.solver.add_constraint(
+                                self.edge_vars[(u, v, i)] == 1,
+                                name=f"safe_list_u={u}_v={v}_i={i}",
+                            )
                         self.solve_statistics["edge_variables=1"] += 1
 
     def _get_walks_to_fix_from_safe_lists(self) -> list:
