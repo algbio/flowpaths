@@ -169,6 +169,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self.solve_statistics = {}
         self._solution = None
         self._lowerbound_k = None
+        self._is_solved = False
 
         # Get the max flow value on an edge
         self.w_max = max(self.G.edges[edge][self.flow_attr] 

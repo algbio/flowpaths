@@ -143,7 +143,7 @@ def process_solution(model):
 
 def main():
     test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
-    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
+    # test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
     test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
     test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
 
