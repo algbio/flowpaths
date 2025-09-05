@@ -27,6 +27,7 @@ def test_min_flow_decomp(filename: str):
         subset_constraints=graph.graph["constraints"], # try with and without
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+            "optimize_with_safe_sequences_allow_geq_constraints": False,
         },
         solver_options={
             "external_solver": "gurobi", # we can try also "highs" at some point
@@ -49,6 +50,7 @@ def test_least_abs_errors(filename):
         subset_constraints=graph.graph["constraints"], # try with and without
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+            "optimize_with_safe_sequences_allow_geq_constraints": False,
         },
         solver_options={
             "external_solver": "gurobi", # we can try also "highs" at some point
@@ -67,6 +69,7 @@ def test_least_abs_errors(filename):
         subset_constraints=graph.graph["constraints"], # try with and without
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+            "optimize_with_safe_sequences_allow_geq_constraints": False,
         },
         solver_options={
             "external_solver": "gurobi", # we can try also "highs" at some point
@@ -90,6 +93,7 @@ def test_min_path_error(filename):
         subset_constraints=graph.graph["constraints"], # try with and without
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+            "optimize_with_safe_sequences_allow_geq_constraints": True,
         },
         solver_options={
             "external_solver": "gurobi", # we can try also "highs" at some point
@@ -107,6 +111,8 @@ def test_min_path_error(filename):
         subset_constraints=graph.graph["constraints"], # try with and without
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+            "optimize_with_safe_sequences_allow_geq_constraints": False,
+            "optimize_with_safe_sequences_fix_via_bounds": True,
         },
         solver_options={
             "external_solver": "gurobi", # we can try also "highs" at some point
