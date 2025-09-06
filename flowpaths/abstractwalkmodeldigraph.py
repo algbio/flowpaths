@@ -379,7 +379,7 @@ class AbstractWalkModelDiGraph(ABC):
                         try:
                             if not self.optimize_with_safe_sequences_fix_via_bounds:
                                 raise Exception("throw")
-                            self.solver.fix_variable(self.edge_vars[(u, v, i)], 1)
+                            self.solver.fix_variable(self.edge_vars[(u, v, i)], int(1))
                         except Exception:
                             # Fallback: keep old behaviour if fixing fails for some backend edge case
                             self.solver.add_constraint(

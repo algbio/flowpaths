@@ -733,6 +733,7 @@ class SolverWrapper:
         value : int | float
             The value to which the variable should be fixed.
         """
+
         # Normalize to float for solvers expecting floating bounds
         value = float(value)
         if self.external_solver == "gurobi":
@@ -746,20 +747,11 @@ class SolverWrapper:
         elif self.external_solver == "highs":
             # HiGHS: change column bounds using internal index of variable
             try:
-                # Attempt a few common attribute names to locate the column index
-                idx = None
-                for cand in ["index", "col", "idx"]:
-                    if hasattr(var, cand):
-                        idx = getattr(var, cand)
-                        break
-                if idx is None:
-                    raise AttributeError("Variable has no index attribute among ['index','col','idx']")
-                # Ensure numpy imported (already imported as np at top)
                 self.solver.changeColsBounds(
                     1,
-                    np.array([idx], dtype=np.int32),
-                    np.array([value], dtype=np.float64 if isinstance(value, float) else np.int32),
-                    np.array([value], dtype=np.float64 if isinstance(value, float) else np.int32),
+                    np.array([var.index], dtype=np.int32),
+                    np.array([value], dtype=np.float64 if isinstance(value, float) else np.int64),
+                    np.array([value], dtype=np.float64 if isinstance(value, float) else np.int64),
                 )
             except Exception as e:
                 utils.logger.error(f"{__name__}: Could not fix highs variable: {e}")
