@@ -167,7 +167,8 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         super().__init__(
             G=self.G,
             k=self.k,
-            max_edge_repetition=self.w_max,
+            # max_edge_repetition=self.w_max,
+            max_edge_repetition_dict=self.G.compute_edge_max_reachable_value(flow_attr=self.flow_attr),
             subset_constraints=self.subset_constraints,
             subset_constraints_coverage=self.subset_constraints_coverage,
             optimization_options=self.optimization_options,

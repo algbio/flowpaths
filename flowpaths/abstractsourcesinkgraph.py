@@ -133,3 +133,4 @@ class AbstractSourceSinkGraph(nx.DiGraph):
                 )
             w_max = max(w_max, data[flow_attr])
         return w_max
+

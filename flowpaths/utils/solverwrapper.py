@@ -169,6 +169,66 @@ class SolverWrapper:
         
         utils.logger.debug(f"{__name__}: solver_options (kwargs) = {kwargs}")
 
+        # Pending bound updates to apply in batch before solving
+        # Stores backend variables directly
+        self._pending_fix_vars = []      # list[var]
+        self._pending_fix_vals = []      # list[float]
+        self._pending_lb_vars = []       # list[var]
+        self._pending_lb_vals = []       # list[float]
+
+    def queue_fix_variable(self, var, value: Union[int, float]):
+        """Queue a variable to be fixed (LB=UB=value) in a later batch update."""
+        self._pending_fix_vars.append(var)
+        self._pending_fix_vals.append(float(value))
+
+    def queue_set_var_lower_bound(self, var, lb: Union[int, float]):
+        """Queue a variable to have its lower bound raised to ``lb`` in batch."""
+        self._pending_lb_vars.append(var)
+        self._pending_lb_vals.append(float(lb))
+
+    def _apply_pending_bound_updates(self):
+        """Apply any queued bound fixes/updates in a backend-specific batched way."""
+        try:
+            # Nothing to do fast exit
+            if not (self._pending_fix_vars or self._pending_lb_vars):
+                return
+
+            if self.external_solver == "gurobi":
+                import gurobipy as gp
+                if self._pending_fix_vars:
+                    self.solver.setAttr(gp.GRB.Attr.LB, self._pending_fix_vars, self._pending_fix_vals)
+                    self.solver.setAttr(gp.GRB.Attr.UB, self._pending_fix_vars, self._pending_fix_vals)
+                if self._pending_lb_vars:
+                    self.solver.setAttr(gp.GRB.Attr.LB, self._pending_lb_vars, self._pending_lb_vals)
+                self.solver.update()
+
+            elif self.external_solver == "highs":
+                # HiGHS batched updates
+                import numpy as np  # local alias to ensure available
+                if self._pending_fix_vars:
+                    idxs = np.array([v.index for v in self._pending_fix_vars], dtype=np.int32)
+                    vals = np.array(self._pending_fix_vals, dtype=np.float64)
+                    self.solver.changeColsBounds(len(idxs), idxs, vals, vals)
+                if self._pending_lb_vars:
+                    idxs = np.array([v.index for v in self._pending_lb_vars], dtype=np.int32)
+                    lbs  = np.array(self._pending_lb_vals, dtype=np.float64)
+                    # Prefer dedicated lower bound update if available, else fall back to bounds change with UB unchanged
+                    if hasattr(self.solver, "changeColsLower"):
+                        self.solver.changeColsLower(len(idxs), idxs, lbs)
+                    else:
+                        # As a conservative fallback, raise LB via changeColsBounds using current UBs fetched via getCols
+                        status, nret, lowers, uppers, costs, nnz = self.solver.getCols(len(idxs), idxs)
+                        # Use returned uppers in the same order as idxs
+                        current_ubs = uppers.astype(np.float64, copy=False)
+                        self.solver.changeColsBounds(len(idxs), idxs, lbs, current_ubs)
+
+        finally:
+            # Clear queues regardless of success
+            self._pending_fix_vars.clear()
+            self._pending_fix_vals.clear()
+            self._pending_lb_vars.clear()
+            self._pending_lb_vals.clear()
+
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
         """Create a set of variables sharing a common name prefix.
 
@@ -183,8 +243,11 @@ class SolverWrapper:
         name_prefix : str
             Prefix for each created variable (e.g. ``x_``). Must be unique with
             respect to existing prefixes (no prefix / super-prefix relations).
-        lb, ub : float, default (0, 1)
-            Lower and upper bounds for every created variable.
+        lb, ub : float | dict | sequence, default (0, 1)
+            Lower and upper bounds for created variables. Can be:
+            - scalars (applied to all indexes), or
+            - dicts mapping each index -> bound, or
+            - sequences aligned with ``indexes`` order (same length).
         var_type : {"integer", "continuous"}, default "integer"
             Variable domain type.
 
@@ -211,6 +274,38 @@ class SolverWrapper:
             
         self.variable_name_prefixes.append(name_prefix)
         
+        # Normalize bounds to per-index arrays when necessary
+        def _materialize_bounds(param, default_value, param_name):
+            # scalar
+            if isinstance(param, (int, float)):
+                return [float(param)] * len(indexes)
+            # dict mapping index -> value
+            if isinstance(param, dict):
+                vals = []
+                missing = []
+                for idx in indexes:
+                    if idx in param:
+                        vals.append(float(param[idx]))
+                    else:
+                        missing.append(idx)
+                if missing:
+                    utils.logger.error(f"{__name__}: Missing {param_name} for indexes: {missing[:3]}{'...' if len(missing)>3 else ''}")
+                    raise ValueError(f"Missing {param_name} for some indexes")
+                return vals
+            # sequence aligned with indexes
+            try:
+                seq = list(param)
+                if len(seq) != len(indexes):
+                    utils.logger.error(f"{__name__}: Length of {param_name} ({len(seq)}) does not match number of indexes ({len(indexes)}).")
+                    raise ValueError(f"Length of {param_name} does not match number of indexes.")
+                return [float(x) for x in seq]
+            except TypeError:
+                # Not iterable; fall back to default scalar for all
+                return [float(default_value)] * len(indexes)
+
+        lbs = _materialize_bounds(lb, 0.0, "lb")
+        ubs = _materialize_bounds(ub, 1.0, "ub")
+
         if self.external_solver == "highs":
 
             var_type_map = {
@@ -218,12 +313,11 @@ class SolverWrapper:
                 "continuous": highspy.HighsVarType.kContinuous,
             }
             return self.solver.addVariables(
-                indexes,
-                lb=lb,
-                ub=ub,
-                type=var_type_map[var_type],
-                name_prefix=name_prefix,
-            )
+                indexes, 
+                lb=lbs, 
+                ub=ubs, 
+                type=var_type_map[var_type], 
+                name_prefix=name_prefix)
         elif self.external_solver == "gurobi":
             import gurobipy
 
@@ -231,16 +325,21 @@ class SolverWrapper:
                 "integer": gurobipy.GRB.INTEGER,
                 "continuous": gurobipy.GRB.CONTINUOUS,
             }
-            vars = {}
-            for index in indexes:
-                vars[index] = self.solver.addVar(
-                    lb=lb,
-                    ub=ub,
-                    vtype=var_type_map[var_type],
-                    name=f"{name_prefix}{index}",
-                )
+            # Single batched call using keys with per-index bounds
+            keys = list(indexes)
+            lb_map = {idx: float(lbs[pos]) for pos, idx in enumerate(keys)}
+            ub_map = {idx: float(ubs[pos]) for pos, idx in enumerate(keys)}
+
+            vars_td = self.solver.addVars(
+                keys,
+                lb=lb_map,
+                ub=ub_map,
+                vtype=var_type_map[var_type],
+                name=name_prefix,
+            )
+            # Keep model in a consistent state
             self.solver.update()
-            return vars
+            return vars_td
 
     def add_constraint(self, expr, name=""):
         """Add a linear (in)equation to the model.
@@ -425,6 +524,9 @@ class SolverWrapper:
         # For both solvers, we have the same function to call
         # If the time limit is infinite, we call the optimize function directly
         # Otherwise, we call the function with a timeout
+        # Apply any queued bound updates right before solving
+        self._apply_pending_bound_updates()
+
         if self.time_limit == float('inf') or (not self.use_also_custom_timeout):
             self.solver.optimize()
         else:
@@ -504,45 +606,33 @@ class SolverWrapper:
     #     return match.groups()
 
     def parse_var_name(self, string, name_prefix):
-        """Parse a variable name and extract indices inside parentheses.
+        """Parse a variable name and extract indices inside parentheses or brackets.
 
-        Variable names follow one of two patterns:
+        Supported forms:
+        - ``<prefix>(i,j,...)`` (HiGHS style / tuple repr)
+        - ``<prefix>[i,j,...]`` (Gurobi addVars style)
+        - Single-suffix names ``<prefix><i>`` are handled elsewhere.
 
-        1. ``<prefix>(i,j,...)`` - parenthesised, comma separated indices
-           where elements may be quoted strings or integers.
-        2. ``<prefix><i>`` - single suffix index (handled elsewhere).
-
-        Parameters
-        ----------
-        string : str
-            Full variable name.
-        name_prefix : str
-            Expected prefix.
-
-        Returns
-        -------
-        list[str]
-            Raw index components (still strings, quotes stripped).
-
-        Raises
-        ------
-        ValueError
-            If the name does not match the expected pattern.
+        Returns a list of raw index components as strings (quotes stripped).
         """
-        # Dynamic regex pattern to extract components inside parentheses
-        pattern = rf"{name_prefix}\(\s*(.*?)\s*\)$"
-        match = re.match(pattern, string)
+        # Try parentheses first
+        match = re.match(rf"{name_prefix}\(\s*(.*?)\s*\)$", string)
+        if match:
+            components_str = match.group(1)
+        else:
+            # Try square brackets
+            match = re.match(rf"{name_prefix}\[\s*(.*?)\s*\]$", string)
+            if match:
+                components_str = match.group(1)
+            else:
+                utils.logger.error(f"{__name__}: Invalid format for variable name: {string}")
+                raise ValueError(f"Invalid format: {string}")
 
-        if not match:
-            utils.logger.error(f"{__name__}: Invalid format for variable name: {string}")
-            raise ValueError(f"Invalid format: {string}")
-
-        # Extract the component list inside parentheses
-        components_str = match.group(1)
-
-        # Split components while handling quoted strings
-        components = re.findall(r"'[^']*'|\d+", components_str)
-
+        # Split components while handling quoted strings and bare tokens
+        # Accept quoted chunks or unquoted non-comma spans
+        components = re.findall(r"'[^']*'|[^,\s]+", components_str)
+        # Strip surrounding quotes if present
+        components = [c.strip("'") for c in components]
         return components
 
     def get_variable_values(
@@ -595,25 +685,23 @@ class SolverWrapper:
                 return values
 
             if var.startswith(name_prefix):
-                
-                # If there are some parentheses in the variable name, we assume that the variable is indexed as var(0,...), var(1,...), ...
-                if var.count("(") > 0:
-                    # We extract the elements inside the parentheses, and remove the ' character from the elements
-                    elements = [elem.strip("'") for elem in self.parse_var_name(var, name_prefix)]
+                # If there are brackets or parentheses, treat as indexed name and parse components
+                if ("(" in var) or ("[" in var):
+                    elements = self.parse_var_name(var, name_prefix)
 
                     if len(index_types) != len(elements):
                         raise Exception(f"We are getting the value of variable `{var}`, but the provided list of var_types `{index_types}` has different length.")
 
-                    # We cast the elements to the appropriate types
-                    tuple_index = tuple([index_types[i](elements[i]) for i in range(len(elements))])
+                    # Cast elements to appropriate types and build index
+                    casted = [index_types[i](elements[i]) for i in range(len(elements))]
+                    key = casted[0] if len(casted) == 1 else tuple(casted)
 
-                    values[tuple_index] = varValues[index]
-                    if binary_values and round(values[tuple_index]) not in [0,1]:
-                        utils.logger.error(f"{__name__}: Variable {var} has value {values[tuple_index]}, which is not binary.")
-                        raise Exception(f"Variable {var} has value {values[tuple_index]}, which is not binary.")
-                
-                # If there are no parentheses in the variable name, we assume that the variable is indexed as var0, var1, ...
+                    values[key] = varValues[index]
+                    if binary_values and round(values[key]) not in [0,1]:
+                        utils.logger.error(f"{__name__}: Variable {var} has value {values[key]}, which is not binary.")
+                        raise Exception(f"Variable {var} has value {values[key]}, which is not binary.")
                 else:
+                    # No brackets/parentheses -> assume single suffix: var0, var1, ...
                     element = var.replace(name_prefix, "", 1)
                     if len(index_types) > 1:
                         utils.logger.error(f"{__name__}: We are getting the value of variable `{var}` for name_prefix `{name_prefix}`, with only one index `{element}`, but the provided list of var_types is not of length one `{index_types}`.")
@@ -621,10 +709,7 @@ class SolverWrapper:
 
                     elem_index = index_types[0](element)
                     values[elem_index] = varValues[index]
-                    if (
-                        binary_values 
-                        and round(values[elem_index]) not in [0,1]
-                    ):
+                    if binary_values and round(values[elem_index]) not in [0,1]:
                         utils.logger.error(f"{__name__}: Variable {var} has value {values[elem_index]}, which is not binary.")
                         raise Exception(f"Variable {var} has value {values[elem_index]}, which is not binary.")
 

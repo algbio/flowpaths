@@ -2,6 +2,7 @@ import flowpaths.stdigraph as stdigraph
 from flowpaths.utils import safetypathcoverscycles
 from flowpaths.utils import solverwrapper as sw
 import flowpaths.utils as utils
+import networkx as nx
 import time
 import copy
 from abc import ABC, abstractmethod
@@ -9,8 +10,9 @@ from abc import ABC, abstractmethod
 class AbstractWalkModelDiGraph(ABC):
     # storing some defaults
     optimize_with_safe_sequences = True
-    optimize_with_safe_sequences_allow_geq_constraints = False
+    optimize_with_safe_sequences_allow_geq_constraints = True
     optimize_with_safe_sequences_fix_via_bounds = False
+    optimize_with_safe_sequences_fix_zero_edges = False
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
     optimize_with_max_safe_antichain_as_subset_constraints = False
@@ -22,6 +24,7 @@ class AbstractWalkModelDiGraph(ABC):
         G: stdigraph.stDiGraph,
         k: int,
         max_edge_repetition: int = 1,
+        max_edge_repetition_dict: dict = None,
         subset_constraints: list = [],
         subset_constraints_coverage: float = 1,
         optimization_options: dict = None,
@@ -43,6 +46,19 @@ class AbstractWalkModelDiGraph(ABC):
         - `max_edge_repetition: int`, optional
 
             The maximum number of times an edge can be used in a walk. Defaults to 1.
+
+        - `max_edge_repetition_dict: dict`, optional
+
+                A per-edge upper bound mapping that overrides `max_edge_repetition` on a per-edge basis.
+                Keys are edges `(u, v)` from `G.edges()` and values are non-negative integers specifying
+                the maximum number of times that edge can be used within a single walk (layer).
+
+                Requirements and behavior:
+                - If provided, it must contain an entry for every edge in `G` (missing entries raise `ValueError`).
+                - Values should be integers ≥ 0; a value of 0 forbids the edge in any walk.
+                - When both `max_edge_repetition` and this dict are provided, the dict takes precedence per edge.
+                - These bounds are applied per layer i and are used to set the variable upper bounds and related
+                    big-M constants in the model.
 
         - `subset_constraints: list`, optional
             
@@ -84,7 +100,9 @@ class AbstractWalkModelDiGraph(ABC):
 
         Raises
         ----------
+
         - ValueError: If `trusted_edges_for_safety` is not provided when optimizing with `optimize_with_safe_sequences`.
+        - ValueError: If `max_edge_repetition_dict` is provided but is missing any edge in `G`.
         """
 
         self.G = G
@@ -96,8 +114,15 @@ class AbstractWalkModelDiGraph(ABC):
         if k <= 0:
             utils.logger.error(f"{__name__}: k must be positive, got {k}.")
             raise ValueError(f"k must be positive, got {k}.")
-        self.max_edge_repetition = max_edge_repetition
-        
+        if max_edge_repetition_dict is None:
+            self.edge_upper_bounds = {edge: max_edge_repetition for edge in self.G.edges()}
+        else:
+            self.edge_upper_bounds = max_edge_repetition_dict
+            for edge in self.G.edges():
+                if edge not in self.edge_upper_bounds:
+                    utils.logger.critical(f"{__name__}: Missing max_edge_repetition in max_edge_repetition_dict for edge {edge}")
+                    raise ValueError(f"Missing max_edge_repetition for edge {edge}")
+
         self.subset_constraints = copy.deepcopy(subset_constraints)
         if self.subset_constraints is not None:
             self._check_valid_subset_constraints()
@@ -128,6 +153,10 @@ class AbstractWalkModelDiGraph(ABC):
         self.optimize_with_max_safe_antichain_as_subset_constraints = optimization_options.get("optimize_with_max_safe_antichain_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_max_safe_antichain_as_subset_constraints)
         self.optimize_with_safe_sequences_allow_geq_constraints = optimization_options.get("optimize_with_safe_sequences_allow_geq_constraints", AbstractWalkModelDiGraph.optimize_with_safe_sequences_allow_geq_constraints)
         self.optimize_with_safe_sequences_fix_via_bounds = optimization_options.get("optimize_with_safe_sequences_fix_via_bounds", AbstractWalkModelDiGraph.optimize_with_safe_sequences_fix_via_bounds)
+        self.optimize_with_safe_sequences_fix_zero_edges = optimization_options.get(
+            "optimize_with_safe_sequences_fix_zero_edges",
+            AbstractWalkModelDiGraph.optimize_with_safe_sequences_fix_zero_edges,
+        )
 
         self._is_solved = False
                 
@@ -182,9 +211,11 @@ class AbstractWalkModelDiGraph(ABC):
 
         # Basic
 
-        utils.logger.debug(f"{__name__}: Encoding walks for graph id = {utils.fpid(self.G)} with k = {self.k} and max_edge_repetition = {self.max_edge_repetition}")
+        utils.logger.debug(f"{__name__}: Encoding walks for graph id = {utils.fpid(self.G)} with k = {self.k}")
 
-        self.edge_vars = self.solver.add_variables(self.edge_indexes, name_prefix="edge", lb=0, ub=self.max_edge_repetition, var_type="integer")
+        # Build per-index UBs for edge variables using self.edge_upper_bounds[(u,v)] repeated across layers
+        edge_ubs = [float(self.edge_upper_bounds[(u, v)]) for (u, v, i) in self.edge_indexes]
+        self.edge_vars = self.solver.add_variables(self.edge_indexes, name_prefix="edge", lb=0, ub=edge_ubs, var_type="integer")
 
         # Note that x[(u,v,i)] can take values bigger than 1 if using the edge (u,v) more times, but by our construction the self.G.source is
         # also a source of the graph, so the walk cannot come back to self.G.source.
@@ -244,8 +275,10 @@ class AbstractWalkModelDiGraph(ABC):
                 incoming_selected_v = self.solver.quicksum( self.edge_selected_vars[(u, v, i)] for u in self.G.predecessors(v) )
 
                 # If at least one x[(u,v,i)] is 1, then at least one y[(u,v,i)] is 1
+                # Big-M uses per-edge upper bounds for incoming edges to v
+                M_v = sum(self.edge_upper_bounds[(u, v)] for u in self.G.predecessors(v))
                 self.solver.add_constraint(
-                    incoming_flow_v <= self.max_edge_repetition * self.G.in_degree(v) * incoming_selected_v,
+                    incoming_flow_v <= M_v * incoming_selected_v,
                     name=f"22a_vertex_selected_v={v}_i={i}",
                 )
                 # At most one y[(u,v,i)] = 1
@@ -284,17 +317,16 @@ class AbstractWalkModelDiGraph(ABC):
         if len(self.subset_constraints) == 0:
             return
         else:
-            utils.logger.debug(f"{__name__}: Encoding subset constraints for graph id = {utils.fpid(self.G)} with k = {self.k} and max_edge_repetition = {self.max_edge_repetition}")
+            utils.logger.debug(f"{__name__}: Encoding subset constraints for graph id = {utils.fpid(self.G)} with k = {self.k}")
 
         self.subset_indexes = [ (i, j) for i in range(self.k) for j in range(len(self.subset_constraints)) ]
 
         self.subset_vars = self.solver.add_variables(
             self.subset_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
 
-        # Model z[(u,v,i)] = min(1, x[(u,v,i)]) with a binary aux var and:
+        # Model z[(u,v,i)] = min(1, x[(u,v,i)]) with a binary aux var and per-edge UB:
         #   z <= x
-        #   x <= U * z
-        U = self.max_edge_repetition
+        #   x <= U_e * z, where U_e is the per-edge upper bound
         self.edge_used_vars = self.solver.add_variables(
             self.edge_indexes, name_prefix="used_edge", lb=0, ub=1, var_type="integer"
         )
@@ -307,8 +339,8 @@ class AbstractWalkModelDiGraph(ABC):
                 )
                 # x_ei <= U * z_ei
                 self.solver.add_constraint(
-                    self.edge_vars[(u, v, i)] <= U * self.edge_used_vars[(u, v, i)],
-                    name=f"x_le_U_min1_u={u}_v={v}_i={i}",
+                    self.edge_vars[(u, v, i)] <= self.edge_upper_bounds[(u, v)] * self.edge_used_vars[(u, v, i)],
+                    name=f"x_le_Ue_min1_u={u}_v={v}_i={i}",
                 )
 
         for i in range(self.k):
@@ -354,6 +386,11 @@ class AbstractWalkModelDiGraph(ABC):
         self.walks_to_fix = self._get_walks_to_fix_from_safe_lists()
         self.solve_statistics["edge_variables=1"] = 0
         self.solve_statistics["edge_variables>=1"] = 0
+        self.solve_statistics["edge_variables=0"] = 0
+
+        # Optionally fix clearly incompatible edges to zero using reachability w.r.t. each safe walk
+        if self.optimize_with_safe_sequences_fix_zero_edges:
+            self._apply_safety_optimizations_fix_zero_edges()
 
         # In this case, we use only the maximum antichain of maximal safe sequences as subset constraints
         if self.optimize_with_max_safe_antichain_as_subset_constraints:
@@ -369,41 +406,144 @@ class AbstractWalkModelDiGraph(ABC):
                 for u, v in self.walks_to_fix[i]:
                     if self.G._is_scc_edge(u, v):
                         if self.optimize_with_safe_sequences_allow_geq_constraints:
-                            self.solver.add_constraint(
-                                self.edge_vars[(u, v, i)] >= 1,
-                                name=f"safe_list_u={u}_v={v}_i={i}",
-                            )
+                            # Raise LB via bounds only when enabled; else add constraint
+                            if self.optimize_with_safe_sequences_fix_via_bounds:
+                                self.solver.queue_set_var_lower_bound(self.edge_vars[(u, v, i)], 1)
+                            else:
+                                self.solver.add_constraint(
+                                    self.edge_vars[(u, v, i)] >= 1,
+                                    name=f"safe_list_u={u}_v={v}_i={i}",
+                                )
                             self.solve_statistics["edge_variables>=1"] += 1
                     else:
                         # Instead of adding an equality constraint x==1 we tighten bounds directly.
-                        try:
-                            if not self.optimize_with_safe_sequences_fix_via_bounds:
-                                raise Exception("throw")
-                            self.solver.fix_variable(self.edge_vars[(u, v, i)], int(1))
-                        except Exception:
-                            # Fallback: keep old behaviour if fixing fails for some backend edge case
+                        if self.optimize_with_safe_sequences_fix_via_bounds:
+                            # Queue a fix to value 1
+                            self.solver.queue_fix_variable(self.edge_vars[(u, v, i)], int(1))
+                        else:
+                            # Keep old behaviour via equality constraint
                             self.solver.add_constraint(
                                 self.edge_vars[(u, v, i)] == 1,
                                 name=f"safe_list_u={u}_v={v}_i={i}",
                             )
                         self.solve_statistics["edge_variables=1"] += 1
 
+    def _apply_safety_optimizations_fix_zero_edges(self):
+        """
+        Prune layer-edge variables to zero using safe-walk reachability while
+        preserving edges that can be part of the walk or its connectors.
+
+        For each walk i in `walks_to_fix` we build a protection set of edges that
+        must not be fixed to 0 for layer i:
+            1) Protect all edges that appear in the walk itself.
+            2) Whole-walk reachability: let first_node be the first node of the walk
+                    and last_node the last node. Protect any edge (u,v) such that
+                        - u is reachable (forward) from last_node, OR
+                        - v can reach (backward) first_node.
+            3) Gap-bridging between consecutive edges: for every pair of consecutive
+                    edges whose endpoints do not match (a gap), let
+                        - current_last  = end node of the first edge, and
+                        - current_start = start node of the next edge.
+                    Protect any edge (u,v) such that
+                        - u is reachable (forward) from current_last, AND
+                        - v can reach (backward) current_start.
+
+        All remaining edges (u,v) not in the protection set are fixed to 0 in
+        layer i.
+
+        Notes:
+        - Requires `self.walks_to_fix` already computed and `self.edge_vars` created.
+        - Reachability is computed with networkx `descendants` (forward) and
+            `ancestors` (backward), including the seed node itself in each set.
+        - If a walk has no gaps, only the whole-walk reachability protection (2)
+            applies. If the graph structure makes many edges reachable, little or no
+            pruning may occur for that walk.
+        """
+        if not hasattr(self, "walks_to_fix") or self.walks_to_fix is None:
+            return
+
+        fixed_zero_count = 0
+        # Ensure we don't go beyond k layers
+        for i in range(min(len(self.walks_to_fix), self.k)):
+            walk = self.walks_to_fix[i]
+            if not walk:
+                continue
+
+            # Build the set of edges that should NOT be fixed to 0 for this layer i
+            # Start by protecting all edges in the walk itself
+            protected_edges = set((u, v) for (u, v) in walk if self.G.has_edge(u, v))
+
+            # Also protect edges that are reachable from the last node of the walk
+            # or that can reach the first node of the walk
+            first_node = walk[0][0]
+            last_node = walk[-1][1]
+            reachable_from_last_walk = nx.descendants(self.G, last_node) | {last_node}
+            can_reach_first_walk = nx.ancestors(self.G, first_node) | {first_node}
+            for (u, v) in self.G.edges:
+                if (u in reachable_from_last_walk) or (v in can_reach_first_walk):
+                    protected_edges.add((u, v))
+
+            # Collect pairs of non-contiguous consecutive edges (gaps)
+            gap_pairs = []
+            for idx in range(len(walk) - 1):
+                end_prev = walk[idx][1]
+                start_next = walk[idx + 1][0]
+                if end_prev != start_next:
+                    gap_pairs.append((end_prev, start_next))
+
+            # If there are no gaps, do not prune anything for this walk/layer
+            if not gap_pairs:
+                continue
+
+            # For each gap, add edges that can lie on some path bridging the gap
+            for (current_last, current_start) in gap_pairs:
+                reachable_from_last = nx.descendants(self.G, current_last) | {current_last}
+                can_reach_start = nx.ancestors(self.G, current_start) | {current_start}
+
+                for (u, v) in self.G.edges:
+                    if (u in reachable_from_last) and (v in can_reach_start):
+                        protected_edges.add((u, v))
+
+            # Now fix every other edge to 0 for this layer i
+            for (u, v) in self.G.edges:
+                if (u, v) in protected_edges:
+                    continue
+                # Queue zero-fix for batch bounds update
+                self.solver.queue_fix_variable(self.edge_vars[(u, v, i)], int(0))
+                fixed_zero_count += 1
+
+        if fixed_zero_count:
+            # Accumulate into solve statistics
+            self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
+            utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
+
+
+
     def _get_walks_to_fix_from_safe_lists(self) -> list:
      
         # Returns the walks to fix based on the safe lists.
         # The method finds the longest safe list for each edge and returns the walks to fix based on the longest safe list.
 
+        # If already computed before, return the cached version
+        if hasattr(self, "walks_to_fix") and self.walks_to_fix is not None:
+            utils.logger.debug(f"{__name__}: Returning cached walks_to_fix with {len(self.walks_to_fix)} walks.")
+            return self.walks_to_fix
+
         # If we have no safe lists, we return an empty list
         if self.safe_lists is None or len(self.safe_lists) == 0:
-            return []
+            self.walks_to_fix = []
+            utils.logger.debug(f"{__name__}: No safe lists available; caching empty walks_to_fix.")
+            return self.walks_to_fix
 
         walks_to_fix = self.G.get_longest_incompatible_sequences(self.safe_lists)
+        # Cache the result
+        self.walks_to_fix = walks_to_fix
 
         utils.logger.debug(f"{__name__}: Found {len(walks_to_fix)} walks to fix based on safe lists.")
         for i, walk in enumerate(walks_to_fix):
             utils.logger.debug(f"{__name__}: Safe walk {i}: {walk}")
 
-        return walks_to_fix
+        return self.walks_to_fix
 
     def _check_valid_subset_constraints(self):
         """
@@ -491,6 +631,16 @@ class AbstractWalkModelDiGraph(ABC):
     
     def set_solved(self):
         self._is_solved = True
+
+    def compute_edge_max_reachable_value(self, u, v) -> int:
+        """
+        Returns an upper bound on how many times edge (u,v) can be used in a single walk layer.
+
+        Subclasses should override this to provide a tighter, problem-specific bound.
+        The default falls back to `self.max_edge_repetition`.
+        Must return a non-negative integer.
+        """
+        return int(self.max_edge_repetition)
 
     @abstractmethod
     def get_solution(self):

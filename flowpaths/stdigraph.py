@@ -4,6 +4,7 @@ from flowpaths.utils import graphutils
 from flowpaths.stdag import stDAG
 import flowpaths.utils as utils
 from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
+from typing import Dict, Tuple
 
 
 class stDiGraph(AbstractSourceSinkGraph):
@@ -374,4 +375,95 @@ class stDiGraph(AbstractSourceSinkGraph):
                 seq_idx_set.add(seq_idx)
 
         return incompatible_sequences
+
+    def compute_edge_max_reachable_value(self, flow_attr: str) -> Dict[Tuple[str, str], float]:
+        """For each base edge (u,v), compute the maximum ``flow_attr`` over:
+        - the edge (u,v) itself,
+        - any edge reachable forward from v,
+        - any edge whose head can reach u (i.e., backward reachability to u).
+
+        Efficiently uses the precomputed SCC condensation and runs dynamic programming on
+        the condensation DAG.
+
+        Returns a dict mapping each original edge (u,v) to the computed float. 
+
+        If an edge has a missing ``flow_attr'' (the source and sink edges) we treat its flow value as 0.
+
+        Examples
+        --------
+        >>> import networkx as nx
+        >>> from flowpaths.stdigraph import stDiGraph
+        >>> G = nx.DiGraph()
+        >>> G.add_edge("a", "b", flow=1)
+        >>> G.add_edge("b", "c", flow=5)
+        >>> G.add_edge("c", "a", flow=3)  # cycle among a,b,c
+        >>> G.add_edge("c", "d", flow=2)
+        >>> H = stDiGraph(G)
+        >>> res = H.compute_edge_max_reachable_value("flow")
+        >>> # Every edge can reach an edge of weight 5 within the SCC or forward
+        >>> res[("a", "b")] == 5 and res[("b", "c")] == 5 and res[("c", "a")] == 5 and res[("c", "d")] == 5
+        True
+        """
+        C: nx.DiGraph = self._condensation
+        mapping = C.graph["mapping"]  # original node -> condensation node (int)
+
+        # 2) Precompute per-SCC local maxima and per-edge weights.
+        #
+        #    - local_out[c]: the max weight of any edge whose TAIL is inside SCC `c`.
+        #      This represents the best edge you can reach by going forward from any
+        #      node in this SCC (including edges that stay inside the SCC or that exit it).
+        #
+        #    - local_in[c]: the max weight of any edge whose HEAD is inside SCC `c`.
+        #      This captures the best edge that can reach this SCC (used for backward reachability).
+        #
+        #    We also record each edge's own weight so the final answer includes (u,v) itself.
+        local_out = {c: 0.0 for c in C.nodes()}
+        local_in = {c: 0.0 for c in C.nodes()}
+
+        edge_weight: Dict[Tuple[str, str], float] = {}
+        for u, v, data in self.edges(data=True):
+            w = float(data.get(flow_attr, 0.0))
+            edge_weight[(u, v)] = w
+            cu = mapping[u]
+            cv = mapping[v]
+            if w > local_out[cu]:
+                local_out[cu] = w
+            if w > local_in[cv]:
+                local_in[cv] = w
+
+        topological_sort = list(nx.topological_sort(C))
+
+        # 3) Forward DP over the condensation DAG to compute, for each SCC `c`, the
+        #    maximum edge weight reachable from `c` by moving forward along DAG edges.
+        #    Because SCCs are contracted, this also correctly accounts for reachability
+        #    within cycles (inside a single SCC).
+        max_desc = {c: local_out[c] for c in C.nodes()}
+        for c in reversed(topological_sort):
+            for s in C.successors(c):
+                if max_desc[s] > max_desc[c]:
+                    max_desc[c] = max_desc[s]
+
+        # 4) Backward DP (propagated forward along edges) to compute, for each SCC `c`, the
+        #    maximum edge weight among edges whose HEAD can reach `c` (i.e. along the
+        #    reversed condensation DAG). We propagate `local_in` from ancestors to successors
+        #    in topological order.
+        max_anc = {c: local_in[c] for c in C.nodes()}
+        for c in topological_sort:
+            for s in C.successors(c):
+                if max_anc[c] > max_anc[s]:
+                    max_anc[s] = max_anc[c]
+
+        # 5) For each original edge (u,v), combine:
+        #    - the edge's own weight,
+        #    - the best reachable-from-SCC(v) weight (forward), and
+        #    - the best reaching-SCC(u) weight (backward).
+        #
+        #    If no reachable candidate exists, the value is 0.0 by construction of locals.
+        result: Dict[Tuple[str, str], float] = {}
+        for u, v in self.edges():
+            cu = mapping[u]
+            cv = mapping[v]
+            result[(u, v)] = max(edge_weight[(u, v)], max_desc[cv], max_anc[cu])
+
+        return result
     
