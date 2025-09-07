@@ -29,7 +29,7 @@ def test_min_flow_decomp(filename: str):
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
             "optimize_with_safe_sequences_allow_geq_constraints": True,
             "optimize_with_safe_sequences_fix_via_bounds": True,
-            "optimize_with_safe_sequences_fix_zero_edges": True,
+            "optimize_with_safe_sequences_fix_zero_edges": False,
         },
         solver_options={
             "external_solver": "highs", # we can try also "highs" at some point
@@ -146,15 +146,16 @@ def process_solution(model):
     print("graph_width:", solve_statistics['graph_width']) # the the minimum number of s-t walks needed to cover all edges
     print("model_status:", solve_statistics['model_status'])
     print("solve_time:", solve_statistics['solve_time']) # time taken by the ILP for a given k, or by MFD to iterate through k and do small internal things
+    print("solve_time_ilp:", solve_statistics['solve_time_ilp']) # time taken by the ILP for a given k, or by MFD to iterate through k and do small internal things
     print("number_of_nontrivial_SCCs:", solve_statistics['number_of_nontrivial_SCCs']) # trivial = at least one edge
     print("size_of_largest_SCC:", solve_statistics['size_of_largest_SCC']) # size = number of edges
     print("avg_size_of_non_trivial_SCC:", solve_statistics['avg_size_of_non_trivial_SCC']) # size = number of edges
 
 def main():
-    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    # test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
     test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(1300000.1400000).V809.E1091.mincyc1000.graph")
-    test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
-    test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
+    # test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
+    # test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
 
 if __name__ == "__main__":
     # Configure logging

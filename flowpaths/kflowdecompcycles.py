@@ -95,7 +95,8 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             - If the graph contains edges with negative flow values.
             - ValueError: If `flow_attr_origin` is not `node` or `edge`.
         """
-    
+        utils.logger.info(f"{__name__}: START initializing with graph id = {utils.fpid(G)}, k = {k}")
+
         # Handling node-weighted graphs
         self.flow_attr_origin = flow_attr_origin
         if self.flow_attr_origin == "node":
@@ -164,11 +165,17 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
 
         # Call the constructor of the parent class AbstractPathModelDAG
+        # Build per-edge repetition upper bounds: use the edge flow when available,
+        # otherwise fall back to self.w_max (e.g., for source/sink helper edges).
+        self.edge_upper_bounds_dict = {
+            (u, v): (data[self.flow_attr] if self.flow_attr in data else self.w_max)
+            for u, v, data in self.G.edges(data=True)
+        }
         super().__init__(
             G=self.G,
             k=self.k,
             # max_edge_repetition=self.w_max,
-            max_edge_repetition_dict=self.G.compute_edge_max_reachable_value(flow_attr=self.flow_attr),
+            max_edge_repetition_dict=self.edge_upper_bounds_dict,
             subset_constraints=self.subset_constraints,
             subset_constraints_coverage=self.subset_constraints_coverage,
             optimization_options=self.optimization_options,
@@ -176,20 +183,28 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             solve_statistics=self.solve_statistics
         )
 
+        utils.logger.debug(f"{__name__}: START create_solver_and_walks()")
         # This method is called from the super class AbstractWalkModelDiGraph
         self.create_solver_and_walks()
+        utils.logger.debug(f"{__name__}: END create_solver_and_walks()")
 
+        utils.logger.debug(f"{__name__}: START encoding flow decomposition")
         # This method is called from the current class 
         self._encode_flow_decomposition()
+        utils.logger.debug(f"{__name__}: END encoding flow decomposition")
 
+        utils.logger.debug(f"{__name__}: START encoding given weights")
         # This method is called from the current class
         self._encode_given_weights()
+        utils.logger.debug(f"{__name__}: END encoding given weights")
 
-        utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
+        utils.logger.info(f"{__name__}: END initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
     def _encode_flow_decomposition(self):
 
+        # print("edge_upper_bounds", self.edge_upper_bounds)
         # pi vars 
+        # edge_ubs = [self.edge_upper_bounds[(u, v)] for (u, v, i) in self.edge_indexes]
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
             name_prefix="pi",

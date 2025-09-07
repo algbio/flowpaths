@@ -165,6 +165,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self.solver_options = solver_options
         self.time_limit = self.solver_options.get("time_limit", sw.SolverWrapper.time_limit)
         self.solve_time_start = None
+        self.solve_time_ilp_total = 0
 
         self.solve_statistics = {}
         self._solution = None
@@ -200,6 +201,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
             This overloads the `solve()` method from `AbstractWalkModelDiGraph` class.
         """
         self.solve_time_start = time.perf_counter()
+        utils.logger.info(f"{__name__}: starting to solve the MinFlowDecompCycles model for graph id = {utils.fpid(self.G)}")
 
         if self.optimization_options.get("optimize_with_given_weights", MinFlowDecompCycles.optimize_with_given_weights):            
             self._solve_with_given_weights()
@@ -213,10 +215,9 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                 if len(self._given_weights_model.get_solution(remove_empty_walks=True)["walks"]) == i:
                     fd_model = self._given_weights_model
 
-            fd_solver_options = copy.deepcopy(self.solver_options)
-            fd_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
-
             if fd_model is None:
+                fd_solver_options = copy.deepcopy(self.solver_options)
+                fd_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
                 fd_model = kflowdecompcycles.kFlowDecompCycles(
                     G=self.G,
                     flow_attr=self.flow_attr,
@@ -231,12 +232,17 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                     solver_options=fd_solver_options,
                 )
                 fd_model.solve()
-                self.solve_statistics = fd_model.solve_statistics
 
-                # If the previous run exceeded the time limit, 
-                # we still stop the search, even if we might have managed to solve it
-                if self.solve_time_elapsed > self.time_limit:
-                    return False
+            self.solve_statistics = fd_model.solve_statistics
+            self.solve_time_ilp_total += self.solve_statistics.get("solve_time_ilp", 0)
+            self.solve_statistics["solve_time"] = self.solve_time_elapsed
+            self.solve_statistics["solve_time_ilp"] = self.solve_time_ilp_total
+            self.solve_statistics["min_gen_set_solve_time"] = self._mingenset_model.solve_statistics.get("total_solve_time", 0) if self._mingenset_model is not None else 0
+
+            # If the previous run exceeded the time limit, 
+            # we still stop the search, even if we might have managed to solve it
+            if self.solve_time_elapsed > self.time_limit:
+                return False
 
             if fd_model.is_solved():
                 self._solution = fd_model.get_solution(remove_empty_walks=True)
@@ -245,17 +251,11 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
                     self._solution["_walks_internal"] = self._solution["walks"]
                     self._solution["walks"] = self.G_internal.get_condensed_paths(self._solution["walks"])
                 self.set_solved()
-                self.solve_statistics = fd_model.solve_statistics
-                # we overwrite solve_time with the total time MFD has taken
-                self.solve_statistics["solve_time"] = time.perf_counter() - self.solve_time_start
-                self.solve_statistics["min_gen_set_solve_time"] = self._mingenset_model.solve_statistics.get("total_solve_time", 0) if self._mingenset_model is not None else 0
                 self.fd_model = fd_model
                 return True
             elif fd_model.solver.get_model_status() == sw.SolverWrapper.infeasible_status:
-                self.solve_statistics = fd_model.solve_statistics
                 utils.logger.info(f"{__name__}: model is infeasible for k = {i}")
             else:
-                self.solve_statistics = fd_model.solve_statistics
                 # If the model is not solved and the status is not infeasible,
                 # it means that the solver stopped because of an unexpected termination,
                 # thus we cannot conclude that the model is infeasible.

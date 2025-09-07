@@ -181,7 +181,7 @@ class stDiGraph(AbstractSourceSinkGraph):
         - `ValueError` if the edge (u,v) is not inside an SCC.
         """
 
-        if not self._is_scc_edge(u, v):
+        if not self.is_scc_edge(u, v):
             utils.logger.error(f"{__name__}: Edge ({u},{v}) is not an edge inside an SCC.")
             raise ValueError(f"Edge ({u},{v}) is not an edge inside an SCC.")
         
@@ -237,7 +237,7 @@ class stDiGraph(AbstractSourceSinkGraph):
         for u, v in (edges_to_ignore or []):
             # If (u,v) is an edge between different SCCs
             # Then the corresponding edge to ignore is between the two SCCs
-            if not self._is_scc_edge(u, v):
+            if not self.is_scc_edge(u, v):
                 edge_multiplicity[self._edge_to_condensation_edge(u, v)] -= 1
             else:
                 # (u,v) is an edge within the same SCC
@@ -286,9 +286,9 @@ class stDiGraph(AbstractSourceSinkGraph):
 
         return width
     
-    def _is_scc_edge(self, u, v) -> bool:
+    def is_scc_edge(self, u, v) -> bool:
         """
-        Returns True if (u,v) is an edge inside an SCCs, False otherwise.
+        Returns True if (u,v) is an edge inside an SCC of self, False otherwise.
         """
 
         # Check if (u,v) is an edge of the graph

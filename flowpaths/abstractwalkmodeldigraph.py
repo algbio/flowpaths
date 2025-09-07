@@ -122,6 +122,11 @@ class AbstractWalkModelDiGraph(ABC):
                 if edge not in self.edge_upper_bounds:
                     utils.logger.critical(f"{__name__}: Missing max_edge_repetition in max_edge_repetition_dict for edge {edge}")
                     raise ValueError(f"Missing max_edge_repetition for edge {edge}")
+        # We set to 1 in edge_upper_bounds if the edge is not inside an SCC of self.G,
+        # because these edges cannot be traversed more than 1 times by any walk
+        for edge in self.G.edges():
+            if not self.G.is_scc_edge(edge[0], edge[1]):
+                self.edge_upper_bounds[edge] = 1
 
         self.subset_constraints = copy.deepcopy(subset_constraints)
         if self.subset_constraints is not None:
@@ -404,7 +409,7 @@ class AbstractWalkModelDiGraph(ABC):
                 # print("Fixing variables for safe list #", i)
                 # iterate over the edges in the safe list to fix variables to 1
                 for u, v in self.walks_to_fix[i]:
-                    if self.G._is_scc_edge(u, v):
+                    if self.G.is_scc_edge(u, v):
                         if self.optimize_with_safe_sequences_allow_geq_constraints:
                             # Raise LB via bounds only when enabled; else add constraint
                             if self.optimize_with_safe_sequences_fix_via_bounds:
@@ -605,7 +610,7 @@ class AbstractWalkModelDiGraph(ABC):
         # self.write_model(f"model-{self.id}.lp")
         start_time = time.perf_counter()
         self.solver.optimize()
-        self.solve_statistics[f"solve_time"] = time.perf_counter() - start_time
+        self.solve_statistics[f"solve_time_ilp"] = time.perf_counter() - start_time
         self.solve_statistics[f"model_status"] = self.solver.get_model_status()
         self.solve_statistics[f"number_of_nontrivial_SCCs"] = self.G.get_number_of_nontrivial_SCCs()
         self.solve_statistics[f"avg_size_of_non_trivial_SCC"] = self.G.get_avg_size_of_non_trivial_SCC()
