@@ -28,8 +28,8 @@ def test_min_flow_decomp(filename: str):
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
             "optimize_with_safe_sequences_allow_geq_constraints": True,
-            "optimize_with_safe_sequences_fix_via_bounds": True,
-            "optimize_with_safe_sequences_fix_zero_edges": False,
+            "optimize_with_safe_sequences_fix_via_bounds": False,
+            "optimize_with_safe_sequences_fix_zero_edges": True,
         },
         solver_options={
             "external_solver": "highs", # we can try also "highs" at some point
@@ -152,10 +152,10 @@ def process_solution(model):
     print("avg_size_of_non_trivial_SCC:", solve_statistics['avg_size_of_non_trivial_SCC']) # size = number of edges
 
 def main():
-    # test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
+    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
     test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(1300000.1400000).V809.E1091.mincyc1000.graph")
-    # test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
-    # test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
+    test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
+    test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
 
 if __name__ == "__main__":
     # Configure logging

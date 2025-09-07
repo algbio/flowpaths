@@ -164,7 +164,10 @@ class AbstractWalkModelDiGraph(ABC):
         )
 
         self._is_solved = False
-                
+
+        if not hasattr(self, "solve_time_start") or self.solve_time_start is None:
+            self.solve_time_start = time.perf_counter()
+
     def create_solver_and_walks(self):
         """
         Creates a solver instance and encodes the walks in the graph.
@@ -611,6 +614,7 @@ class AbstractWalkModelDiGraph(ABC):
         start_time = time.perf_counter()
         self.solver.optimize()
         self.solve_statistics[f"solve_time_ilp"] = time.perf_counter() - start_time
+        self.solve_statistics[f"solve_time"] = time.perf_counter() - self.solve_time_start
         self.solve_statistics[f"model_status"] = self.solver.get_model_status()
         self.solve_statistics[f"number_of_nontrivial_SCCs"] = self.G.get_number_of_nontrivial_SCCs()
         self.solve_statistics[f"avg_size_of_non_trivial_SCC"] = self.G.get_avg_size_of_non_trivial_SCC()
@@ -672,9 +676,7 @@ class AbstractWalkModelDiGraph(ABC):
         """
         
         if self.edge_vars_sol == {}:
-            self.edge_vars_sol = self.solver.get_variable_values(
-                "edge", [str, str, int]
-            )
+            self.edge_vars_sol = self.solver.get_values(self.edge_vars)
         # utils.logger.debug(f"{__name__}: Getting solution walks with self.edge_vars_sol = {self.edge_vars_sol}")
 
         # self.distance_vars_sol = self.solver.get_variable_values("distance", [str, int])

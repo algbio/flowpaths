@@ -4,7 +4,7 @@ import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 import copy
-
+import time
 
 class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
@@ -161,6 +161,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self._lowerbound_k = None
 
         self.solve_statistics = {}
+        self.solve_time_start = time.perf_counter()
         
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
 
@@ -202,9 +203,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
     def _encode_flow_decomposition(self):
 
-        # print("edge_upper_bounds", self.edge_upper_bounds)
         # pi vars 
-        # edge_ubs = [self.edge_upper_bounds[(u, v)] for (u, v, i) in self.edge_indexes]
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
             name_prefix="pi",
@@ -326,7 +325,7 @@ class kFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_variable_values("weights", [int])
+        weights_sol_dict = self.solver.get_values(self.path_weights_vars)
 
         utils.logger.debug(f"{__name__}: weights_sol_dict = {weights_sol_dict}")
 

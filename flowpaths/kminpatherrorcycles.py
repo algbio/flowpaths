@@ -5,7 +5,7 @@ import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 import copy
 import numpy as np
-
+import time
 
 class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
@@ -197,7 +197,8 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         self._lowerbound_k = None
 
         self.solve_statistics = {}
-        
+        self.solve_time_start = time.perf_counter()
+
         if trusted_edges_for_safety_percentile is not None:
             # Select edges where the flow_attr value is >= trusted_edges_for_safety_percentile (using self.G)
             flow_values = [self.G.edges[edge][flow_attr] for edge in self.G.edges() if flow_attr in self.G.edges[edge]]
@@ -399,7 +400,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_variable_values("weights", [int])
+        weights_sol_dict = self.solver.get_values(self.path_weights_vars)
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])
@@ -408,7 +409,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             )
             for i in range(self.k)
         ]
-        slacks_sol_dict = self.solver.get_variable_values("slack", [int])
+        slacks_sol_dict = self.solver.get_values(self.path_slacks_vars)
         self.path_slacks_sol = [
             (
                 round(slacks_sol_dict[i])

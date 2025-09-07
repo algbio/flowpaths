@@ -4,6 +4,7 @@ import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 from copy import deepcopy
+import time
 
 class kPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
@@ -128,6 +129,7 @@ class kPathCoverCycles(walkmodel.AbstractWalkModelDiGraph):
         self._lowerbound_k = None
 
         self.solve_statistics = {}
+        self.solve_time_start = time.perf_counter()
         self.optimization_options = optimization_options.copy() if optimization_options else {}
         self.optimization_options["trusted_edges_for_safety"] = set(e for e in self.G.edges() if e not in self.edges_to_ignore)
         

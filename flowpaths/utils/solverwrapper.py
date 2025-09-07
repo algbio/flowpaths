@@ -12,75 +12,73 @@ import numpy as np
 class SolverWrapper:
     """Unified MILP/LP modelling convenience layer for HiGHS and Gurobi.
 
-        This class provides *one* API that delegates to either the
-        [HiGHS (``highspy``)](https://highs.dev) or
-        [Gurobi (``gurobipy``)](https://www.gurobi.com/solutions/gurobi-optimizer/) back-end.
-        Only a very small, stable subset of features needed by *flowpaths* is
-        wrapped - it is **not** a general purpose replacement for the native APIs.
+    This class provides *one* API that delegates to either the
+    [HiGHS (``highspy``)](https://highs.dev) or
+    [Gurobi (``gurobipy``)](https://www.gurobi.com/solutions/gurobi-optimizer/) back-end.
+    Only a very small, stable subset of features needed by *flowpaths* is
+    wrapped - it is **not** a general purpose replacement for the native APIs.
 
-        Key capabilities
-        ----------------
-        - Create variables (continuous / integer) in bulk with name prefixing
-        - Add linear constraints
-        - Add specialized modelling shortcuts:
-                - binary * continuous (McCormick) product constraints
-                - integer * continuous product constraints (bit expansion + binaries)
-                - piecewise constant constraints (one-hot selection)
-        - Build linear objectives without triggering a solve (HiGHS) or with native
-            semantics (Gurobi)
-        - Optimize with optional *custom* wall clock timeout (in addition to the
-            solver internal time limit)
-        - Retrieve objective, variable names, variable values (optionally enforcing
-            integrality for binaries), status (mapped to HiGHS style codes)
-        - Persist model to disk (``.lp`` / ``.mps`` depending on backend support)
+    Key capabilities
+    ----------------
+    - Create variables (continuous / integer) in bulk with name prefixing
+    - Add linear constraints
+    - Add specialized modelling shortcuts:
+            - binary * continuous (McCormick) product constraints
+            - integer * continuous product constraints (bit expansion + binaries)
+            - piecewise constant constraints (one-hot selection)
+    - Build linear objectives without triggering a solve (HiGHS) or with native
+        semantics (Gurobi)
+    - Optimize with optional *custom* wall clock timeout (in addition to the
+        solver internal time limit)
+    - Retrieve objective, variable names, variable values (optionally enforcing
+        integrality for binaries), status (mapped to HiGHS style codes)
+    - Persist model to disk (``.lp`` / ``.mps`` depending on backend support)
 
-        Design notes
-        ------------
-        - A minimal set of solver parameters is exposed via keyword arguments in
-            ``__init__`` to keep call sites clean.
-        - Status codes for Gurobi are mapped onto HiGHS style names where a clear
-            1-to-1 mapping exists (see ``gurobi_status_to_highs``).
-        - A *secondary* timeout based on POSIX signals can be enabled to guard
-            against situations where the native solver time limit is not obeyed
-            precisely. When this fires ``did_timeout`` is set and the reported status
-            becomes ``kTimeLimit``.
+    Design notes
+    ------------
+    - A minimal set of solver parameters is exposed via keyword arguments in
+        ``__init__`` to keep call sites clean.
+    - Status codes for Gurobi are mapped onto HiGHS style names where a clear
+        1-to-1 mapping exists (see ``gurobi_status_to_highs``).
+    - A *secondary* timeout based on POSIX signals can be enabled to guard
+        against situations where the native solver time limit is not obeyed
+        precisely. When this fires ``did_timeout`` is set and the reported status
+        becomes ``kTimeLimit``.
 
-        Parameters
-        ----------
-        **kwargs :
-            Flexible configuration. Recognised keys (all optional):
-            - ``external_solver`` (str): ``"highs"`` (default) or ``"gurobi"``.
-            - ``threads`` (int): Thread limit for solver (default: ``4``).
-            - ``time_limit`` (float): Internal solver time limit in seconds
-                (default: ``inf`` = no limit).
-            - ``use_also_custom_timeout`` (bool): If ``True`` activate an *extra*
-                signal based timeout equal to ``time_limit`` (default ``False``).
-            - ``presolve`` (str): HiGHS presolve strategy (default ``"choose"``).
-            - ``log_to_console`` (str): ``"true"`` / ``"false"`` (default
-                ``"false"``) - normalized to solver specific flags.
-            - ``tolerance`` (float): MIP gap, feasibility, integrality tolerance
-                applied uniformly (default ``1e-9``; must be >= 1e-9).
-            - ``optimization_sense`` (str): ``"minimize"`` or ``"maximize``
-                (default ``"minimize"``).
+    Parameters
+    ----------
+    **kwargs :
+        Flexible configuration. Recognised keys (all optional):
+        - ``external_solver`` (str): ``"highs"`` (default) or ``"gurobi"``.
+        - ``threads`` (int): Thread limit for solver (default: ``4``).
+        - ``time_limit`` (float): Internal solver time limit in seconds
+            (default: ``inf`` = no limit).
+        - ``use_also_custom_timeout`` (bool): If ``True`` activate an *extra*
+            signal based timeout equal to ``time_limit`` (default ``False``).
+        - ``presolve`` (str): HiGHS presolve strategy (default ``"choose"``).
+        - ``log_to_console`` (str): ``"true"`` / ``"false"`` (default
+            ``"false"``) - normalized to solver specific flags.
+        - ``tolerance`` (float): MIP gap, feasibility, integrality tolerance
+            applied uniformly (default ``1e-9``; must be >= 1e-9).
+        - ``optimization_sense`` (str): ``"minimize"`` or ``"maximize``
+            (default ``"minimize"``).
 
-        Attributes
-        ----------
-        external_solver : str
-                Active backend (``"highs"`` or ``"gurobi"``).
-        solver : object
-                Underlying solver object (``highspy.Highs`` or ``gurobipy.Model``).
-        time_limit : float
-                Configured internal solver time limit (seconds).
-        use_also_custom_timeout : bool
-                Whether the secondary POSIX signal timeout is enabled.
-        tolerance : float
-                Unified tolerance applied to various solver parameters.
-        optimization_sense : str
-                ``"minimize"`` or ``"maximize"`` as last set on the objective.
-        did_timeout : bool
-                Flag set to ``True`` only when the *custom* timeout fired.
-        variable_name_prefixes : list[str]
-                Record of prefixes used to detect accidental collisions.
+    Attributes
+    ----------
+    external_solver : str
+            Active backend (``"highs"`` or ``"gurobi"``).
+    solver : object
+            Underlying solver object (``highspy.Highs`` or ``gurobipy.Model``).
+    time_limit : float
+            Configured internal solver time limit (seconds).
+    use_also_custom_timeout : bool
+            Whether the secondary POSIX signal timeout is enabled.
+    tolerance : float
+            Unified tolerance applied to various solver parameters.
+    optimization_sense : str
+            ``"minimize"`` or ``"maximize"`` as last set on the objective.
+    did_timeout : bool
+        Flag set to ``True`` only when the *custom* timeout fired.
 
     Raises
     ------
@@ -128,8 +126,6 @@ class SolverWrapper:
         if self.optimization_sense not in ["minimize", "maximize"]:
             utils.logger.error(f"{__name__}: The optimization sense must be either `minimize` or `maximize`.")
             raise ValueError(f"Optimization sense {self.optimization_sense} is not supported. Only [\"minimize\", \"maximize\"] are supported.")
-
-        self.variable_name_prefixes = []
 
         self.did_timeout = False
 
@@ -232,8 +228,11 @@ class SolverWrapper:
     def add_variables(self, indexes, name_prefix: str, lb=0, ub=1, var_type="integer"):
         """Create a set of variables sharing a common name prefix.
 
-        A *collision* check ensures no prefix is a prefix of an existing one to
-        avoid ambiguous parsing later when values are retrieved.
+        !!! warning "Important: Avoid collisions!"
+        
+            This function does not track or enforce unique/non-overlapping
+            prefixes. The caller is responsible for choosing prefixes that do not
+            create ambiguous names when mixed with other variables.
 
         Parameters
         ----------
@@ -257,22 +256,18 @@ class SolverWrapper:
             Mapping from provided index to underlying solver variable objects
             (HiGHS returns an internal structure; Gurobi returns a dict).
 
-        Raises
-        ------
-        ValueError
-            If ``name_prefix`` conflicts with an existing prefix.
+                Notes
+                -----
+                - Avoid ambiguous prefixes across different variable groups. For example,
+                    prefer prefixes like "x("/"x[" or "x_" that unambiguously delimit the
+                    name from indices, rather than bare "x" if you also use "x_long".
+                - Retrieval via ``get_variable_values`` matches only exact structured
+                    forms ``prefix(...)`` or ``prefix[...]`` and a legacy single numeric
+                    suffix ``prefix<idx>`` (or ``prefix_<idx>``). Overlapping prefixes are
+                    safe under these rules, but ambiguous ad-hoc naming may still collide.
         """
         
-        # Check if there is already a variable name prefix which has as prefix the current one
-        # of if the current one has as prefix an existing one
-        for prefix in self.variable_name_prefixes:
-            if prefix.startswith(name_prefix) or name_prefix.startswith(prefix):
-                utils.logger.error(f"{__name__}: Variable name prefix {name_prefix} conflicts with existing variable name prefix {prefix}. Use a different name prefix.")
-                raise ValueError(
-                    f"Variable name prefix {name_prefix} conflicts with existing variable name prefix {prefix}. Use a different name prefix."
-                )
-            
-        self.variable_name_prefixes.append(name_prefix)
+    # No internal tracking of prefixes; caller must avoid collisions.
         
         # Normalize bounds to per-index arrays when necessary
         def _materialize_bounds(param, default_value, param_name):
@@ -613,36 +608,95 @@ class SolverWrapper:
         - ``<prefix>[i,j,...]`` (Gurobi addVars style)
         - Single-suffix names ``<prefix><i>`` are handled elsewhere.
 
-        Returns a list of raw index components as strings (quotes stripped).
+    Returns a list of raw index components as strings (quotes stripped).
+    Commas inside nested parentheses/brackets are treated as part of the
+    component, e.g. ``var((a,b))`` -> ["(a,b)"].
         """
         # Try parentheses first
-        match = re.match(rf"{name_prefix}\(\s*(.*?)\s*\)$", string)
+        match = re.match(rf"{re.escape(name_prefix)}\(\s*(.*?)\s*\)$", string)
         if match:
             components_str = match.group(1)
         else:
-            # Try square brackets
-            match = re.match(rf"{name_prefix}\[\s*(.*?)\s*\]$", string)
+            # Try square brackets (Gurobi addVars style)
+            match = re.match(rf"{re.escape(name_prefix)}\[\s*(.*?)\s*\]$", string)
             if match:
                 components_str = match.group(1)
             else:
-                utils.logger.error(f"{__name__}: Invalid format for variable name: {string}")
-                raise ValueError(f"Invalid format: {string}")
+                # Not a structured name for this prefix
+                return None
 
-        # Split components while handling quoted strings and bare tokens
-        # Accept quoted chunks or unquoted non-comma spans
-        components = re.findall(r"'[^']*'|[^,\s]+", components_str)
-        # Strip surrounding quotes if present
-        components = [c.strip("'") for c in components]
+        # Split at top-level commas only; keep commas inside nested () or []
+        if components_str.strip() == "":
+            return []
+
+        components = []
+        buf = []
+        in_quote = False
+        depth_paren = 0
+        depth_brack = 0
+
+        for ch in components_str:
+            if in_quote:
+                buf.append(ch)
+                if ch == "'":
+                    in_quote = False
+                continue
+
+            if ch == "'":
+                in_quote = True
+                buf.append(ch)
+                continue
+
+            if ch == '(':
+                depth_paren += 1
+                buf.append(ch)
+                continue
+            if ch == ')' and depth_paren > 0:
+                depth_paren -= 1
+                buf.append(ch)
+                continue
+            if ch == '[':
+                depth_brack += 1
+                buf.append(ch)
+                continue
+            if ch == ']' and depth_brack > 0:
+                depth_brack -= 1
+                buf.append(ch)
+                continue
+
+            if ch == ',' and depth_paren == 0 and depth_brack == 0:
+                token = ''.join(buf).strip()
+                if len(token) >= 2 and token[0] == "'" and token[-1] == "'":
+                    token = token[1:-1]
+                components.append(token)
+                buf = []
+            else:
+                buf.append(ch)
+
+        # Flush last token
+        token = ''.join(buf).strip()
+        if len(token) >= 2 and token[0] == "'" and token[-1] == "'":
+            token = token[1:-1]
+        if token != "" or components_str.strip() != "":
+            components.append(token)
+
         return components
 
     def get_variable_values(
         self, name_prefix, index_types: list, binary_values: bool = False 
     ) -> dict:
         """
-        Retrieve the values of variables whose names start with a given prefix.
+        Retrieve the values of variables belonging to a given prefix.
 
-        This method extracts variable values from the solver, filters them based on a 
-        specified prefix, and returns them in a dictionary with appropriate indexing.
+        This method matches variables using one of these forms for the given
+        ``name_prefix``:
+        - Structured names: ``<prefix>(i, j, ...)`` or ``<prefix>[i, j, ...]``
+        - Legacy single numeric suffix: ``<prefix>k`` or ``<prefix>_k``
+        - Exact scalar variable name: ``<prefix>`` (when ``index_types`` is empty)
+
+        Under these rules, overlapping prefixes (e.g., ``x`` and ``x_long``)
+        won't interfere with each other. Callers must still avoid custom ad-hoc
+        naming that mimics these patterns for different variables.
 
         Args:
             name_prefix (str): The prefix of the variable names to filter.
@@ -666,56 +720,79 @@ class SolverWrapper:
         varNames = self.get_all_variable_names()
         varValues = self.get_all_variable_values()
 
-        values = dict()
+        values: dict = {}
 
-        for index, var in enumerate(varNames):
-            # print(f"Checking variable {var} against prefix {name_prefix}")
-            if var == name_prefix:
-                if len(index_types) > 0:
-                    utils.logger.error(f"{__name__}: We are getting the value of variable `{var}`, but the provided list of var_types is not empty `{index_types}`.")
-                    raise Exception(
-                        f"We are getting the value of variable `{var}`, but the provided list of var_types is not empty `{index_types}`."
-                    )
-                values[0] = varValues[index]
-                if binary_values and round(values[0]) not in [0,1]:
-                    utils.logger.error(f"{__name__}: Variable {var} has value {values[0]}, which is not binary.")
-                    raise Exception(f"Variable {var} has value {values[0]}, which is not binary.")
-                # We return already, because we are supposed to match only one variable name
-                # print("Returning values", values)
-                return values
-
-            if var.startswith(name_prefix):
-                # If there are brackets or parentheses, treat as indexed name and parse components
-                if ("(" in var) or ("[" in var):
-                    elements = self.parse_var_name(var, name_prefix)
-
-                    if len(index_types) != len(elements):
-                        raise Exception(f"We are getting the value of variable `{var}`, but the provided list of var_types `{index_types}` has different length.")
-
-                    # Cast elements to appropriate types and build index
-                    casted = [index_types[i](elements[i]) for i in range(len(elements))]
-                    key = casted[0] if len(casted) == 1 else tuple(casted)
-
-                    values[key] = varValues[index]
-                    if binary_values and round(values[key]) not in [0,1]:
-                        utils.logger.error(f"{__name__}: Variable {var} has value {values[key]}, which is not binary.")
-                        raise Exception(f"Variable {var} has value {values[key]}, which is not binary.")
+        def _cast_components(comps, types):
+            casted = []
+            for c, t in zip(comps, types):
+                if t is int:
+                    casted.append(int(c))
+                elif t is float:
+                    casted.append(float(c))
+                elif t is str:
+                    casted.append(str(c))
                 else:
-                    # No brackets/parentheses -> assume single suffix: var0, var1, ...
-                    element = var.replace(name_prefix, "", 1)
-                    if len(index_types) > 1:
-                        utils.logger.error(f"{__name__}: We are getting the value of variable `{var}` for name_prefix `{name_prefix}`, with only one index `{element}`, but the provided list of var_types is not of length one `{index_types}`.")
-                        raise Exception(f"We are getting the value of variable `{var}` for name_prefix `{name_prefix}`, with only one index `{element}`, but the provided list of var_types is not of length one `{index_types}`.")
+                    casted.append(t(c))
+            if len(casted) == 0:
+                return ()
+            if len(casted) == 1:
+                return casted[0]
+            return tuple(casted)
 
-                    elem_index = index_types[0](element)
-                    values[elem_index] = varValues[index]
-                    if binary_values and round(values[elem_index]) not in [0,1]:
-                        utils.logger.error(f"{__name__}: Variable {var} has value {values[elem_index]}, which is not binary.")
-                        raise Exception(f"Variable {var} has value {values[elem_index]}, which is not binary.")
+        simple_numeric = re.compile(r"^-?\d+$")
+
+        for i, var in enumerate(varNames):
+            val = varValues[i]
+
+            # Scalar exact name
+            if not index_types:
+                if var == name_prefix:
+                    values[0] = val
+                    if binary_values:
+                        rv = int(round(values[0]))
+                        if rv not in (0, 1):
+                            raise Exception(f"Variable {var} has value {values[0]}, which is not binary.")
+                        values[0] = rv
+                    # exact scalar match is unique
+                    continue
+                else:
+                    continue
+
+            # Structured prefix(name) or prefix[name]
+            comps = self.parse_var_name(var, name_prefix)
+            if comps is not None:
+                if len(comps) != len(index_types):
+                    # Ignore mismatched arity
+                    continue
+                try:
+                    key = _cast_components(comps, index_types)
+                except Exception:
+                    # Skip if casting fails
+                    continue
+                values[key] = val
+                continue
+
+            # Legacy numeric suffix: prefix<idx> or prefix_<idx>
+            if len(index_types) == 1 and var.startswith(name_prefix):
+                suffix = var[len(name_prefix):]
+                if suffix.startswith("_"):
+                    suffix_try = suffix[1:]
+                else:
+                    suffix_try = suffix
+                if simple_numeric.match(suffix_try):
+                    try:
+                        key = _cast_components([suffix_try], index_types)
+                        values[key] = val
+                    except Exception:
+                        pass
 
         if binary_values:
-            for key in values.keys():
-                values[key] = round(values[key])
+            tol = max(1e-9, getattr(self, "tolerance", 1e-9))
+            for k, v in list(values.items()):
+                rv = int(round(v))
+                if rv not in (0, 1) or abs(v - rv) > tol:
+                    raise Exception(f"Variable {name_prefix}{k if k!=0 else ''} has non-binary value {v}")
+                values[k] = rv
 
         return values
 
@@ -731,6 +808,77 @@ class SolverWrapper:
             return self.solver.getObjectiveValue()
         elif self.external_solver == "gurobi":
             return self.solver.objVal
+
+    def get_values(self, variables, binary_values: bool = False) -> dict:
+        """Return solution values for variables without name parsing.
+
+        Parameters
+        ----------
+        variables : iterable | mapping
+            Either an iterable of (index, variable) pairs, or a mapping where
+            keys are indices and values are variable objects (e.g., a dict or
+            a Gurobi tupledict).
+        binary_values : bool, default False
+            If True, round values to 0/1 and validate against tolerance.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping each provided index to its solution value.
+
+        Notes
+        -----
+        - For HiGHS, values are retrieved using the internal column index of each
+          variable via a single call to ``allVariableValues``.
+        - For Gurobi, values are read from ``Var.X``.
+        - Indices are taken from the first element of each tuple in ``variables``
+          (when an iterable of pairs is supplied). If a mapping is supplied,
+          its items() are used.
+        """
+        # Prepare a value accessor per backend
+        if self.external_solver == "highs":
+            all_vals = self.get_all_variable_values()
+
+            def _val_of(v):
+                idx = getattr(v, "index", None)
+                if idx is None:
+                    raise Exception("HiGHS variable object missing 'index' attribute.")
+                return all_vals[idx]
+        elif self.external_solver == "gurobi":
+            def _val_of(v):
+                return v.X
+        else:
+            raise ValueError(f"Unsupported solver type '{self.external_solver}'.")
+
+        def _maybe_round_binary(val):
+            if not binary_values:
+                return val
+            tol = max(1e-9, getattr(self, "tolerance", 1e-9))
+            rv = int(round(val))
+            if rv not in (0, 1) or abs(val - rv) > tol:
+                raise Exception(f"Variable has non-binary value {val}")
+            return rv
+
+        # Build an iterator of (index, variable) pairs
+        try:
+            pair_iter = variables.items()
+        except AttributeError:
+            # variables may already be an iterable of pairs or a mapping that
+            # doesn't expose items(); handle both
+            def _pair_gen():
+                for elem in variables:
+                    if isinstance(elem, tuple) and len(elem) == 2:
+                        yield elem  # (index, var)
+                    else:
+                        # Assume elem is a key into a mapping supporting __getitem__
+                        yield (elem, variables[elem])
+            pair_iter = _pair_gen()
+
+        result = {}
+        for key, var in pair_iter:
+            value = _val_of(var)
+            result[key] = _maybe_round_binary(value)
+        return result
 
     def add_piecewise_constant_constraint(
         self, x, y, ranges: list, constants: list, name_prefix: str

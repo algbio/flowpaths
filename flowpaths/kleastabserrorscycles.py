@@ -5,6 +5,7 @@ import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
 import copy
 import numpy as np
+import time
 
 class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
     def __init__(
@@ -216,6 +217,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self._lowerbound_k = None
 
         self.solve_statistics = {}
+        self.solve_time_start = time.perf_counter()
         
         # If we get subset constraints, and the coverage fraction is 1
         # then we know their edges must appear in the solution, so we add their edges to the trusted edges for safety
@@ -371,7 +373,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_variable_values("weights", [int])
+        weights_sol_dict = self.solver.get_values(self.path_weights_vars)
 
         utils.logger.debug(f"{__name__}: weights_sol_dict = {weights_sol_dict}")
 
@@ -383,7 +385,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             )
             for i in range(self.k)
         ]
-        self.edge_errors_sol = self.solver.get_variable_values("ee", [str, str])
+        self.edge_errors_sol = self.solver.get_values(self.edge_errors_vars)
         for (u,v) in self.edge_indexes_basic:
             self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
 
