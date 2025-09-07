@@ -425,7 +425,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_variable_values("weights", [int])
+        weights_sol_dict = self.solver.get_values(self.path_weights_vars)
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])
@@ -434,7 +434,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             )
             for i in range(self.k)
         ]
-        self.edge_errors_sol = self.solver.get_variable_values("ee", [str, str])
+        self.edge_errors_sol = self.solver.get_values(self.edge_errors_vars)
         for (u,v) in self.edge_indexes_basic:
             self.edge_errors_sol[(u,v)] = round(self.edge_errors_sol[(u,v)]) if self.weight_type == int else float(self.edge_errors_sol[(u,v)])
 

@@ -431,7 +431,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         if self._solution is None:            
 
             self.check_is_solved()
-            weights_sol_dict = self.solver.get_variable_values("w", [int])
+            weights_sol_dict = self.solver.get_values(self.path_weights_vars)
             self.path_weights_sol = [
                 (
                     round(weights_sol_dict[i])

@@ -323,7 +323,7 @@ class MinGenSet():
             self.solver.optimize()
 
             if self.solver.get_model_status() == "kOptimal":
-                genset_sol = self.solver.get_variable_values("gen_set", [int])
+                genset_sol = self.solver.get_values(self.genset_vars)
                 self._solution = sorted(self.weight_type(genset_sol[i]) for i in range(k))
                 self._is_solved = True
                 self.solve_statistics = {

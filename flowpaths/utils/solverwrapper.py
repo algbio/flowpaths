@@ -8,6 +8,7 @@ import signal
 import math
 import flowpaths.utils as utils
 import numpy as np
+import warnings
 
 class SolverWrapper:
     """Unified MILP/LP modelling convenience layer for HiGHS and Gurobi.
@@ -256,15 +257,6 @@ class SolverWrapper:
             Mapping from provided index to underlying solver variable objects
             (HiGHS returns an internal structure; Gurobi returns a dict).
 
-                Notes
-                -----
-                - Avoid ambiguous prefixes across different variable groups. For example,
-                    prefer prefixes like "x("/"x[" or "x_" that unambiguously delimit the
-                    name from indices, rather than bare "x" if you also use "x_long".
-                - Retrieval via ``get_variable_values`` matches only exact structured
-                    forms ``prefix(...)`` or ``prefix[...]`` and a legacy single numeric
-                    suffix ``prefix<idx>`` (or ``prefix_<idx>``). Overlapping prefixes are
-                    safe under these rules, but ambiguous ad-hoc naming may still collide.
         """
         
     # No internal tracking of prefixes; caller must avoid collisions.
@@ -682,10 +674,15 @@ class SolverWrapper:
 
         return components
 
+
     def get_variable_values(
         self, name_prefix, index_types: list, binary_values: bool = False 
     ) -> dict:
         """
+        !!! warning "Deprecated"
+
+            Use `get_values(...)` instead.
+
         Retrieve the values of variables belonging to a given prefix.
 
         This method matches variables using one of these forms for the given
@@ -709,14 +706,22 @@ class SolverWrapper:
 
         Returns:
             values: A dictionary where the keys are the indices of the variables (as tuples or 
-                  single values) and the values are the corresponding variable values.
-                  If index_types is empty, then the unique key is 0 and the value is the variable value.
+                single values) and the values are the corresponding variable values.
+                If index_types is empty, then the unique key is 0 and the value is the variable value.
 
         Raises:
             Exception: If the length of `index_types` does not match the number of indices 
-                       in a variable name.
+                    in a variable name.
             Exception: If `binary_values` is True and a variable value (rounded) is not binary.
         """
+        # Emit a deprecation warning (hidden by default unless enabled by filters)
+        warnings.warn(
+            "SolverWrapper.get_variable_values is deprecated and will be removed in a future release. "
+            "Use SolverWrapper.get_values(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         varNames = self.get_all_variable_names()
         varValues = self.get_all_variable_values()
 

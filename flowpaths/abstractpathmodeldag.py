@@ -678,10 +678,7 @@ class AbstractPathModelDAG(ABC):
             return self.external_solution_paths
 
         if self.edge_vars_sol == {}:
-            self.edge_vars_sol = self.solver.get_variable_values(
-                "edge", [str, str, int], 
-                binary_values=True,
-            )
+            self.edge_vars_sol = self.solver.get_values(self.edge_vars, binary_values=True)
 
         paths = []
         for i in range(self.k):
@@ -732,7 +729,7 @@ class AbstractPathModelDAG(ABC):
 
         paths = self.get_solution_paths()
 
-        edge_position_sol = self.solver.get_variable_values("position", [str, str, int])
+        edge_position_sol = self.solver.get_values(self.edge_position_vars)
 
         for path_index, path in enumerate(paths):
             current_edge_position = 0
@@ -752,7 +749,7 @@ class AbstractPathModelDAG(ABC):
 
         paths = self.get_solution_paths()
 
-        path_length_sol = self.solver.get_variable_values("path_length", [int])
+        path_length_sol = self.solver.get_values(self.path_length_vars)
 
         for path_index, path in enumerate(paths):
             if len(path) > 0:

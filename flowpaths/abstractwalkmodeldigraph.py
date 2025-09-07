@@ -679,12 +679,6 @@ class AbstractWalkModelDiGraph(ABC):
             self.edge_vars_sol = self.solver.get_values(self.edge_vars)
         # utils.logger.debug(f"{__name__}: Getting solution walks with self.edge_vars_sol = {self.edge_vars_sol}")
 
-        # self.distance_vars_sol = self.solver.get_variable_values("distance", [str, int])
-        # utils.logger.debug(f"{__name__}: Getting solution walks with distances = {self.distance_vars_sol}")
-
-        # self.edge_selected_sol = self.solver.get_variable_values("selected_edge", [str, str, int])
-        # utils.logger.debug(f"{__name__}: Getting solution walks with edge selected = {self.edge_selected_sol}")
-
         walks = []
         for i in range(self.k):
             # Build residual graph for this layer with edge multiplicities

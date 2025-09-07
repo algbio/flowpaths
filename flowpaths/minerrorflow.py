@@ -461,15 +461,15 @@ class MinErrorFlow():
         
         self._check_is_solved()
 
-        edge_sol_dict = self.solver.get_variable_values("edge_vars", [str, str])
+        edge_sol_dict = self.solver.get_values(self.edge_vars)
         for edge in edge_sol_dict.keys():
             self.edge_sol[edge] = (
                 round(edge_sol_dict[edge])
                 if self.weight_type == int
                 else float(edge_sol_dict[edge])
             )
-        
-        edge_error_sol_dict = self.solver.get_variable_values("edge_error_vars", [str, str])
+
+        edge_error_sol_dict = self.solver.get_values(self.edge_error_vars)
         error = sum(edge_error_sol_dict.values())
 
         corrected_graph = deepcopy(self.original_graph_copy)

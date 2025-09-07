@@ -538,7 +538,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_variable_values("weights", [int])
+        weights_sol_dict = self.solver.get_values(self.path_weights_vars)
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])
@@ -547,7 +547,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             )
             for i in range(self.k)
         ]
-        slacks_sol_dict = self.solver.get_variable_values("slack", [int])
+        slacks_sol_dict = self.solver.get_values(self.path_slacks_vars)
         self.path_slacks_sol = [
             (
                 round(slacks_sol_dict[i])
@@ -572,7 +572,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 }
 
         if len(self.path_length_factors) > 0:
-            slacks_scaled_sol_dict = self.solver.get_variable_values("scaled_slack", index_types=[int])
+            slacks_scaled_sol_dict = self.solver.get_values(self.scaled_slack_vars)
             self.path_slacks_scaled_sol = [slacks_scaled_sol_dict[i] for i in range(self.k)]
 
             self._solution["scaled_slacks"] = self.path_slacks_scaled_sol
@@ -658,10 +658,10 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         
         # Checking that the error scale factor is correctly encoded
         if len(self.path_length_factors) > 0:
-            path_length_sol = self.solver.get_variable_values("path_length", [int])
-            slack_sol = self.solver.get_variable_values("slack", [int])
-            path_slack_scaled_sol = self.solver.get_variable_values("path_slack_scaled", [int])
-            scaled_slack_sol = self.solver.get_variable_values("scaled_slack", [int])
+            path_length_sol = self.solver.get_values(self.path_length_vars)
+            slack_sol = self.solver.get_values(self.path_slacks_vars)
+            path_slack_scaled_sol = self.solver.get_values(self.slack_factors_vars)
+            scaled_slack_sol = self.solver.get_values(self.scaled_slack_vars) 
             
             for i in range(self.k):
                 # Checking which interval the path length is in,
@@ -681,16 +681,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         
         if not self.verify_path_length():
             return False
-
-        # var_dict = {var: val for var, val in zip(self.solver.get_all_variable_names(),self.solver.get_all_variable_values())}
-        # print(var_dict)
-        # self.solver.write_model("kminpatherror.lp")
-
-        # gamma_sol = self.solver.get_variable_values("gamma", [str, str, int])
-        # pi_sol = self.solver.get_variable_values("pi", [str, str, int])
-
-        # print("pi_sol", pi_sol)
-        # print("gamma_sol", gamma_sol)
 
         return True
 

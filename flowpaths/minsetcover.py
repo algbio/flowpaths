@@ -99,7 +99,7 @@ class MinSetCover():
 
         self.solver.optimize()
         if self.solver.get_model_status() == "kOptimal":
-            subset_cover_sol = self.solver.get_variable_values("subset", [int])
+            subset_cover_sol = self.solver.get_values(self.subset_vars)
             self._solution = [i for i in range(len(self.subsets)) if subset_cover_sol[i] == 1]
             self._is_solved = True
             self.solve_statistics = {
