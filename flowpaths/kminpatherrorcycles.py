@@ -18,6 +18,7 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         subset_constraints: list = [],
         subset_constraints_coverage: float = 1.0,
         elements_to_ignore: list = [],
+        elements_to_ignore_percentile: float = None,
         error_scaling: dict = {},
         additional_starts: list = [],
         additional_ends: list = [],
@@ -77,6 +78,14 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted walks. 
             Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
 
+        - `elements_to_ignore_percentile: float`, optional
+
+            If provided, ignores elements automatically based on a percentile threshold of their flow values (`flow_attr`).
+            Elements (edges, or nodes if `flow_attr_origin` is `"node"`) whose flow is below this percentile
+            are ignored when enforcing the error constraints. Must be in the range `[0, 100]`.
+            This is mutually exclusive with `elements_to_ignore` (setting both raises a `ValueError`).
+            See [ignoring edges documentation](ignoring-edges.md).
+
         - `error_scaling: dict`, optional
 
             Dictionary `edge: factor` (or `node: factor`, if `flow_attr_origin` is `"node"`)) storing the error scale factor (in [0,1]) of every edge, which scale the allowed difference between edge/node weight and walk weights.
@@ -114,6 +123,8 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             - If the flow attribute `flow_attr` is not specified in some edge.
             - If the graph contains edges with negative flow values.
             - ValueError: If `flow_attr_origin` is not "node" or "edge".
+            - If `elements_to_ignore_percentile` is set and is not in `[0, 100]`.
+            - If `elements_to_ignore_percentile` is set together with `elements_to_ignore`.
         """
     
         # Handling node-weighted graphs
@@ -155,6 +166,20 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.G = stdigraph.stDiGraph(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subset_constraints = subset_constraints_internal
+
+        if elements_to_ignore_percentile is not None:
+            if elements_to_ignore_percentile < 0 or elements_to_ignore_percentile > 100:
+                utils.logger.error(f"{__name__}: elements_to_ignore_percentile must be between 0 and 100, not {elements_to_ignore_percentile}")
+                raise ValueError(f"elements_to_ignore_percentile must be between 0 and 100, not {elements_to_ignore_percentile}")
+            if len(elements_to_ignore) > 0:
+                utils.logger.critical(f"{__name__}: you cannot set elements_to_ignore when elements_to_ignore_percentile is set.")
+                raise ValueError(f"you cannot set elements_to_ignore when elements_to_ignore_percentile is set.")
+
+            # Select edges where the flow_attr value is >= elements_to_ignore_percentile (using self.G)
+            flow_values = [self.G.edges[edge][flow_attr] for edge in self.G.edges() if flow_attr in self.G.edges[edge]]
+            percentile = np.percentile(flow_values, elements_to_ignore_percentile) if flow_values else 0
+            edges_to_ignore_internal = [edge for edge in edges_to_ignore_internal if self.G.edges[edge][flow_attr] < percentile]
+
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
         self.edge_error_scaling = error_scaling_internal
         # If the error scaling factor is 0, we ignore the edge
@@ -200,6 +225,10 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
         self.solve_time_start = time.perf_counter()
 
         if trusted_edges_for_safety_percentile is not None:
+            if trusted_edges_for_safety_percentile < 0 or trusted_edges_for_safety_percentile > 100:
+                utils.logger.error(f"{__name__}: trusted_edges_for_safety_percentile must be between 0 and 100.")
+                raise ValueError(f"trusted_edges_for_safety_percentile must be between 0 and 100.")
+
             # Select edges where the flow_attr value is >= trusted_edges_for_safety_percentile (using self.G)
             flow_values = [self.G.edges[edge][flow_attr] for edge in self.G.edges() if flow_attr in self.G.edges[edge]]
             percentile = np.percentile(flow_values, trusted_edges_for_safety_percentile) if flow_values else 0

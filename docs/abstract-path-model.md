@@ -1,4 +1,4 @@
-# Abstract Path Model in DAGs
+# Abstract Path Model in DAGs 
 
 A general approach in developing a model to decompose a weighted graph into weighted paths is to:
 

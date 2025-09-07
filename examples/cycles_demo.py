@@ -5,18 +5,18 @@ def test_min_flow_decomp(filename: str):
     graph = fp.graphutils.read_graphs(filename)[0]
     print("graph id", graph.graph["id"])
     # print("subset_constraints", graph.graph["constraints"])
-    fp.utils.draw(
-            G=graph,
-            filename=filename + ".pdf",
-            flow_attr="flow",
-            subpath_constraints=graph.graph["constraints"],
-            draw_options={
-            "show_graph_edges": True,
-            "show_edge_weights": True,
-            "show_path_weights": False,
-            "show_path_weight_on_first_edge": True,
-            "pathwidth": 2,
-        })
+    # fp.utils.draw(
+    #         G=graph,
+    #         filename=filename + ".pdf",
+    #         flow_attr="flow",
+    #         subpath_constraints=graph.graph["constraints"],
+    #         draw_options={
+    #         "show_graph_edges": True,
+    #         "show_edge_weights": True,
+    #         "show_path_weights": False,
+    #         "show_path_weight_on_first_edge": True,
+    #         "pathwidth": 2,
+    #     })
 
     print(graph.graph["n"], graph.graph["m"], graph.graph["w"])
 
@@ -28,11 +28,11 @@ def test_min_flow_decomp(filename: str):
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
             "optimize_with_safe_sequences_allow_geq_constraints": True,
-            "optimize_with_safe_sequences_fix_via_bounds": False,
+            "optimize_with_safe_sequences_fix_via_bounds": True,
             "optimize_with_safe_sequences_fix_zero_edges": True,
         },
         solver_options={
-            "external_solver": "highs", # we can try also "highs" at some point
+            "external_solver": "gurobi", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
     )
@@ -125,6 +125,26 @@ def test_min_path_error(filename):
     kmpe_percentile_model.solve()
     process_solution(kmpe_percentile_model)
 
+    # here, we use percentile to determine which edges we ignore
+    kmpe_percentile_ignore_model = fp.kMinPathErrorCycles(
+        G=graph,
+        flow_attr="flow",
+        weight_type=int,
+        elements_to_ignore_percentile=25, # we ignore edges whose weight is < 25 percentile
+        subset_constraints=graph.graph["constraints"], # try with and without
+        optimization_options={
+            "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+            "optimize_with_safe_sequences_allow_geq_constraints": False,
+            "optimize_with_safe_sequences_fix_via_bounds": True,
+        },
+        solver_options={
+            "external_solver": "gurobi", # we can try also "highs" at some point
+            "time_limit": 300, # 300s = 5min, is it ok?
+        },
+    )
+    kmpe_percentile_ignore_model.solve()
+    process_solution(kmpe_percentile_ignore_model)
+
 def process_solution(model):
     if model.is_solved():
         solution = model.get_solution()
@@ -154,6 +174,7 @@ def process_solution(model):
 def main():
     test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
     test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(1300000.1400000).V809.E1091.mincyc1000.graph")
+    # test_min_flow_decomp(filename = "tests/cyclic_graphs/gt4.kmer15.(0.10000).V1096.E1622.mincyc100.e1.0.graph")
     test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
     test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
 
