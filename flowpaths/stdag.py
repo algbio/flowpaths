@@ -2,6 +2,7 @@ import networkx as nx
 from flowpaths.utils import graphutils
 import flowpaths.utils as utils
 from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
+from typing import Optional
 
 
 class stDAG(AbstractSourceSinkGraph):
@@ -16,8 +17,8 @@ class stDAG(AbstractSourceSinkGraph):
     def __init__(
         self,
         base_graph: nx.DiGraph,
-        additional_starts: list | None = None,
-        additional_ends: list | None = None,
+        additional_starts: Optional[list] = None,
+        additional_ends: Optional[list] = None,
     ):
         super().__init__(
             base_graph=base_graph,

@@ -180,8 +180,8 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
 
         # Internal variables
         self._generating_set = None
-        self._given_weights_model: kflowdecompcycles.kFlowDecompCycles | None = None
-        self._mingenset_model: mgs.MinGenSet | None = None
+        self._given_weights_model = None
+        self._mingenset_model = None
         self._source_flow = None
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}")

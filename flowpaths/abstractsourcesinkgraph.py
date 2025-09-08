@@ -1,5 +1,6 @@
 import networkx as nx
 import flowpaths.utils as utils
+from typing import Optional
 
 class AbstractSourceSinkGraph(nx.DiGraph):
     """Base class for s-t augmented graphs (internal).
@@ -34,8 +35,8 @@ class AbstractSourceSinkGraph(nx.DiGraph):
     def __init__(
         self,
         base_graph: nx.DiGraph,
-        additional_starts: list | None = None,
-        additional_ends: list | None = None,
+        additional_starts: Optional[list] = None,
+        additional_ends: Optional[list] = None,
     ):
         if not all(isinstance(node, str) for node in base_graph.nodes()):
             utils.logger.error(f"{__name__}: Every node of the graph must be a string.")

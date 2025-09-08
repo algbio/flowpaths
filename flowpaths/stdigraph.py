@@ -4,7 +4,7 @@ from flowpaths.utils import graphutils
 from flowpaths.stdag import stDAG
 import flowpaths.utils as utils
 from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 
 class stDiGraph(AbstractSourceSinkGraph):
@@ -19,8 +19,8 @@ class stDiGraph(AbstractSourceSinkGraph):
     def __init__(
         self,
         base_graph: nx.DiGraph,
-        additional_starts: list | None = None,
-        additional_ends: list | None = None,
+        additional_starts: Optional[list] = None,
+        additional_ends: Optional[list] = None,
     ):
         """
         This class inherits from networkx.DiGraph. The graph equals `base_graph` plus:
