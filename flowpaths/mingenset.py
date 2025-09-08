@@ -1,16 +1,17 @@
 import flowpaths.utils.solverwrapper as sw
 import flowpaths.utils as utils
 import time
+from typing import Union, Type, Optional
 
 class MinGenSet():
     def __init__(
             self, 
             numbers: list,
-            total: int | float,
-            weight_type: int | float = float,
+            total: Union[int, float],
+            weight_type: Type[Union[int, float]] = float,
             max_multiplicity: int = 1,
             lowerbound: int = 1,
-            partition_constraints: list = None,
+            partition_constraints: Optional[list] = None,
             remove_complement_values: bool = True,
             remove_sums_of_two: bool = False,
             solver_options: dict = {}
