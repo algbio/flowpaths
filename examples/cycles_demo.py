@@ -4,7 +4,7 @@ import networkx as nx
 def test_min_flow_decomp(filename: str):
     graph = fp.graphutils.read_graphs(filename)[0]
     print("graph id", graph.graph["id"])
-    # print("subset_constraints", graph.graph["constraints"])
+    print("subset_constraints", graph.graph["constraints"])
     # fp.utils.draw(
     #         G=graph,
     #         filename=filename + ".pdf",
@@ -16,6 +16,7 @@ def test_min_flow_decomp(filename: str):
     #         "show_path_weights": False,
     #         "show_path_weight_on_first_edge": True,
     #         "pathwidth": 2,
+    #         "style": "points",
     #     })
 
     print(graph.graph["n"], graph.graph["m"], graph.graph["w"])
@@ -153,6 +154,21 @@ def process_solution(model):
         print("model.is_valid_solution()", model.is_valid_solution()) # Keep this to verify the solution
     else:
         print("Model could not be solved.")
+
+    fp.utils.draw(
+            G=model.G,
+            filename= "solution.pdf",
+            flow_attr="flow",
+            paths=model.get_solution().get('walks', None),
+            weights=model.get_solution().get('weights', None),
+            draw_options={
+                "show_graph_edges": False,
+                "show_edge_weights": False,
+                "show_path_weights": False,
+                "show_path_weight_on_first_edge": True,
+                "pathwidth": 2,
+                # "style": "points",
+            })
 
     solve_statistics = model.solve_statistics
     print(solve_statistics)

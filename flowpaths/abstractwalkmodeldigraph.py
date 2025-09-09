@@ -6,6 +6,7 @@ import networkx as nx
 import time
 import copy
 from abc import ABC, abstractmethod
+from collections import Counter
 
 class AbstractWalkModelDiGraph(ABC):
     # storing some defaults
@@ -407,32 +408,42 @@ class AbstractWalkModelDiGraph(ABC):
 
         # Otherwise, we fix variables using the walks to fix
         if self.optimize_with_safe_sequences:
-            # iterating over safe lists
+            # Iterate over walks to fix (up to k layers) and enforce per-edge multiplicity
             for i in range(min(len(self.walks_to_fix), self.k)):
-                # print("Fixing variables for safe list #", i)
-                # iterate over the edges in the safe list to fix variables to 1
-                for u, v in self.walks_to_fix[i]:
+                walk = self.walks_to_fix[i]
+                if not walk:
+                    continue
+
+                # Count multiplicities of each edge in this safe walk
+                edge_multiplicities = Counter(walk)  # keys are (u,v), values are number of occurrences
+
+                for (u, v), m in edge_multiplicities.items():
                     if self.G.is_scc_edge(u, v):
+                        # Inside an SCC we allow multiple traversals; enforce lower bound = m
                         if self.optimize_with_safe_sequences_allow_geq_constraints:
-                            # Raise LB via bounds only when enabled; else add constraint
                             if self.optimize_with_safe_sequences_fix_via_bounds:
-                                self.solver.queue_set_var_lower_bound(self.edge_vars[(u, v, i)], 1)
+                                # Tighten variable lower bound directly
+                                self.solver.queue_set_var_lower_bound(self.edge_vars[(u, v, i)], m)
                             else:
+                                # Add inequality constraint x >= m
                                 self.solver.add_constraint(
-                                    self.edge_vars[(u, v, i)] >= 1,
-                                    name=f"safe_list_u={u}_v={v}_i={i}",
+                                    self.edge_vars[(u, v, i)] >= m,
+                                    name=f"safe_list_u={u}_v={v}_i={i}_geq{m}",
                                 )
                             self.solve_statistics["edge_variables>=1"] += 1
+                        # If allow_geq_constraints is False, fall through without enforcing (original logic only acted when True)
                     else:
-                        # Instead of adding an equality constraint x==1 we tighten bounds directly.
+                        # Edge not in SCC: x == 1 either via direct fix (bounds) or equality constraint
+                        if m != 1:
+                            utils.logger.critical(f"{__name__}: Unexpected multiplicity {m} != 1 for non-SCC edge ({u},{v})")
+                            raise ValueError(f"Unexpected multiplicity {m} != 1 for non-SCC edge ({u},{v})")
                         if self.optimize_with_safe_sequences_fix_via_bounds:
-                            # Queue a fix to value 1
-                            self.solver.queue_fix_variable(self.edge_vars[(u, v, i)], int(1))
+                            # Since UB=1, fixing is safe and sets both LB & UB to m
+                            self.solver.queue_fix_variable(self.edge_vars[(u, v, i)], 1)
                         else:
-                            # Keep old behaviour via equality constraint
                             self.solver.add_constraint(
                                 self.edge_vars[(u, v, i)] == 1,
-                                name=f"safe_list_u={u}_v={v}_i={i}",
+                                name=f"safe_list_u={u}_v={v}_i={i}_eq{m}",
                             )
                         self.solve_statistics["edge_variables=1"] += 1
 

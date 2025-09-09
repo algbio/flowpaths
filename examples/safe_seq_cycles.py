@@ -114,6 +114,72 @@ def test2():
     lae_model.solve()
     process_solution(graph, lae_model)
 
+def test6():
+    graph = nx.DiGraph()
+    graph.add_edge("s", "a", flow=10)   
+    graph.add_edge("a", "a", flow=10)
+    graph.add_edge("a", "b", flow=10)
+    graph.add_edge("a", "f", flow=10)
+    graph.add_edge("a", "h", flow=10)
+    graph.add_edge("b", "c", flow=10)
+    graph.add_edge("c", "d", flow=10)
+    graph.add_edge("d", "b", flow=10)
+    # graph.add_edge("d", "h", flow=10)
+    graph.add_edge("c", "t", flow=10)
+    graph.add_edge("s", "e", flow=10)
+    graph.add_edge("e", "f", flow=10)
+    graph.add_edge("f", "g", flow=10)
+    graph.add_edge("g", "h", flow=10)
+    graph.add_edge("h", "f", flow=10)
+    graph.add_edge("g", "t", flow=10)
+
+    stDiGraph = fp.stDiGraph(graph)
+    X = set(stDiGraph.edges())
+    safe_seqs = safety.maximal_safe_sequences_via_dominators(stDiGraph, X)
+    for seq in safe_seqs:
+        print("Safe sequence:", seq)
+
+    # For every edge of stDiGraph, compute the length of the longest safe seq using it
+    longest_safe_seq_length = dict()
+    for edge in stDiGraph.edges():
+        longest_safe_seq_length[edge] = max(len(seq) for seq in safe_seqs if edge in seq)
+    print("Longest safe seq lengths:", longest_safe_seq_length)
+
+    incompatible_sequences = stDiGraph.get_longest_incompatible_sequences(safe_seqs)
+    for seq in incompatible_sequences:
+        print("Incompatible sequence:", seq)
+
+    fp.graphutils.draw(
+        G=stDiGraph,
+        filename="safe_sequences_example.pdf",
+        subpath_constraints=incompatible_sequences,
+        flow_attr="flow",
+        draw_options={
+            "show_graph_edges": True,
+            "show_edge_weights": False,
+            "show_path_weights": False,
+            "show_path_weight_on_first_edge": True,
+            "pathwidth": 2,
+            "style": "points",
+        }
+    )
+
+    kmpe_model = fp.kMinPathErrorCycles(
+        G=graph,
+        flow_attr="flow",
+        weight_type=float,
+        optimization_options={
+            "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+        },
+        solver_options={
+            "external_solver": "gurobi", # we can try also "highs" at some point
+            "time_limit": 300, # 300s = 5min, is it ok?
+        },
+    )
+    kmpe_model.solve()
+    assert(kmpe_model.is_solved())
+    assert(kmpe_model.is_valid_solution())
+
 def process_solution(graph, model: fp.kLeastAbsErrors):
     if model.is_solved():
         print(model.get_solution())
@@ -135,11 +201,12 @@ def process_solution(graph, model: fp.kLeastAbsErrors):
         print("Model could not be solved.")
 
 def main():
-    test1()
-    test3()
-    test2()
-    test4()
-    test5()
+    # test1()
+    # test3()
+    # test2()
+    # test4()
+    # test5()
+    test6()
 
 if __name__ == "__main__":
     # Configure logging

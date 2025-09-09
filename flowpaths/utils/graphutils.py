@@ -368,7 +368,8 @@ def draw(
             "show_node_weights": False,
             "show_path_weights": False,
             "show_path_weight_on_first_edge": True,
-            "pathwidth": 3.0
+            "pathwidth": 3.0,
+            "style": "default",
         },
         ):
         """
@@ -437,6 +438,10 @@ def draw(
             
                 The width of the path to be drawn. Default is `3.0`.
 
+            - `style`: str
+
+                The style of the drawing. Available options: `default`, `points`.
+
         """
 
         if len(paths) != len(weights) and len(weights) > 0:
@@ -447,8 +452,16 @@ def draw(
         
             dot = gv.Digraph(format="pdf")
             dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
-            dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
-            dot.node_attr["style"] = "rounded"  # Rounded rectangle nodes
+            
+            style = draw_options.get("style", "default")
+            if style == "default":
+                dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
+                dot.node_attr["style"] = "rounded"  # Rounded rectangle nodes
+            elif style == "points":
+                dot.node_attr["shape"] = "point"  # Point nodes
+                dot.node_attr["style"] = "filled"  # Filled point nodes
+                # dot.node_attr['label'] = '' 
+                dot.node_attr['width'] = '0.1' 
 
             colors = [
                 "red",
@@ -483,17 +496,17 @@ def draw(
                     elif node in additional_ends:
                         color = "red"
                         penwidth = "2.0"
-                    
+
                     if draw_options.get("show_node_weights", False) and flow_attr is not None and flow_attr in G.nodes[node]:
+                        label = f"{G.nodes[node][flow_attr]}\\n{node}" if style != "points" else ""
                         dot.node(
                             name=str(node),
-                            #label=f"{{{node} | {G.nodes[node][flow_attr]}}}",
-                            label=f"{G.nodes[node][flow_attr]}\\n{node}",
-                            #xlabel=str(G.nodes[node][flow_attr]),
+                            label=label,
                             shape="record",
                             color=color, 
                             penwidth=penwidth)
                     else:
+                        label = str(node) if style != "points" else ""
                         dot.node(
                             name=str(node), 
                             label=str(node), 
