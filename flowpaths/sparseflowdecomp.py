@@ -4,6 +4,7 @@ import networkx as nx
 import flowpaths.stdigraph as stdigraph
 import flowpaths.kflowdecomp as kflowdecomp
 import flowpaths.abstractpathmodeldag as pathmodel
+import numpy as np
 
 class SparseFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths,
     """
@@ -77,6 +78,7 @@ class SparseFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit f
             This overloads the `solve()` method from `AbstractPathModelDAG` class.
         """
         start_time = time.time()
+        
         v0 = nx SHORTEST PATH
         path_set = [v0]
         path_weights = [1.0]
@@ -193,3 +195,22 @@ class SparseFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit f
     def draw_solution(self, show_flow_attr=True):
         # TODO necessary?
         # self.fd_model.draw_solution(show_flow_attr)
+
+    # constructs a sparse incidence vector from the list of vector indices produced by nx    
+    def _pathindex_to_sparsevec(G, path_index):
+        nedges = G.number_of_edges()
+        assert sorted(path_index) == path_index
+        v = scipy.sparse.dok_array((nedges,), dtype=int)
+        for (e_idx, e) in enumerate(G.edges):
+            if e[0] in path_index:
+                idx = path_index.index(e[0])
+                if idx < len(path_index) - 1 and path_index[idx + 1] == e[1]:
+                    v[e_idx] = 1
+        return v
+    
+    def _compute_extreme_point(G, direction, src, dst):
+        # TODO set edge weights in an attribute or define a weight function
+        path_index = nx.shortest_paths.bellman_ford_path(G, src, dst)
+        return _pathindex_to_sparsevec(G, path_index)
+
+
