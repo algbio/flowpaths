@@ -203,7 +203,7 @@ class MinFlowDecompCycles(walkmodel.AbstractWalkModelDiGraph):
         self.solve_time_start = time.perf_counter()
         utils.logger.info(f"{__name__}: starting to solve the MinFlowDecompCycles model for graph id = {utils.fpid(self.G)}")
 
-        if self.optimization_options.get("optimize_with_given_weights", MinFlowDecompCycles.optimize_with_given_weights):            
+        if self.optimization_options.get("optimize_with_guessed_weights", MinFlowDecompCycles.optimize_with_given_weights):            
             self._solve_with_given_weights()
 
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):

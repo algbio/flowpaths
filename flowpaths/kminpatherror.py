@@ -137,8 +137,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         - `solution_weights_superset: list`, optional
 
             List of allowed weights for the paths. Default is `None`. 
-            If set, the model will use the solution path weights only from this set, with the property that **every weight in the superset
-            appears at most once in the solution weight**.
+            If set, the model will use the solution path weights only from this set, with the property that **every weight in this list
+            appears at most once in the solution weight**. That is, if you want to have more paths with the same weight, add it more times to `solution_weights_superset`.
 
         - `optimization_options: dict`, optional
 
@@ -290,15 +290,16 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self._encode_minpatherror_decomposition()
-
-        # This method is called from the current class    
-        self._encode_solution_weights_superset()
+        if self.solution_weights_superset is None:
+            self._encode_minpatherror_decomposition()
+        else:
+            self._encode_minpatherror_decomposition_with_given_weights()
 
         # This method is called from the current class to add the objective function
         self._encode_objective()
 
         utils.logger.info(f"{__name__}: initialized with graph id = {utils.fpid(G)}, k = {self.k}")
+
 
     def _encode_minpatherror_decomposition(self):
 
@@ -435,37 +436,128 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
 
-    def _encode_solution_weights_superset(self):
+    def _encode_minpatherror_decomposition_with_given_weights(self):
 
-        if self.solution_weights_superset is not None:
+        # Some checks        
+        if len(self.solution_weights_superset) != self.k:
+            utils.logger.error(f"{__name__}: solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+            raise ValueError(f"solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+        if not self.allow_empty_paths:
+            utils.logger.error(f"{__name__}: solution_weights_superset is not allowed when allow_empty_paths is False")
+            raise ValueError(f"solution_weights_superset is not allowed when allow_empty_paths is False")
 
-            if len(self.solution_weights_superset) != self.k:
-                utils.logger.error(f"{__name__}: solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
-                raise ValueError(f"solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
-            if not self.allow_empty_paths:
-                utils.logger.error(f"{__name__}: solution_weights_superset is not allowed when allow_empty_paths is False")
-                raise ValueError(f"solution_weights_superset is not allowed when allow_empty_paths is False")
-            
-            # We state that the weight of the i-th path equals the i-th entry of the solution_weights_superset
+
+        # path slacks
+        self.path_slacks_vars = self.solver.add_variables(
+            self.path_indexes,
+            name_prefix="slack",
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+        )
+        
+        # gamma vars from https://helda.helsinki.fi/server/api/core/bitstreams/96693568-d973-4b43-a68f-bc796bbeb225/content
+        # We will encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
+        # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
+        self.gamma_vars = self.solver.add_variables(
+            self.edge_indexes,
+            name_prefix="gamma",
+            lb=0,
+            ub=self.w_max,
+            var_type="continuous",
+        )
+
+        if len(self.path_length_factors) > 0:
+
+            # path_error_scale_vars[(i)] will give the error scale factor for path i
+            self.slack_factors_vars = self.solver.add_variables(
+                self.path_indexes,
+                name_prefix="path_slack_scaled",
+                lb=min(self.path_length_factors),
+                ub=max(self.path_length_factors),
+                var_type="continuous"
+            )
+
+            # Getting the right error scale factor depending on the path length
+            # if path_length_vars[(i)] in [ranges[i][0], ranges[i][1]] then slack_factors_vars[(i)] = constants[i].
             for i in range(self.k):
-                if self.solution_weights_superset[i] > self.w_max:
-                    utils.logger.error(f"{__name__}: solution_weights_superset[{i}] = {self.solution_weights_superset[i]} > w_max = {self.w_max}")
-                    raise ValueError(f"solution_weights_superset[{i}] = {self.solution_weights_superset[i]} > w_max = {self.w_max}")
-                self.solver.add_constraint(
-                    self.path_weights_vars[i] == self.solution_weights_superset[i],
-                    name=f"solution_weights_superset_{i}",
+                self.solver.add_piecewise_constant_constraint(
+                    x=self.path_length_vars[(i)], 
+                    y=self.slack_factors_vars[(i)],
+                    ranges = self.path_length_ranges, 
+                    constants = self.path_length_factors,
+                    name_prefix=f"error_scale_{i}"
                 )
 
-            # We state that at most self.original_k paths can be used
-            self.solver.add_constraint(            
-                self.solver.quicksum(
-                    self.solver.quicksum(
-                            self.edge_vars[(self.G.source, v, i)]
-                            for v in self.G.successors(self.G.source)
-                    ) for i in range(self.k)
-                ) <= self.original_k,
-                name="max_paths_original_k_paths",
+            self.scaled_slack_vars = self.solver.add_variables(
+                self.path_indexes,
+                name_prefix="scaled_slack",
+                lb=0,
+                ub=self.w_max * max(self.path_length_factors),
+                var_type="continuous",
             )
+
+            # We encode that self.scaled_slack_vars[i] = self.slack_factors_vars[i] * self.path_slacks_vars[i]
+            for i in range(self.k):
+                self.solver.add_integer_continuous_product_constraint(
+                    integer_var=self.path_slacks_vars[i],
+                    continuous_var=self.slack_factors_vars[i],
+                    product_var=self.scaled_slack_vars[i],
+                    lb=0,
+                    ub=self.w_max * max(self.path_length_factors),
+                    name=f"scaled_slack_i{i}",
+                )
+                        
+        for u, v, data in self.G.edges(data=True):
+            if (u, v) in self.edges_to_ignore:
+                continue
+
+            f_u_v = data[self.flow_attr]
+            edge_error_scaling_u_v = self.edge_error_scaling.get((u, v), 1)
+
+            # We encode that edge_vars[(u,v,i)] * self.path_slacks_vars[(i)] = self.gamma_vars[(u,v,i)],
+            # assuming self.w_max is a bound for self.path_slacks_vars[(i)]
+
+            for i in range(self.k):
+                # We take either the scaled slack or the regular slack
+                slack_var = self.path_slacks_vars[i] if len(self.path_length_factors) == 0 else self.scaled_slack_vars[i]
+
+                self.solver.add_binary_continuous_product_constraint(
+                    binary_var=self.edge_vars[(u, v, i)],
+                    continuous_var=slack_var,
+                    product_var=self.gamma_vars[(u, v, i)],
+                    lb=0,
+                    ub=self.w_max,
+                    name=f"12_u={u}_v={v}_i={i}",
+                )
+
+            # We encode that 
+            #   abs(f_u_v - sum(self.pi_vars[(u, v, i)] for i in range(self.k))) 
+            #   * edge_error_scale_u_v 
+            #   <= sum(self.gamma_vars[(u, v, i)] for i in range(self.k))
+            self.solver.add_constraint(
+                (f_u_v - self.solver.quicksum(self.solution_weights_superset[i] * self.edge_vars[(u, v, i)] for i in range(self.k))) 
+                * edge_error_scaling_u_v
+                <= self.solver.quicksum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                name=f"9aa_u={u}_v={v}_i={i}",
+            )
+            self.solver.add_constraint(
+                (f_u_v - self.solver.quicksum(self.solution_weights_superset[i] * self.edge_vars[(u, v, i)] for i in range(self.k))) 
+                * edge_error_scaling_u_v
+                >= -self.solver.quicksum(self.gamma_vars[(u, v, i)] for i in range(self.k)),
+                name=f"9ab_u={u}_v={v}_i={i}",
+            )
+        
+        # We state that at most self.original_k paths can be used
+        self.solver.add_constraint(            
+            self.solver.quicksum(
+                self.solver.quicksum(
+                        self.edge_vars[(self.G.source, v, i)]
+                        for v in self.G.successors(self.G.source)
+                ) for i in range(self.k)
+            ) <= self.original_k,
+            name="max_paths_original_k_paths",
+        )
 
     def _encode_objective(self):
 
@@ -538,7 +630,11 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_values(self.path_weights_vars)
+        if self.solution_weights_superset is None:
+            weights_sol_dict = self.solver.get_values(self.path_weights_vars)
+        else:
+            weights_sol_dict = {i: self.solution_weights_superset[i] for i in range(self.k)}
+
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])

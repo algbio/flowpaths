@@ -19,7 +19,6 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
     # Default optimization parameters
     subgraph_lowerbound_size = 20
     subgraph_lowerbound_shift = 18
-    optimize_with_given_weights_num_free_paths = 0
     use_min_gen_set_lowerbound = False
     use_min_gen_set_lowerbound_partition_constraints = False
     use_min_gen_set_lowerbound_partition_constraints_min_constraint_len = 2
@@ -199,7 +198,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         self.solve_statistics = {}
         self._solution = None
         self._lowerbound_k = None
-        self._is_solved = None
+        self._is_solved = False
 
         # Internal variables
         self._generating_set = None
@@ -225,7 +224,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
         """
         self.solve_time_start = time.perf_counter()
 
-        if self.optimization_options.get("optimize_with_given_weights", MinFlowDecomp.optimize_with_given_weights):            
+        if self.optimization_options.get("optimize_with_guessed_weights", MinFlowDecomp.optimize_with_given_weights):            
             self._solve_with_given_weights()
 
         for i in range(self.get_lowerbound_k(), self.G.number_of_edges()):
@@ -273,10 +272,8 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
                 # it means that the solver stopped because of an unexpected termination,
                 # thus we cannot conclude that the model is infeasible.
                 # In this case, we stop the search.
-                self.set_not_solved()
                 return False
 
-        self.set_not_solved()
         return False
 
     def _solve_with_given_weights(self) -> bool:
@@ -302,21 +299,14 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
 
         given_weights_optimization_options = copy.deepcopy(self.optimization_options)
         given_weights_optimization_options["optimize_with_greedy"] = False
-        given_weights_optimization_options["optimize_with_safe_paths"] = False
-        given_weights_optimization_options["optimize_with_safe_sequences"] = False
-        given_weights_optimization_options["optimize_with_zero_safe_edges"] = False
-        given_weights_optimization_options["optimize_with_flow_safe_paths"] = False
-        given_weights_optimization_options["allow_empty_paths"] = True
-        given_weights_optimization_options["given_weights"] = all_weights_list
-        utils.logger.info(f"{__name__}: Solving with given weights = {given_weights_optimization_options['given_weights']}")
+        utils.logger.info(f"{__name__}: Solving with given weights = {all_weights_list}")
 
         given_weights_kfd_solver_options = copy.deepcopy(self.solver_options)
         if "time_limit" in given_weights_kfd_solver_options:
             given_weights_kfd_solver_options["time_limit"] = self.time_limit - self.solve_time_elapsed
-
         given_weights_kfd_solver = kflowdecomp.kFlowDecomp(
             G=self.G,
-            k = len(given_weights_optimization_options["given_weights"]) + self.optimization_options.get("optimize_with_given_weights_num_free_paths", MinFlowDecomp.optimize_with_given_weights_num_free_paths),
+            k = len(all_weights_list),
             flow_attr=self.flow_attr,
             weight_type=self.weight_type,
             subpath_constraints=self.subpath_constraints,
@@ -324,6 +314,7 @@ class MinFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit from
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
             length_attr=self.length_attr,
             elements_to_ignore=self.edges_to_ignore,
+            solution_weights_superset=all_weights_list,
             optimization_options=given_weights_optimization_options,
             solver_options=given_weights_kfd_solver_options,
             )

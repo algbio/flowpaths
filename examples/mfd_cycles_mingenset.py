@@ -24,7 +24,7 @@ def test(filename: str):
             "optimize_with_safe_sequences": True,
             "optimize_with_safety_as_subset_constraints": False,
             "use_min_gen_set_lowerbound": False,
-            "optimize_with_given_weights": False,
+            "optimize_with_guessed_weights": False,
         },
         solver_options={"external_solver": "highs"},
     )

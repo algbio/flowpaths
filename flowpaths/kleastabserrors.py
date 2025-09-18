@@ -108,8 +108,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         - `solution_weights_superset: list`, optional
 
             List of allowed weights for the paths. Default is `None`. 
-            If set, the model will use the solution path weights only from this set, with the property that **every weight in the superset
-            appears at most once in the solution weight**.
+            If set, the model will use the solution path weights only from this set, with the property that **every weight in this list
+            appears at most once in the solution weight**. That is, if you want to have more paths with the same weight, add it more times to `solution_weights_superset`.
 
         - `optimization_options: dict`, optional
 
@@ -260,10 +260,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class 
-        self._encode_leastabserrors_decomposition()
-
-        # This method is called from the current class    
-        self._encode_solution_weights_superset()
+        if self.solution_weights_superset is not None:
+            self._encode_leastabserrors_decomposition_with_given_weights()
+        else:
+            self._encode_leastabserrors_decomposition()
 
         # This method is called from the current class to add the objective function
         self._encode_objective()
@@ -330,37 +330,55 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 name=f"9ab_u={u}_v={v}_i={i}",
             )
 
-    def _encode_solution_weights_superset(self):
+    def _encode_leastabserrors_decomposition_with_given_weights(self):
 
-        if self.solution_weights_superset is not None:
+        # Some checks on the solution_weights_superset
+        if len(self.solution_weights_superset) != self.k:
+            utils.logger.error(f"{__name__}: solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+            raise ValueError(f"solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
+        if not self.allow_empty_paths:
+            utils.logger.error(f"{__name__}: solution_weights_superset is not allowed when allow_empty_paths is False")
+            raise ValueError(f"solution_weights_superset is not allowed when allow_empty_paths is False")
 
-            if len(self.solution_weights_superset) != self.k:
-                utils.logger.error(f"{__name__}: solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
-                raise ValueError(f"solution_weights_superset must have length {self.k}, not {len(self.solution_weights_superset)}")
-            if not self.allow_empty_paths:
-                utils.logger.error(f"{__name__}: solution_weights_superset is not allowed when allow_empty_paths is False")
-                raise ValueError(f"solution_weights_superset is not allowed when allow_empty_paths is False")
-            
-            # We state that the weight of the i-th path equals the i-th entry of the solution_weights_superset
-            for i in range(self.k):
-                if self.solution_weights_superset[i] > self.w_max:
-                    utils.logger.error(f"{__name__}: solution_weights_superset[{i}] must be less than or equal to {self.w_max}, not {self.solution_weights_superset[i]}")
-                    raise ValueError(f"solution_weights_superset[{i}] must be less than or equal to {self.w_max}, not {self.solution_weights_superset[i]}")
-                self.solver.add_constraint(
-                    self.path_weights_vars[i] == self.solution_weights_superset[i],
-                    name=f"solution_weights_superset_{i}",
-                )
+        self.edge_indexes_basic = [(u,v) for (u,v) in self.G.edges() if (u,v) not in self.edges_to_ignore]
+        
+        self.edge_errors_vars = self.solver.add_variables(
+            self.edge_indexes_basic,
+            name_prefix="ee",
+            lb=0,
+            ub=self.w_max,
+            var_type="integer" if self.weight_type == int else "continuous",
+        )
 
-            # We state that at most self.original_k paths can be used
-            self.solver.add_constraint(            
-                self.solver.quicksum(
-                    self.solver.quicksum(
-                            self.edge_vars[(self.G.source, v, i)]
-                            for v in self.G.successors(self.G.source)
-                    ) for i in range(self.k)
-                ) <= self.original_k,
-                name="max_paths_original_k_paths",
+        for u, v, data in self.G.edges(data=True):
+            if (u, v) in self.edges_to_ignore:
+                continue
+
+            f_u_v = data[self.flow_attr]
+
+            # Encoding the error on the edge (u, v) as the difference between 
+            # the flow value of the edge and the sum of the weights of the paths that go through it (pi variables)
+            # If we minimize the sum of edge_errors_vars, then we are minimizing the sum of the absolute errors.
+            self.solver.add_constraint(
+                f_u_v - self.solver.quicksum(self.solution_weights_superset[i] * self.edge_vars[(u, v, i)] for i in range(self.k)) <= self.edge_errors_vars[(u, v)],
+                name=f"9aa_u={u}_v={v}",
             )
+
+            self.solver.add_constraint(
+                -f_u_v + self.solver.quicksum(self.solution_weights_superset[i] * self.edge_vars[(u, v, i)] for i in range(self.k)) <= self.edge_errors_vars[(u, v)],
+                name=f"9ab_u={u}_v={v}",
+            )
+
+        # We state that at most self.original_k paths can be used
+        self.solver.add_constraint(            
+            self.solver.quicksum(
+                self.solver.quicksum(
+                        self.edge_vars[(self.G.source, v, i)]
+                        for v in self.G.successors(self.G.source)
+                ) for i in range(self.k)
+            ) <= self.original_k,
+            name="max_paths_original_k_paths",
+        )
 
     def _encode_objective(self):
 
@@ -425,7 +443,11 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         self.check_is_solved()
 
-        weights_sol_dict = self.solver.get_values(self.path_weights_vars)
+        if self.solution_weights_superset is None:
+            weights_sol_dict = self.solver.get_values(self.path_weights_vars)
+        else:
+            weights_sol_dict = {i: self.solution_weights_superset[i] for i in range(self.k)}
+
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])
