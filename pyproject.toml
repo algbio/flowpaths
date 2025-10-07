@@ -1,6 +1,6 @@
 [project]
 name = "flowpaths"
-version = "0.2.7" 
+version = "0.2.9" 
 description = "A Python package to quickly decompose weighted graphs into weights paths, under various models."
 readme = "README.md"
 authors = [{name="Graph Algorithms and Bioinformatics Group @ University of Helsinki, and external collaborators"}]
