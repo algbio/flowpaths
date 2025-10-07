@@ -27,14 +27,15 @@ def test_min_flow_decomp(filename: str):
         weight_type=int,
         subset_constraints=graph.graph["constraints"], # try with and without
         optimization_options={
-            "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
+            "optimize_with_safe_sequences": False, # set to false to deactivate the safe sequences optimization
             "optimize_with_safe_sequences_allow_geq_constraints": True,
-            "optimize_with_safe_sequences_fix_via_bounds": True,
+            # "optimize_with_safe_sequences_fix_via_bounds": True,
             "optimize_with_safe_sequences_fix_zero_edges": True,
         },
         solver_options={
             "external_solver": "gurobi", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
+            "threads": 1
         },
     )
     mfd_model.solve()
@@ -56,7 +57,7 @@ def test_least_abs_errors(filename):
             "optimize_with_safe_sequences_allow_geq_constraints": False,
         },
         solver_options={
-            "external_solver": "gurobi", # we can try also "highs" at some point
+            "external_solver": "highs", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
         trusted_edges_for_safety_percentile=0, # we trust for safety edges whose weight in >= 0 percentile, that is, all edges
@@ -75,7 +76,7 @@ def test_least_abs_errors(filename):
             "optimize_with_safe_sequences_allow_geq_constraints": False,
         },
         solver_options={
-            "external_solver": "gurobi", # we can try also "highs" at some point
+            "external_solver": "highs", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
         trusted_edges_for_safety_percentile=25, # we trust for safety edges whose weight in >= 25 percentile, remove this if not using the safety optimization
@@ -99,7 +100,7 @@ def test_min_path_error(filename):
             "optimize_with_safe_sequences_allow_geq_constraints": True,
         },
         solver_options={
-            "external_solver": "gurobi", # we can try also "highs" at some point
+            "external_solver": "highs", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
     )
@@ -115,10 +116,9 @@ def test_min_path_error(filename):
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
             "optimize_with_safe_sequences_allow_geq_constraints": False,
-            "optimize_with_safe_sequences_fix_via_bounds": True,
         },
         solver_options={
-            "external_solver": "gurobi", # we can try also "highs" at some point
+            "external_solver": "highs", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
         trusted_edges_for_safety_percentile=25, # we trust for safety edges whose weight in >= 25 percentile, remove this if not using the safety optimization
@@ -136,10 +136,9 @@ def test_min_path_error(filename):
         optimization_options={
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
             "optimize_with_safe_sequences_allow_geq_constraints": False,
-            "optimize_with_safe_sequences_fix_via_bounds": True,
         },
         solver_options={
-            "external_solver": "gurobi", # we can try also "highs" at some point
+            "external_solver": "highs", # we can try also "highs" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
     )
@@ -155,20 +154,20 @@ def process_solution(model):
     else:
         print("Model could not be solved.")
 
-    fp.utils.draw(
-            G=model.G,
-            filename= "solution.pdf",
-            flow_attr="flow",
-            paths=model.get_solution().get('walks', None),
-            weights=model.get_solution().get('weights', None),
-            draw_options={
-                "show_graph_edges": False,
-                "show_edge_weights": False,
-                "show_path_weights": False,
-                "show_path_weight_on_first_edge": True,
-                "pathwidth": 2,
-                # "style": "points",
-            })
+    # fp.utils.draw(
+    #         G=model.G,
+    #         filename= "solution.pdf",
+    #         flow_attr="flow",
+    #         paths=model.get_solution().get('walks', None),
+    #         weights=model.get_solution().get('weights', None),
+    #         draw_options={
+    #             "show_graph_edges": False,
+    #             "show_edge_weights": False,
+    #             "show_path_weights": False,
+    #             "show_path_weight_on_first_edge": True,
+    #             "pathwidth": 2,
+    #             # "style": "points",
+    #         })
 
     solve_statistics = model.solve_statistics
     print(solve_statistics)
@@ -189,7 +188,8 @@ def process_solution(model):
 
 def main():
     test_min_flow_decomp(filename = "tests/cyclic_graphs/gt3.kmer15.(130000.132000).V23.E32.cyc100.graph")
-    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(1300000.1400000).V809.E1091.mincyc1000.graph")
+    # test_min_flow_decomp(filename = "tests/cyclic_graphs/gt5.kmer27.(1300000.1400000).V809.E1091.mincyc1000.graph")
+    test_min_flow_decomp(filename = "tests/cyclic_graphs/gt32.kmer63.(0.10000).V231.E336.mincyc1.e1.0.graph")
     # test_min_flow_decomp(filename = "tests/cyclic_graphs/gt4.kmer15.(0.10000).V1096.E1622.mincyc100.e1.0.graph")
     test_least_abs_errors(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")
     test_min_path_error(filename = "tests/cyclic_graphs/gt5.kmer27.(655000.660000).V18.E27.mincyc4.e0.75.graph")

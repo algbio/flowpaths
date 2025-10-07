@@ -288,6 +288,20 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
             for i in range(self.k):
+                if (u, v, i) in self.edges_set_to_zero:
+                    self.solver.add_constraint(
+                            self.pi_vars[(u, v, i)] == 0,
+                            name=f"i={i}_u={u}_v={v}_10b",
+                        )
+                    continue
+
+                if (u, v, i) in self.edges_set_to_one:
+                    self.solver.add_constraint(
+                            self.pi_vars[(u, v, i)] == self.path_weights_vars[(i)],
+                            name=f"i={i}_u={u}_v={v}_10b",
+                        )
+                    continue
+
                 self.solver.add_integer_continuous_product_constraint(
                     integer_var=self.edge_vars[(u, v, i)],
                     continuous_var=self.path_weights_vars[(i)],

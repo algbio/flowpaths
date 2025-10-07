@@ -4,7 +4,7 @@ from flowpaths.utils import graphutils
 from flowpaths.stdag import stDAG
 import flowpaths.utils as utils
 from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Set
 
 
 class stDiGraph(AbstractSourceSinkGraph):
@@ -59,6 +59,27 @@ class stDiGraph(AbstractSourceSinkGraph):
             raise ValueError("The graph passed to stDiGraph must have at least one sink, or at least one node in `additional_ends`.")
         self.condensation_width = None
         self._build_condensation_expanded()
+        # Build indices and caches used by reachability queries
+        C: nx.DiGraph = self._condensation
+        mapping = C.graph["mapping"]  # original node -> condensation node (int)
+        # Per-SCC indices for fast unions
+        # - edges by SCC (kept for other utilities in this class)
+        self._edges_by_tail_scc: Dict[int, Set[Tuple[str, str]]] = {c: set() for c in C.nodes()}
+        self._edges_by_head_scc: Dict[int, Set[Tuple[str, str]]] = {c: set() for c in C.nodes()}
+        for a, b in self.edges():
+            ca = mapping[a]
+            cb = mapping[b]
+            self._edges_by_tail_scc[ca].add((a, b))
+            self._edges_by_head_scc[cb].add((a, b))
+
+        # - nodes by SCC (for fast node reachability queries)
+        self._nodes_by_scc: Dict[int, Set[str]] = {c: set() for c in C.nodes()}
+        for n in self.nodes():
+            self._nodes_by_scc[mapping[n]].add(n)
+
+        # Per-node caches for reachability queries (now returning nodes)
+        self._nodes_reachable_from_node_cache: Dict[str, Set[str]] = {}
+        self._nodes_reaching_node_cache: Dict[str, Set[str]] = {}
 
     def _expanded(self, v: int) -> str:
 
@@ -465,5 +486,81 @@ class stDiGraph(AbstractSourceSinkGraph):
             cv = mapping[v]
             result[(u, v)] = max(edge_weight[(u, v)], max_desc[cv], max_anc[cu])
 
+        return result
+
+    def nodes_reachable(self, node: str) -> Set[str]:
+        """Return the set of nodes reachable from ``node`` (including itself).
+
+        The result is cached per query node. Reachability is computed on the SCC
+        condensation DAG: for the SCC containing ``node``, take all SCCs reachable
+        in the condensation (including itself) and return the union of original
+        nodes lying in any of those SCCs.
+
+        Parameters
+        ----------
+        node: str
+            The node ``v`` in this graph from which to evaluate forward reachability.
+
+        Returns
+        -------
+        Set[str]
+            All nodes ``a`` such that there exists a path from ``node`` to ``a``.
+        """
+        if node not in self.nodes():
+            utils.logger.error(f"{__name__}: Node {node} is not in the graph.")
+            raise ValueError(f"Node {node} is not in the graph.")
+        if node in self._nodes_reachable_from_node_cache:
+            return self._nodes_reachable_from_node_cache[node]
+
+        C: nx.DiGraph = self._condensation
+        mapping = C.graph["mapping"]
+        cv = mapping[node]
+
+        # All SCCs reachable from cv (descendants) plus itself
+        reachable_sccs = set(nx.descendants(C, cv)) | {cv}
+
+        result: Set[str] = set()
+        for c in reachable_sccs:
+            result |= self._nodes_by_scc.get(c, set())
+
+        self._nodes_reachable_from_node_cache[node] = result
+        return result
+
+    def nodes_reaching(self, node: str) -> Set[str]:
+        """Return the set of nodes that can reach ``node`` (including itself).
+
+        The result is cached per query node. Reachability is computed on the SCC
+        condensation DAG: for the SCC containing ``node``, take all SCCs that can
+        reach it (ancestors, including itself) and return the union of original
+        nodes lying in any of those SCCs.
+
+        Parameters
+        ----------
+        node: str
+            The node ``u`` in this graph to evaluate backward reachability to ``u``.
+
+        Returns
+        -------
+        Set[str]
+            All nodes ``a`` such that there exists a path from ``a`` to ``node``.
+        """
+        if node not in self.nodes():
+            utils.logger.error(f"{__name__}: Node {node} is not in the graph.")
+            raise ValueError(f"Node {node} is not in the graph.")
+        if node in self._nodes_reaching_node_cache:
+            return self._nodes_reaching_node_cache[node]
+
+        C: nx.DiGraph = self._condensation
+        mapping = C.graph["mapping"]
+        cu = mapping[node]
+
+        # All SCCs that can reach cu (ancestors) plus itself
+        ancestor_sccs = set(nx.ancestors(C, cu)) | {cu}
+
+        result: Set[str] = set()
+        for c in ancestor_sccs:
+            result |= self._nodes_by_scc.get(c, set())
+
+        self._nodes_reaching_node_cache[node] = result
         return result
     

@@ -13,11 +13,10 @@ class AbstractWalkModelDiGraph(ABC):
     optimize_with_safe_sequences = True
     optimize_with_safe_sequences_allow_geq_constraints = True
     optimize_with_safe_sequences_fix_via_bounds = False
-    optimize_with_safe_sequences_fix_zero_edges = False
+    optimize_with_safe_sequences_fix_zero_edges = True
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
     optimize_with_max_safe_antichain_as_subset_constraints = False
-    allow_empty_walks = False
     allow_empty_walks = False
 
     def __init__(
@@ -148,6 +147,9 @@ class AbstractWalkModelDiGraph(ABC):
         if self.solver_options is None:
             self.solver_options = {}
         self.threads = self.solver_options.get("threads", sw.SolverWrapper.threads)
+
+        self.edges_set_to_zero = {}
+        self.edges_set_to_one = {}
 
         # optimizations
         if optimization_options is None:
@@ -445,6 +447,7 @@ class AbstractWalkModelDiGraph(ABC):
                                 self.edge_vars[(u, v, i)] == 1,
                                 name=f"safe_list_u={u}_v={v}_i={i}_eq{m}",
                             )
+                        self.edges_set_to_one[(u, v, i)] = True
                         self.solve_statistics["edge_variables=1"] += 1
 
     def _apply_safety_optimizations_fix_zero_edges(self):
@@ -496,10 +499,8 @@ class AbstractWalkModelDiGraph(ABC):
             # or that can reach the first node of the walk
             first_node = walk[0][0]
             last_node = walk[-1][1]
-            reachable_from_last_walk = nx.descendants(self.G, last_node) | {last_node}
-            can_reach_first_walk = nx.ancestors(self.G, first_node) | {first_node}
             for (u, v) in self.G.edges:
-                if (u in reachable_from_last_walk) or (v in can_reach_first_walk):
+                if (u in self.G.nodes_reachable(last_node)) or (v in self.G.nodes_reaching(first_node)):
                     protected_edges.add((u, v))
 
             # Collect pairs of non-contiguous consecutive edges (gaps)
@@ -507,7 +508,9 @@ class AbstractWalkModelDiGraph(ABC):
             for idx in range(len(walk) - 1):
                 end_prev = walk[idx][1]
                 start_next = walk[idx + 1][0]
-                if end_prev != start_next:
+                # We consider all consecutive edges as gap pairs, because there could be a cycle
+                # formed between them (this is not the case in DAGs)
+                if True or end_prev != start_next:
                     gap_pairs.append((end_prev, start_next))
 
             # If there are no gaps, do not prune anything for this walk/layer
@@ -516,11 +519,9 @@ class AbstractWalkModelDiGraph(ABC):
 
             # For each gap, add edges that can lie on some path bridging the gap
             for (current_last, current_start) in gap_pairs:
-                reachable_from_last = nx.descendants(self.G, current_last) | {current_last}
-                can_reach_start = nx.ancestors(self.G, current_start) | {current_start}
-
                 for (u, v) in self.G.edges:
-                    if (u in reachable_from_last) and (v in can_reach_start):
+                    if (u in self.G.nodes_reachable(current_last)) and (v in self.G.nodes_reaching(current_start)):
+                    # if (u in reachable_from_last) and (v in can_reach_start):
                         protected_edges.add((u, v))
 
             # Now fix every other edge to 0 for this layer i
@@ -528,7 +529,12 @@ class AbstractWalkModelDiGraph(ABC):
                 if (u, v) in protected_edges:
                     continue
                 # Queue zero-fix for batch bounds update
-                self.solver.queue_fix_variable(self.edge_vars[(u, v, i)], int(0))
+                # self.solver.queue_fix_variable(self.edge_vars[(u, v, i)], int(0))
+                self.solver.add_constraint(
+                    self.edge_vars[(u, v, i)] == 0,
+                    name=f"i={i}_u={u}_v={v}_fix0",
+                )
+                self.edges_set_to_zero[(u, v, i)] = True
                 fixed_zero_count += 1
 
         if fixed_zero_count:
