@@ -293,23 +293,20 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
                             self.pi_vars[(u, v, i)] == 0,
                             name=f"i={i}_u={u}_v={v}_10b",
                         )
-                    continue
-
-                if (u, v, i) in self.edges_set_to_one:
+                elif (u, v, i) in self.edges_set_to_one:
                     self.solver.add_constraint(
                             self.pi_vars[(u, v, i)] == self.path_weights_vars[(i)],
                             name=f"i={i}_u={u}_v={v}_10b",
                         )
-                    continue
-
-                self.solver.add_integer_continuous_product_constraint(
-                    integer_var=self.edge_vars[(u, v, i)],
-                    continuous_var=self.path_weights_vars[(i)],
-                    product_var=self.pi_vars[(u, v, i)],
-                    lb=0,
-                    ub=self.w_max,
-                    name=f"u={u}_v={v}_i={i}_10",
-                )
+                else:
+                    self.solver.add_integer_continuous_product_constraint(
+                        integer_var=self.edge_vars[(u, v, i)],
+                        continuous_var=self.path_weights_vars[(i)],
+                        product_var=self.pi_vars[(u, v, i)],
+                        lb=0,
+                        ub=self.w_max,
+                        name=f"u={u}_v={v}_i={i}_10",
+                    )
 
             # Encoding the error on the edge (u, v) as the difference between 
             # the flow value of the edge and the sum of the weights of the walks that go through it (pi variables)

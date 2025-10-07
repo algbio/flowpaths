@@ -462,8 +462,7 @@ class AbstractWalkModelDiGraph(ABC):
                     and last_node the last node. Protect any edge (u,v) such that
                         - u is reachable (forward) from last_node, OR
                         - v can reach (backward) first_node.
-            3) Gap-bridging between consecutive edges: for every pair of consecutive
-                    edges whose endpoints do not match (a gap), let
+            3) Gap-bridging between consecutive edges: for every pair of consecutive, let
                         - current_last  = end node of the first edge, and
                         - current_start = start node of the next edge.
                     Protect any edge (u,v) such that
@@ -475,11 +474,6 @@ class AbstractWalkModelDiGraph(ABC):
 
         Notes:
         - Requires `self.walks_to_fix` already computed and `self.edge_vars` created.
-        - Reachability is computed with networkx `descendants` (forward) and
-            `ancestors` (backward), including the seed node itself in each set.
-        - If a walk has no gaps, only the whole-walk reachability protection (2)
-            applies. If the graph structure makes many edges reachable, little or no
-            pruning may occur for that walk.
         """
         if not hasattr(self, "walks_to_fix") or self.walks_to_fix is None:
             return
@@ -512,10 +506,6 @@ class AbstractWalkModelDiGraph(ABC):
                 # formed between them (this is not the case in DAGs)
                 if True or end_prev != start_next:
                     gap_pairs.append((end_prev, start_next))
-
-            # If there are no gaps, do not prune anything for this walk/layer
-            if not gap_pairs:
-                continue
 
             # For each gap, add edges that can lie on some path bridging the gap
             for (current_last, current_start) in gap_pairs:

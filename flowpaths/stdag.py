@@ -46,7 +46,7 @@ class stDAG(AbstractSourceSinkGraph):
         self.topological_order_rev = list(reversed(self.topological_order))
         self._reachable_nodes_from = None
         self._reachable_edges_from = None
-        self._reachable_nodes_rev_from = None
+        self._nodes_reaching = None
         self._reachable_edges_rev_from = None
 
     @property
@@ -75,16 +75,16 @@ class stDAG(AbstractSourceSinkGraph):
         return self._reachable_edges_from
 
     @property
-    def reachable_nodes_rev_from(self):
+    def nodes_reaching(self):
 
-        if self._reachable_nodes_rev_from is None:
+        if self._nodes_reaching is None:
             # Initialize by traversing the nodes in topological order.
-            self._reachable_nodes_rev_from = {node:{node} for node in self.nodes()}
+            self._nodes_reaching = {node:{node} for node in self.nodes()}
             for node in self.topological_order:
                 for v in self.predecessors(node):
-                    self._reachable_nodes_rev_from[node] |= self._reachable_nodes_rev_from[v]
+                    self._nodes_reaching[node] |= self._nodes_reaching[v]
 
-        return self._reachable_nodes_rev_from
+        return self._nodes_reaching
 
     @property
     def reachable_edges_rev_from(self):

@@ -195,6 +195,9 @@ class AbstractPathModelDAG(ABC):
         self.encode_path_length = encode_path_length
         self.edge_position_vars = {}
 
+        self.edges_set_to_zero = {}
+        self.edges_set_to_one = {}
+
         self.solver_options = solver_options
         if self.solver_options is None:
             self.solver_options = {}
@@ -287,6 +290,8 @@ class AbstractPathModelDAG(ABC):
         self.solver = sw.SolverWrapper(**self.solver_options)
 
         self._encode_paths()
+
+        self._apply_safety_optimizations_fix_zero_edges()
 
     def _encode_paths(self):
         
@@ -447,49 +452,108 @@ class AbstractPathModelDAG(ABC):
                     name=f"path_length_constr_i={i}"
                 )
 
-        ########################################
-        #                                      #
-        # Fixing variables based on safe lists #
-        #                                      #
-        ########################################
+    def _apply_safety_optimizations(self):
 
         if self.safe_lists is not None:
-            paths_to_fix = self._get_paths_to_fix_from_safe_lists()
+            self.paths_to_fix = self._get_paths_to_fix_from_safe_lists()
 
-            if not self.optimize_with_safety_as_subpath_constraints:
-                # iterating over safe lists
-                for i in range(min(len(paths_to_fix), self.k)):
-                    # print("Fixing variables for safe list #", i)
-                    # iterate over the edges in the safe list to fix variables to 1
-                    for u, v in paths_to_fix[i]:
-                        self.solver.add_constraint(
-                            self.edge_vars[(u, v, i)] == 1,
-                            name=f"safe_list_u={u}_v={v}_i={i}",
-                        )
+        if not self.optimize_with_safety_as_subpath_constraints:
+            # iterating over safe lists
+            for i in range(min(len(self.paths_to_fix), self.k)):
+                # print("Fixing variables for safe list #", i)
+                # iterate over the edges in the safe list to fix variables to 1
+                for u, v in self.paths_to_fix[i]:
+                    self.solver.add_constraint(
+                        self.edge_vars[(u, v, i)] == 1,
+                        name=f"safe_list_u={u}_v={v}_i={i}",
+                    )
+                    self.edges_set_to_one[(u, v, i)] = True
 
-                    if self.optimize_with_safe_zero_edges:
-                        # get the endpoints of the longest safe path in the sequence
-                        first_node, last_node = (
-                            safetypathcovers.get_endpoints_of_longest_safe_path_in(paths_to_fix[i])
-                        )
-                        # get the reachable nodes from the last node
-                        reachable_nodes = self.G.reachable_nodes_from[last_node]
-                        # get the backwards reachable nodes from the first node
-                        reachable_nodes_reverse = self.G.reachable_nodes_rev_from[first_node]
-                        # get the edges in the path
-                        path_edges = set((u, v) for (u, v) in paths_to_fix[i])
+            self._apply_safety_optimizations_fix_zero_edges()
 
-                        for u, v in self.G.base_graph.edges():
-                            if (
-                                (u, v) not in path_edges
-                                and u not in reachable_nodes
-                                and v not in reachable_nodes_reverse
-                            ):
-                                # print(f"Adding zero constraint for edge ({u}, {v}) in path {i}")
-                                self.solver.add_constraint(
-                                    self.edge_vars[(u, v, i)] == 0,
-                                    name=f"safe_list_zero_edge_u={u}_v={v}_i={i}",
-                                )
+    def _apply_safety_optimizations_fix_zero_edges(self):
+        """
+        Prune layer-edge variables to zero using safe-walk reachability while
+        preserving edges that can be part of the walk or its connectors.
+
+        For each walk i in `walks_to_fix` we build a protection set of edges that
+        must not be fixed to 0 for layer i:
+            1) Protect all edges that appear in the walk itself.
+            2) Whole-walk reachability: let first_node be the first node of the walk
+                    and last_node the last node. Protect any edge (u,v) such that
+                        - u is reachable (forward) from last_node, OR
+                        - v can reach (backward) first_node.
+            3) Gap-bridging between consecutive edges: for every pair of consecutive
+                    edges whose endpoints do not match (a gap), let
+                        - current_last  = end node of the first edge, and
+                        - current_start = start node of the next edge.
+                    Protect any edge (u,v) such that
+                        - u is reachable (forward) from current_last, AND
+                        - v can reach (backward) current_start.
+
+        All remaining edges (u,v) not in the protection set are fixed to 0 in
+        layer i.
+
+        Notes:
+        - Requires `self.paths_to_fix` already computed and `self.edge_vars` created.
+        """
+        if not hasattr(self, "paths_to_fix") or self.paths_to_fix is None:
+            return
+
+        fixed_zero_count = 0
+        # Ensure we don't go beyond k layers
+        for i in range(min(len(self.paths_to_fix), self.k)):
+            path = self.paths_to_fix[i]
+            if not path or len(path) == 0:
+                continue
+
+            # Build the set of edges that should NOT be fixed to 0 for this layer i
+            # Start by protecting all edges in the path itself
+            protected_edges = set((u, v) for (u, v) in path if self.G.has_edge(u, v))
+
+            # Also protect edges that are reachable from the last node of the path
+            # or that can reach the first node of the path
+            first_node = path[0][0]
+            last_node = path[-1][1]
+            for (u, v) in self.G.edges:
+                if (u in self.G.reachable_nodes_from[last_node]) or (v in self.G.nodes_reaching(first_node)):
+                    protected_edges.add((u, v))
+
+            # Collect pairs of non-contiguous consecutive edges (gaps)
+            gap_pairs = []
+            for idx in range(len(path) - 1):
+                end_prev = path[idx][1]
+                start_next = path[idx + 1][0]
+                # We consider all consecutive edges as gap pairs, because there could be a cycle
+                # formed between them (this is not the case in DAGs)
+                if end_prev != start_next:
+                    gap_pairs.append((end_prev, start_next))
+
+            # For each gap, add edges that can lie on some path bridging the gap
+            for (current_last, current_start) in gap_pairs:
+                for (u, v) in self.G.edges:
+                    if (u in self.G.nodes_reachable(current_last)) and (v in self.G.nodes_reaching(current_start)):
+                    # if (u in reachable_from_last) and (v in can_reach_start):
+                        protected_edges.add((u, v))
+
+            # Now fix every other edge to 0 for this layer i
+            for (u, v) in self.G.edges:
+                if (u, v) in protected_edges:
+                    continue
+                # Queue zero-fix for batch bounds update
+                # self.solver.queue_fix_variable(self.edge_vars[(u, v, i)], int(0))
+                self.solver.add_constraint(
+                    self.edge_vars[(u, v, i)] == 0,
+                    name=f"i={i}_u={u}_v={v}_fix0",
+                )
+                self.edges_set_to_zero[(u, v, i)] = True
+                fixed_zero_count += 1
+
+        if fixed_zero_count:
+            # Accumulate into solve statistics
+            self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
+            utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
+
 
 
     def _get_paths_to_fix_from_safe_lists(self) -> list:
