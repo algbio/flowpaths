@@ -187,7 +187,10 @@ class AbstractWalkModelDiGraph(ABC):
 
         self._encode_walks()
         
+        start_time = time.perf_counter()
         self._apply_safety_optimizations()
+        utils.logger.debug(f"{__name__}: Applied safety optimizations in {time.perf_counter() - start_time} seconds.")
+        self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
 
         self._encode_subset_constraints()
 
@@ -378,13 +381,10 @@ class AbstractWalkModelDiGraph(ABC):
         self.safe_lists = []
 
         if self.optimize_with_safe_sequences or self.optimize_with_safety_as_subset_constraints or self.optimize_with_max_safe_antichain_as_subset_constraints:
-            start_time = time.perf_counter()
             self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
                 G=self.G,
                 X=self.trusted_edges_for_safety,
             )
-            utils.logger.debug(f"{__name__}: Found {len(self.safe_lists)} safe sequences in {time.perf_counter() - start_time} seconds.")
-            self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
 
         if self.safe_lists is None:
             return
