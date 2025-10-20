@@ -1,56 +1,188 @@
 from itertools import count
 import networkx as nx
+import flowpaths.utils as utils
+# NOTE: Do NOT import flowpaths.stdigraph at module import time to avoid a circular
+# import chain: stdag -> graphutils -> stdigraph -> stdag. We instead lazily import
+# stdigraph inside functions that need it (e.g. read_graph) after this module is fully loaded.
 
 bigNumber = 1 << 32
 
+def fpid(G) -> str:
+    """
+    Returns a unique identifier for the given graph.
+    """
+    if isinstance(G, nx.DiGraph):
+        if "id" in G.graph:
+            return G.graph["id"]
+
+    return str(id(G))
 
 def read_graph(graph_raw) -> nx.DiGraph:
-    # Input format is: ['#Graph id\n', 'n\n', 'u_1 v_1 w_1\n', ..., 'u_k v_k w_k\n']
-    id = graph_raw[0].strip("# ").strip()
-    n = int(graph_raw[1])
+    """
+    Parse a single graph block from a list of lines.
+
+    Accepts one or more header lines at the beginning (each prefixed by '#'),
+    followed by a line containing the number of vertices (n), then any number
+    of edge lines of the form: "u v w" (whitespace-separated).
+
+    Subpath constraint lines:
+        Lines starting with "#S" define a (directed) subpath constraint as a
+        sequence of nodes: "#S n1 n2 n3 ...". For each such line we build the
+        list of consecutive edge tuples [(n1,n2), (n2,n3), ...] and append this
+        edge-list (the subpath) to G.graph["constraints"]. Duplicate filtering
+        is applied on the whole node sequence: if an identical sequence of
+        nodes has already appeared in a previous "#S" line, the entire subpath
+        line is ignored (its edges are not added again). Different subpaths may
+    share edges; they are kept as separate entries. After all graph edges
+    are parsed, every constraint edge is validated to ensure it exists in
+    the graph; a missing edge raises ValueError.
+
+    Example block:
+        # graph number = 1 name = foo
+        # any other header line
+        #S a b c d          (adds subpath [(a,b),(b,c),(c,d)])
+        #S b c e            (adds subpath [(b,c),(c,e)])
+        #S a b c d          (ignored: exact node sequence already seen)
+        5
+        a b 1.0
+        b c 2.5
+        c d 3.0
+        c e 4.0
+    """
+
+    # Collect leading header lines (prefixed by '#') and parse constraint lines prefixed by '#S'
+    idx = 0
+    header_lines = []
+    constraint_subpaths = []       # list of subpaths, each a list of (u,v) edge tuples
+    subpaths_seen = set()          # set of full node sequences (tuples) to filter duplicate subpaths
+    while idx < len(graph_raw) and graph_raw[idx].lstrip().startswith("#"):
+        stripped = graph_raw[idx].lstrip()
+        # Subpath constraint line: starts with '#S'
+        if stripped.startswith("#S"):
+            # Remove leading '#S' and split remaining node sequence
+            nodes_part = stripped[2:].strip()  # drop '#S'
+            if nodes_part:
+                nodes_seq = nodes_part.split()
+                seq_key = tuple(nodes_seq)
+                # Skip if this exact subpath sequence already processed
+                if seq_key not in subpaths_seen:
+                    subpaths_seen.add(seq_key)
+                    edges_list = [(u, v) for u, v in zip(nodes_seq, nodes_seq[1:])]
+                    # Only append if there is at least one edge (>=2 nodes)
+                    if edges_list:
+                        constraint_subpaths.append(edges_list)
+        else:
+            # Regular header line (remove leading '#') for metadata / id extraction
+            header_lines.append(stripped.lstrip("#").strip())
+        idx += 1
+
+    # Determine graph id from the first (non-#S) header line if present
+    graph_id = header_lines[0] if header_lines else str(id(graph_raw))
+
+    # Skip blank lines before the vertex-count line
+    while idx < len(graph_raw) and graph_raw[idx].strip() == "":
+        idx += 1
+
+    if idx >= len(graph_raw):
+        error_msg = "Graph block missing vertex-count line."
+        utils.logger.error(f"{__name__}: {error_msg}")
+        raise ValueError(error_msg)
+    # Parse number of vertices (kept for information; not used to count edges here)
+    try:
+        n = int(graph_raw[idx].strip())
+    except ValueError:
+        utils.logger.error(f"{__name__}: Invalid vertex-count line: {graph_raw[idx].rstrip()}.")
+        raise
+
+    idx += 1
 
     G = nx.DiGraph()
-    G.graph["id"] = id
+    G.graph["id"] = graph_id
+    # Store (possibly empty) list of subpaths (each a list of edge tuples)
+    G.graph["constraints"] = constraint_subpaths
 
     if n == 0:
-        print("Graph %s has 0 vertices.", id)
+        utils.logger.info(f"Graph {graph_id} has 0 vertices.")
         return G
 
-    for edge in graph_raw[2:]:
-        elements = edge.split(" ")
+    # Parse edges: skip blanks and comment/header lines defensively
+    for line in graph_raw[idx:]:
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        elements = line.split()
         if len(elements) != 3:
-            raise ValueError("Invalid edge format: %s", edge)
-        # print(elements)
-        u = elements[0].strip()
-        v = elements[1].strip()
-        w = int(elements[2].strip(" \n"))
-        # print(u, v, w)
-        G.add_edge(u, v, flow=w)
+            utils.logger.error(f"{__name__}: Invalid edge format: {line.rstrip()}")
+            raise ValueError(f"Invalid edge format: {line.rstrip()}")
+        u, v, w_str = elements
+        try:
+            w = float(w_str)
+        except ValueError:
+            utils.logger.error(f"{__name__}: Invalid weight value in edge: {line.rstrip()}")
+            raise
+        G.add_edge(u.strip(), v.strip(), flow=w)
+
+    # Validate that every constraint edge exists in the graph
+    for subpath in constraint_subpaths:
+        for (u, v) in subpath:
+            if not G.has_edge(u, v):
+                utils.logger.error(f"{__name__}: Constraint edge ({u}, {v}) not found in graph {graph_id} edges.")
+                raise ValueError(f"Constraint edge ({u}, {v}) not found in graph edges.")
+
+    G.graph["n"] = G.number_of_nodes()
+    G.graph["m"] = G.number_of_edges()
+    # Lazy import here to avoid circular import at module load time
+    from flowpaths import stdigraph as _stdigraph  # type: ignore
+    G.graph["w"] = _stdigraph.stDiGraph(G).get_width()
 
     return G
 
 
 def read_graphs(filename):
-    f = open(filename, "r")
-    lines = f.readlines()
-    f.close()
-    graphs = []
+    """
+    Read one or more graphs from a file.
 
-    # Assume: every file contains at least one graph
-    i, j = 0, 1
-    while True:
-        if lines[j].startswith("#"):
-            graphs.append(read_graph(lines[i:j]))
-            i = j
-        j += 1
-        if j == len(lines):
-            graphs.append(read_graph(lines[i:j]))
+    Supports graphs whose header consists of one or multiple consecutive lines
+    prefixed by '#'. Each graph block is:
+        - one or more header lines starting with '#'
+        - one line with the number of vertices (n)
+        - zero or more edge lines "u v w"
+
+    Graphs are delimited by the start of the next header (a line starting with '#')
+    or the end of file.
+    """
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    graphs = []
+    n_lines = len(lines)
+    i = 0
+
+    # Iterate through the file, capturing blocks that start with one or more '#' lines
+    while i < n_lines:
+        # Move to the start of the next graph header
+        while i < n_lines and not lines[i].lstrip().startswith('#'):
+            i += 1
+        if i >= n_lines:
             break
+
+        start = i
+
+        # Consume all consecutive header lines for this graph
+        while i < n_lines and lines[i].lstrip().startswith('#'):
+            i += 1
+
+        # Advance until the next header line (start of next graph) or EOF
+        j = i
+        while j < n_lines and not lines[j].lstrip().startswith('#'):
+            j += 1
+
+        graphs.append(read_graph(lines[start:j]))
+        i = j
 
     return graphs
 
 
-def min_cost_flow(G: nx.DiGraph, s, t):
+def min_cost_flow(G: nx.DiGraph, s, t, demands_attr = 'l', capacities_attr = 'u', costs_attr = 'c') -> tuple:
 
     flowNetwork = nx.DiGraph()
 
@@ -71,37 +203,50 @@ def min_cost_flow(G: nx.DiGraph, s, t):
         z1 = uid + str(next(counter))
         z2 = uid + str(next(counter))
         edgeMap[(x, y)] = z1
-        l = G[x][y]["l"]
-        u = G[x][y]["u"]
-        c = G[x][y]["c"]
+        l = G[x][y][demands_attr]
+        u = G[x][y][capacities_attr]
+        c = G[x][y][costs_attr]
         flowNetwork.add_node(z1, demand=l)
         flowNetwork.add_node(z2, demand=-l)
         flowNetwork.add_edge(x, z1, weight=c, capacity=u)
         flowNetwork.add_edge(z1, z2, weight=0, capacity=u)
         flowNetwork.add_edge(z2, y, weight=0, capacity=u)
 
-    flowCost, flowDictNet = nx.network_simplex(flowNetwork)
+    
+    try:
+        flowCost, flowDictNet = nx.network_simplex(flowNetwork)
 
-    flowDict = {node: dict() for node in G.nodes()}
+        flowDict = {node: dict() for node in G.nodes()}
 
-    for x, y in G.edges():
-        flowDict[x][y] = flowDictNet[x][edgeMap[(x, y)]]
+        for x, y in G.edges():
+            flowDict[x][y] = flowDictNet[x][edgeMap[(x, y)]]
 
-    return flowCost, flowDict
+        return flowCost, flowDict
+    
+    except Exception as e:
+        # If there was no feasible flow, return None    
+        return None, None
 
 
-def maxBottleckPath(G: nx.DiGraph, flow_attr) -> tuple:
+def max_bottleneck_path(G: nx.DiGraph, flow_attr) -> tuple:
     """
     Computes the maximum bottleneck path in a directed graph.
 
     Parameters
     ----------
-    - G (nx.DiGraph): A directed graph where each edge has a flow attribute.
-    - flow_attr (str): The flow attribute from where to get the flow values.
+    - `G`: nx.DiGraph
+    
+        A directed graph where each edge has a flow attribute.
+
+    - `flow_attr`: str
+    
+        The flow attribute from where to get the flow values.
 
     Returns
-    ----------
+    --------
+
     - tuple: A tuple containing:
+
         - The value of the maximum bottleneck.
         - The path corresponding to the maximum bottleneck (list of nodes).
             If no s-t flow exists in the network, returns (None, None).
@@ -143,19 +288,37 @@ def check_flow_conservation(G: nx.DiGraph, flow_attr) -> bool:
 
     Parameters
     ----------
-    - G (nx.DiGraph): The input directed acyclic graph, as networkx DiGraph.
-    - flow_attr (str): The attribute name from where to get the flow values on the edges.
+    - `G`: nx.DiGraph
+    
+        The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
+
+    - `flow_attr`: str
+    
+        The attribute name from where to get the flow values on the edges.
 
     Returns
     -------
-    - bool: True if the flow conservation property holds, False otherwise.
+    
+    - bool: 
+    
+        True if the flow conservation property holds, False otherwise.
     """
 
     for v in G.nodes():
         if G.out_degree(v) == 0 or G.in_degree(v) == 0:
             continue
-        out_flow = sum(flow for _, _, flow in G.out_edges(v, data=flow_attr))
-        in_flow = sum(flow for _, _, flow in G.in_edges(v, data=flow_attr))
+
+        out_flow = 0
+        for x, y, data in G.out_edges(v, data=True):
+            if data.get(flow_attr) is None:
+                return False
+            out_flow += data[flow_attr]
+
+        in_flow = 0
+        for x, y, data in G.in_edges(v, data=True):
+            if data.get(flow_attr) is None:
+                return False
+            in_flow += data[flow_attr]
 
         if out_flow != in_flow:
             return False
@@ -190,47 +353,257 @@ def max_occurrence(seq, paths_in_DAG, edge_lengths: dict = {}) -> int:
             
     return max_occurence
 
-def draw_solution_basic(graph: nx.DiGraph, flow_attr: str, paths: list, weights: list, id:str):
+def draw(
+        G: nx.DiGraph, 
+        filename: str,
+        flow_attr: str = None,
+        paths: list = [], 
+        weights: list = [], 
+        additional_starts: list = [],
+        additional_ends: list = [],
+        subpath_constraints: list = [],
+        draw_options: dict = {
+            "show_graph_edges": True,
+            "show_edge_weights": False,
+            "show_node_weights": False,
+            "show_path_weights": False,
+            "show_path_weight_on_first_edge": True,
+            "pathwidth": 3.0,
+            "style": "default",
+        },
+        ):
+        """
+        Draw the graph with the paths and their weights highlighted.
 
-        import graphviz as gv
+        Parameters
+        ----------
 
-        dot = gv.Digraph(format="pdf")
-        dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
-        dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
-
-        colors = [
-            "red",
-            "blue",
-            "green",
-            "purple",
-            "brown",
-            "cyan",
-            "yellow",
-            "pink",
-            "grey",
-        ]
-
-        for u, v, data in graph.edges(data=True):
-            dot.edge(str(u), str(v), str(data.get(flow_attr,"")))
-
-        for path in paths:
-            pathColor = colors[len(path) + 73 % len(colors)]
-            for i in range(len(path) - 1):
-                dot.edge(
-                    str(path[i]),
-                    str(path[i + 1]),
-                    fontcolor=pathColor,
-                    color=pathColor,
-                    penwidth="2.0",
-                )  # label=str(weight)
-            if len(path) == 1:
-                dot.node(str(path[0]), color=pathColor, penwidth="2.0")
+        - `G`: nx.DiGraph 
         
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html). 
 
-        dot.render(f"{id}", view=False)
+        - `filename`: str
+        
+            The name of the file to save the drawing. The file type is inferred from the extension. Supported extensions are '.bmp', '.canon', '.cgimage', '.cmap', '.cmapx', '.cmapx_np', '.dot', '.dot_json', '.eps', '.exr', '.fig', '.gd', '.gd2', '.gif', '.gtk', '.gv', '.ico', '.imap', '.imap_np', '.ismap', '.jp2', '.jpe', '.jpeg', '.jpg', '.json', '.json0', '.pct', '.pdf', '.pic', '.pict', '.plain', '.plain-ext', '.png', '.pov', '.ps', '.ps2', '.psd', '.sgi', '.svg', '.svgz', '.tga', '.tif', '.tiff', '.tk', '.vml', '.vmlz', '.vrml', '.wbmp', '.webp', '.x11', '.xdot', '.xdot1.2', '.xdot1.4', '.xdot_json', '.xlib'
 
+        - `flow_attr`: str
+        
+            The attribute name from where to get the flow values on the edges. Default is an empty string, in which case no edge weights are shown.
 
-def draw_solution(graph: nx.DiGraph, paths: list, weights: list, id:str):
+        - `paths`: list
+        
+            The list of paths to highlight, as lists of nodes. Default is an empty list, in which case no path is drawn. Default is an empty list.
+
+        - `weights`: list
+        
+            The list of weights corresponding to the paths, of various colors. Default is an empty list, in which case no path is drawn.
+
+        - `additional_starts`: list
+
+                A list of additional nodes to highlight in green as starting nodes. Default is an empty list.
+
+        - `additional_ends`: list
+
+                A list of additional nodes to highlight in red as ending nodes. Default is an empty list.
+        
+        - `subpath_constraints`: list
+
+            A list of subpaths to highlight in the graph as dashed edges, of various colors. Each subpath is a list of edges. Default is an empty list. There is no association between the subpath colors and the path colors.
+        
+        - `draw_options`: dict
+
+            A dictionary with the following keys:
+
+            - `show_graph_edges`: bool
+
+                Whether to show the edges of the graph. Default is `True`.
+            
+            - `show_edge_weights`: bool
+
+                Whether to show the edge weights in the graph from the `flow_attr`. Default is `False`.
+
+            - `show_node_weights`: bool
+
+                Whether to show the node weights in the graph from the `flow_attr`. Default is `False`.
+
+            - `show_path_weights`: bool
+
+                Whether to show the path weights in the graph on every edge. Default is `False`.
+
+            - `show_path_weight_on_first_edge`: bool
+
+                Whether to show the path weight on the first edge of the path. Default is `True`.
+
+            - `pathwidth`: float
+            
+                The width of the path to be drawn. Default is `3.0`.
+
+            - `style`: str
+
+                The style of the drawing. Available options: `default`, `points`.
+
+        """
+
+        if len(paths) != len(weights) and len(weights) > 0:
+            raise ValueError(f"{__name__}: Paths and weights must have the same length, if provided.")
+
+        try:
+            import graphviz as gv
+        
+            dot = gv.Digraph(format="pdf")
+            dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
+            
+            style = draw_options.get("style", "default")
+            if style == "default":
+                dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
+                dot.node_attr["style"] = "rounded"  # Rounded rectangle nodes
+            elif style == "points":
+                dot.node_attr["shape"] = "point"  # Point nodes
+                dot.node_attr["style"] = "filled"  # Filled point nodes
+                # dot.node_attr['label'] = '' 
+                dot.node_attr['width'] = '0.1' 
+
+            colors = [
+                "red",
+                "blue",
+                "green",
+                "purple",
+                "brown",
+                "cyan",
+                "yellow",
+                "pink",
+                "grey",
+                "chocolate",
+                "darkblue",
+                "darkolivegreen",
+                "darkslategray",
+                "deepskyblue2",
+                "cadetblue3",
+                "darkmagenta",
+                "goldenrod1"
+            ]
+
+            dot.attr('node', fontname='Arial')
+
+            if draw_options.get("show_graph_edges", True):
+                # drawing nodes
+                for node in G.nodes():
+                    color = "black"
+                    penwidth = "1.0"
+                    if node in additional_starts:
+                        color = "green"
+                        penwidth = "2.0"
+                    elif node in additional_ends:
+                        color = "red"
+                        penwidth = "2.0"
+
+                    if draw_options.get("show_node_weights", False) and flow_attr is not None and flow_attr in G.nodes[node]:
+                        label = f"{G.nodes[node][flow_attr]}\\n{node}" if style != "points" else ""
+                        dot.node(
+                            name=str(node),
+                            label=label,
+                            shape="record",
+                            color=color, 
+                            penwidth=penwidth)
+                    else:
+                        label = str(node) if style != "points" else ""
+                        dot.node(
+                            name=str(node), 
+                            label=str(node), 
+                            color=color, 
+                            penwidth=penwidth)
+
+                # drawing edges
+                for u, v, data in G.edges(data=True):
+                    if draw_options.get("show_edge_weights", False):
+                        dot.edge(
+                            tail_name=str(u), 
+                            head_name=str(v), 
+                            label=str(data.get(flow_attr,"")),
+                            fontname="Arial",)
+                    else:
+                        dot.edge(
+                            tail_name=str(u), 
+                            head_name=str(v))
+
+            for index, path in enumerate(paths):
+                pathColor = colors[index % len(colors)]
+                for i in range(len(path) - 1):
+                    if i == 0 and draw_options.get("show_path_weight_on_first_edge", True) or \
+                        draw_options.get("show_path_weights", True):
+                        dot.edge(
+                            str(path[i]),
+                            str(path[i + 1]),
+                            fontcolor=pathColor,
+                            color=pathColor,
+                            penwidth=str(draw_options.get("pathwidth", 3.0)),
+                            label=str(weights[index]) if len(weights) > 0 else "",
+                            fontname="Arial",
+                        )
+                    else:
+                        dot.edge(
+                            str(path[i]),
+                            str(path[i + 1]),
+                            color=pathColor,
+                            penwidth=str(draw_options.get("pathwidth", 3.0)),
+                            )
+                if len(path) == 1:
+                    dot.node(str(path[0]), color=pathColor, penwidth=str(draw_options.get("pathwidth", 3.0)))        
+                
+            for index, path in enumerate(subpath_constraints):
+                pathColor = colors[index % len(colors)]
+                for i in range(len(path)):
+                    if len(path[i]) != 2:
+                        utils.logger.error(f"{__name__}: Subpaths must be lists of edges.")
+                        raise ValueError("Subpaths must be lists of edges.")
+                    dot.edge(
+                        str(path[i][0]),
+                        str(path[i][1]),
+                        color=pathColor,
+                        style="dashed",
+                        penwidth="2.0"
+                        )
+                    
+            dot.render(outfile=filename, view=False, cleanup=True)
+        
+        except ImportError:
+            utils.logger.error(f"{__name__}: graphviz module not found. Please install it via pip (pip install graphviz).")
+            raise ImportError("graphviz module not found. Please install it via pip (pip install graphviz).")
+
+def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, left: int, right: int) -> nx.DiGraph:
+    """
+    Create a subgraph with the nodes between left and right in the topological order, 
+    including the edges between them, but also the edges from these nodes that are incident to nodes outside this range.
+    """
+
+    if left < 0 or right >= len(topo_order):
+        utils.logger.error(f"{__name__}: Invalid range for topological order: {left}, {right}.")
+        raise ValueError("Invalid range for topological order")
+    if left > right:
+        utils.logger.error(f"{__name__}: Invalid range for topological order: {left}, {right}.")
+        raise ValueError("Invalid range for topological order")
+
+    # Create a subgraph with the nodes between left and right in the topological order
+    subgraph = nx.DiGraph()
+    if "id" in graph.graph:
+        subgraph.graph["id"] = graph.graph["id"]
+    for i in range(left, right):
+        subgraph.add_node(topo_order[i], **graph.nodes[topo_order[i]])
+
+    fixed_nodes = set(subgraph.nodes())
+
+    # Add the edges between the nodes in the subgraph
+    for u, v in graph.edges():
+        if u in fixed_nodes or v in fixed_nodes:
+            subgraph.add_edge(u, v, **graph[u][v])
+            if u not in fixed_nodes:
+                subgraph.add_node(u, **graph.nodes[u])
+            if v not in fixed_nodes:
+                subgraph.add_node(v, **graph.nodes[v])
+
+    return subgraph
+
+def draw_WIP(graph: nx.DiGraph, paths: list, weights: list, id:str):
 
     import matplotlib.pyplot as plt
     import pydot

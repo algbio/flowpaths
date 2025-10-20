@@ -74,7 +74,7 @@ def main():
     mfd_model5 = fp.MinFlowDecomp(
         graph2, 
         flow_attr="flow", 
-        edge_length_attr="length", 
+        length_attr="length", 
         subpath_constraints=[[("a", "c"),("c", "e")]], 
         subpath_constraints_coverage_length=0.7
         )
@@ -84,7 +84,7 @@ def main():
     mfd_model6 = fp.MinFlowDecomp(
         graph2, 
         flow_attr="flow", 
-        edge_length_attr="length", 
+        length_attr="length", 
         subpath_constraints=[[("a", "c"),("c", "e")]], 
         subpath_constraints_coverage_length=0.7, 
         optimization_options={"optimize_with_greedy": False}

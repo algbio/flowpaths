@@ -1,15 +1,15 @@
-# Ignoring edges
+# Ignoring edges or nodes
 
 All decomposition models (except `MinFlowDecomp`) offer the option of ignoring some edges from the constraints that the solution paths need to satisfy, or dampening their effect on the constraints or on the objective value of the model. 
 
-The indented use-case is when some edges, or their weights, are not fully trusted. Inituitively, we want to keep them in the graph to e.g. allow the solution paths to go through them, but we do not want them to penalize the solution.
+The indented use-case is when some edges, or their weights, are not fully trusted. Intuitively, we want to keep them in the graph to e.g. allow the solution paths to go through them, but we do not want them to penalize the solution.
 
 ## 1. Implementation
 
 This is achieved via:
 
-1. Passing a list  of edges as `edges_to_ignore`. 
-2. Passing a dict `edge_error_scaling` that associates to some edges `(u,v)` a scaling factor `edge_error_scaling[(u,v,)]` in the interval [0,1]. If this factor is 0, then edges are completely ignored, if it is 1 they are fully trusted. Adding an edge to `edges_to_ignore` overrides the value it could be assigned via this dictionary (i.e. it is equivalent to setting its scaling factor to 0). 
+1. Passing a list  of edges as `elements_to_ignore`. 
+2. Passing a dict `error_scaling` that associates to some edges `(u,v)` a scaling factor `error_scaling[(u,v,)]` in the interval [0,1]. If this factor is 0, then edges are completely ignored, if it is 1 they are fully trusted. Adding an edge to `elements_to_ignore` overrides the value it could be assigned via this dictionary (i.e. it is equivalent to setting its scaling factor to 0). 
 
 !!! note "See also"
 
@@ -60,7 +60,7 @@ graph.add_edge("c", "t", flow=70)
 
 graph.add_edge("a", "d", flow=1)
 
-mpe_model = fp.kMinPathError(graph, flow_attr="flow", num_paths=4, weight_type=int)
+mpe_model = fp.kMinPathError(graph, flow_attr="flow", k=4, weight_type=int)
 mpe_model.solve()
 if mpe_model.is_solved():
     print(mpe_model.get_solution())
@@ -73,15 +73,15 @@ if mpe_model.is_solved():
     # 'slacks': [0, 0, 1, 0]}
 ```
 
-Such a high difference in weights (or any other domain knowledge) might raise some red flags, so we can set `edges_to_ignore = [('a','d')]`. Noteice that in this case 3 paths are enough to cover all the edges except `('a','d')`.
+Such a high difference in weights (or any other domain knowledge) might raise some red flags, so we can set `elements_to_ignore = [('a','d')]`. Noteice that in this case 3 paths are enough to cover all the edges except `('a','d')`.
 
 ``` python
 mpe_model_2 = fp.kMinPathError(
     graph, 
     flow_attr="flow", 
-    num_paths=3, 
+    k=3, 
     weight_type=int,
-    edges_to_ignore=[("a", "d")])
+    elements_to_ignore=[("a", "d")])
 mpe_model_2.solve()
 if mpe_model_2.is_solved():
     print(mpe_model_2.get_solution())

@@ -1,2 +1,4 @@
 networkx>=3.4.2
-highspy>=1.9.0
+highspy>=1.10.0
+graphviz>=0.20.3
+numpy>=2.2.5

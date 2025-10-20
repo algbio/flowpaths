@@ -1,39 +1,84 @@
 site_name: flowpaths
+repo_url: https://github.com/algbio/flowpaths
 
 nav:
   - Home: 
     - About: index.md
+    - FAQ: faq.md
     - References: references.md
-  - Decomposition models:
-    - Models:
-      - Minimum Flow Decomposition: minimum-flow-decomposition.md
-      - k-Flow Decomposition: k-flow-decomposition.md
-      - k-Least Absolute Errors: k-least-absolute-errors.md
-      - k-Minimum Path Error: k-min-path-error.md
-    - Additional options:
-      - Solver options and optimizations: solver-options-optimizations.md
-      - Subpath constraints: subpath-constraints.md
-      - Ignoring edges: ignoring-edges.md
-      - Additional start/end nodes: additional-start-end-nodes.md
-      - Optimization Routine for k: numpathsoptimization.md
-  - Developing new models:
-    - Abstract Path Model: abstract-path-model.md
+    - Contributing: contributing.md
+  - Acyclic Decomposition Models:
+    - Minimum Flow Decomposition: minimum-flow-decomposition.md
+    - $k$-Flow Decomposition: k-flow-decomposition.md
+    - $k$-Least Absolute Errors: k-least-absolute-errors.md
+    - $k$-Minimum Path Error: k-min-path-error.md
+    - Minimum Path Cover: minimum-path-cover.md
+    - Optimizing $k$: numpathsoptimization.md
+  - Decomposition Models with Cycles:
+    - Minimum Flow Decomposition: minimum-flow-decomposition-cycles.md
+    - $k$-Flow Decomposition: k-flow-decomposition-cycles.md
+    - $k$-Least Absolute Errors: k-least-absolute-errors-cycles.md
+    - $k$-Minimum Path Error: k-min-path-error-cycles.md
+    - Minimum Path Cover: minimum-path-cover-cycles.md
+  - Advanced Options:
+    - Flows/weights on nodes: node-expanded-digraph.md
+    - Subpath constraints: subpath-constraints.md
+    - Subset constraints: subset-constraints.md
+    - Ignoring edges: ignoring-edges.md
+    - Additional start/end nodes: additional-start-end-nodes.md
+    - Correcting weights: minimum-error-flow.md
+    - Solver options and optimizations: solver-options-optimizations.md
+    - Various utils: utils.md
+  - Developing New Models:
     - Solver Wrapper: solver-wrapper.md
-    - stDiGraph: stdigraph.md  
+    - Abstract Path Model: abstract-path-model.md
+    - stDAG: stdag.md
+    - Abstract Walk Model: abstract-walk-model.md
+    - stDiGraph: stdigraph.md
+    - Abstract Source Sink Graph: abstractsourcesinkgraph.md
+    - Minimum Generating Set: minimum-generating-set.md
+    - Minimum Set Cover: minimum-set-cover.md
 
 use_directory_urls: false
 
 theme:
   name: material
+  theme:
   palette:
-    primary: white
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      primary: black
+      toggle:
+        icon: material/lightbulb-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      primary: black
+      scheme: default 
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      primary: black
+      scheme: slate
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to system preference
+
   features:
     - content.code.copy
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.expand
     - navigation.path
+    - search.highlight
   logo: flowpaths-logo.svg  
+  favicon: flowpaths-logo.svg
+  icon:
+    repo: fontawesome/brands/github
 
 extra_javascript:
   - javascripts/katex.js
@@ -67,20 +112,20 @@ markdown_extensions:
 
 plugins:
   - search 
-  - macros:
-      module_name: docs/getversion
   - mkdocstrings:
       default_handler: python
       handlers:
         python:
           options:
             show_root_toc_entry: false
-            docstring_options:
+            # docstring_options:
             merge_init_into_class: true
             # docstring_section_style: spacy
-            separate_signature: true
+            separate_signature: true 
             show_signature_annotations: true
-            # signature_crossrefs: true
-            line_length: 60
+            modernize_annotations: true
+            signature_crossrefs: false
+            line_length: 30
+          load_external_modules: true
 
       

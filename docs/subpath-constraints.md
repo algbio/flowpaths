@@ -1,8 +1,12 @@
-# Adding subpath constraints
+# Subpath constraints in DAGs
+
+!!! info inline end "See also"
+
+    - [Subset constraints in general graphs](subset-constraints.md)
 
 ## 1. Definition
 
-To any of the models that are based on (or inherit from) the [AbstractPathModelDAG](abstract-path-model.md) class you can add *subpath constraints*. This means the following. Say that you have prior knowledge of some (shorter) paths that *must* appear in at least one solution path of you model. These *constrain* the space of possible solution paths.
+To any of the models on directed acyclic graphs that are based on (or inherit from) the [AbstractPathModelDAG](abstract-path-model.md) class you can add *subpath constraints*. This means the following. Say that you have prior knowledge of some (shorter) paths that *must* appear in at least one solution path of you model. These *constrain* the space of possible solution paths.
 
 Let's consider the [Minimum Flow Decomposition](minimum-flow-decomposition.md) problem, and let's take the example graph from there. Let's assume that you want the subpath `[a,c,t]` (which we draw in brown) to appear in at last one solution path. 
 
@@ -154,13 +158,13 @@ graph2.add_edge("c", "t", flow=7, length=15) #
 graph2.add_edge("d", "t", flow=6, length=1)
 ```
 
-When initializing the solver, we pass `edge_length_attr="length"` so that the solver knows from which edge attribute to get the lengths, and set the parameter `subpath_constraints_coverage_length` to say 0.6. The constraint has total length 1+20+15 = 36, and the length coverage fraction requires that 0.6 * 36 = 6 of the subpath length be covered by some solution path. This means that covering the edge `("s", "a")` alone is not enough to satisfy the constraint, as it could cover only length 1.
+When initializing the solver, we pass `length_attr="length"` so that the solver knows from which edge attribute to get the lengths, and set the parameter `subpath_constraints_coverage_length` to say 0.6. The constraint has total length 1+20+15 = 36, and the length coverage fraction requires that 0.6 * 36 = 6 of the subpath length be covered by some solution path. This means that covering the edge `("s", "a")` alone is not enough to satisfy the constraint, as it could cover only length 1.
 
 ``` python
 mfd_model = fp.MinFlowDecomp(
     graph2, 
     flow_attr="flow", 
-    edge_length_attr="length", 
+    length_attr="length", 
     subpath_constraints=[[("s", "a"),("a", "c"),("c","t")]], 
     subpath_constraints_coverage_length=0.6
     )

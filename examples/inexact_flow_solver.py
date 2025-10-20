@@ -18,15 +18,15 @@ import networkx as nx
 class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
     def __init__(self, G: nx.DiGraph, lb:str, ub:str, num_paths:int, threads:int=4):
 
-        self.G = fp.stDiGraph(G)
+        self.G = fp.stDAG(G)
         self.lb = lb # We assume all lowerbounds are >= 0
         self.ub = ub # We assume all upperbounds are >= 0
         # self.k = num_paths will be available from the superclass AbstractPathModelDAG, 
         # after calling super().__init__(...), which happens below.
 
-        # We declare the __solution attribute, to be able to cache it.
-        # Note that we make it private to this class, so that we can access it only with get_solution()
-        self.__solution = None      
+        # We declare the _solution attribute, to be able to cache it.
+        # Note that we make it private to this class (with underscore prefix), so that we can access it only with get_solution()
+        self._solution = None      
         
         # To be able to apply the safety optimizations, we get the edges that 
         # must appear in some solution path. For this problem, these are the edges 
@@ -45,12 +45,12 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class
-        self.__encode_inexact_flow_decomposition()
+        self._encode_inexact_flow_decomposition()
 
         # We encode the objective, from the current class
-        self.__encode_objective()
+        self._encode_objective()
             
-    def __encode_inexact_flow_decomposition(self):
+    def _encode_inexact_flow_decomposition(self):
 
         # Get the maximum data in an edge indexed under self.lb.
         # This will be used to set the upper bound of the path weights, since a path weight larger than this
@@ -106,36 +106,37 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
             
             # That is, the sum of the pi_vars for edge (u,v) is at least the lowerbound of the edge,
             self.solver.add_constraint(
-                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) >= data[self.lb],
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) >= data[self.lb],
                 name=f"lowerbound_u={u}_v={v}",
             )
 
             # and at most the upperbound of the edge.
             self.solver.add_constraint(
-                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= data[self.ub],
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) <= data[self.ub],
                 name=f"upperbound_u={u}_v={v}",
             )
 
-    def __encode_objective(self):
+    def _encode_objective(self):
 
         # We set the objective to minimize the sum of the path weights
         self.solver.set_objective(
-            sum(self.path_weights_vars[(i)] for i in range(self.k)), 
+            self.solver.quicksum(self.path_weights_vars[(i)] for i in range(self.k)), 
             sense="minimize",
         )
 
     def get_solution(self):
 
-        if self.__solution is not None:
-            return self.__solution
+        if self._solution is not None:
+            return self._solution
     
         solution_weights_dict = self.solver.get_variable_values("w", [int])
-        self.__solution = {
+        # solution_weights_dict = self.solver.get_values(self.path_weights_vars)
+        self._solution = {
             "paths": self.get_solution_paths(),
             "weights": [solution_weights_dict[i] for i in range(self.k)],
         }
 
-        return self.__solution
+        return self._solution
     
     def is_valid_solution(self):
         # AbstractPathModelDAG requires implementing a basic check that the solution is valid, 
@@ -156,14 +157,14 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
     
     def get_lowerbound_k(self):
         # AbstractPathModelDAG requires implementing a method to get the lowerbound for the number of paths.
-        # A possible implemenattion is as followed
+        # A possible implementation is as follows.
         # We know that each edge with lb > 0 must be covered by at least one path.
         # Therefore, a lowerbound is the minimum number of paths needed to cover all the edges with lb > 0.
 
         weight_function = {(u,v): 1 for u, v, data in self.G.edges(data=True) if data.get(self.lb, 0 ) > 0}
         return self.G.compute_max_edge_antichain(weight_function=weight_function)
 
-if __name__ == "__main__":
+def main():    
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"
@@ -192,3 +193,7 @@ if __name__ == "__main__":
         print("model.is_valid_solution()", kifd_model.is_valid_solution())
     else:
         print("Model could not be solved.")
+
+
+if __name__ == "__main__":
+    main()

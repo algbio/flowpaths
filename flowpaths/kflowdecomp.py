@@ -1,38 +1,41 @@
 import time
 import networkx as nx
-import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
 import flowpaths.utils.graphutils as gu
 import flowpaths.abstractpathmodeldag as pathmodel
-
+import flowpaths.utils.safetyflowdecomp as sfd
+import flowpaths.utils as utils
+import flowpaths.nodeexpandeddigraph as nedg
 
 class kFlowDecomp(pathmodel.AbstractPathModelDAG):
-    """
-    Class to decompose a flow into a given number of weighted paths.
-    """
     # storing some defaults
     optimize_with_greedy = True
+    optimize_with_flow_safe_paths = True
 
     def __init__(
         self,
         G: nx.DiGraph,
         flow_attr: str,
         k: int,
+        flow_attr_origin: str = "edge",
         weight_type: type = float,
         subpath_constraints: list = [],
         subpath_constraints_coverage: float = 1.0,
         subpath_constraints_coverage_length: float = None,
-        edge_length_attr: str = None,
-        optimization_options: dict = None,
-        solver_options: dict = None,
+        length_attr: str = None,
+        elements_to_ignore: list = [],
+        solution_weights_superset: list = None,
+        optimization_options: dict = {},
+        solver_options: dict = {},
     ):
         """
-        Initialize the Flow Decompostion model for a given number of paths `num_paths`.
+        Initialize the Flow Decomposition model for a given number of paths `k`.
 
         Parameters
         ----------
         - `G : nx.DiGraph`
             
-            The input directed acyclic graph, as networkx DiGraph.
+            The input directed acyclic graph, as [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html).
 
         - `flow_attr : str`
             
@@ -41,6 +44,13 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - `k: int`
             
             The number of paths to decompose in.
+
+        - `flow_attr_origin : str`, optional
+
+            The origin of the flow attribute. Default is `"edge"`. Options:
+            
+            - `"edge"`: the flow attribute is assumed to be on the edges of the graph.
+            - `"node"`: the flow attribute is assumed to be on the nodes of the graph. See [the documentation](node-expanded-digraph.md) on how node-weighted graphs are handled.
 
         - `weight_type : type`, optional
             
@@ -56,18 +66,33 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             
             Coverage fraction of the subpath constraints that must be covered by some solution paths. 
             
-            Defaults to `1.0` (meaning that 100% of the edges of the constraint need to be covered by some solution path). See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
+            Defaults to `1.0`, meaning that 100% of the edges (or nodes, if `flow_attr_origin` is `"node"`) of 
+            the constraint need to be covered by some solution path). 
+            See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
         - `subpath_constraints_coverage_length : float`, optional
             
             Coverage length of the subpath constraints. Default is `None`. If set, this overrides `subpath_constraints_coverage`, 
             and the coverage constraint is expressed in terms of the subpath constraint length. 
-            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `edge_length_attr`) needs to appear in some solution path.
+            `subpath_constraints_coverage_length` is then the fraction of the total length of the constraint (specified via `length_attr`) needs to appear in some solution path.
             See [subpath constraints documentation](subpath-constraints.md#3-relaxing-the-constraint-coverage)
 
-        - `edge_length_attr : str`, optional
+        - `length_attr : str`, optional
             
-            Attribute name for edge lengths. Default is `None`.
+            The attribute name from where to get the edge lengths (or node length, if `flow_attr_origin` is `"node"`). Defaults to `None`.
+            
+            - If set, then the subpath lengths (above) are in terms of the edge/node lengths specified in the `length_attr` field of each edge/node.
+            - If set, and an edge/node has a missing edge length, then it gets length 1.
+
+        - `elements_to_ignore : list`, optional
+
+            List of edges (or nodes, if `flow_attr_origin` is `"node"`) to ignore when adding constrains on flow explanation by the weighted paths. Default is an empty list. See [ignoring edges documentation](ignoring-edges.md)
+
+        - `solution_weights_superset: list`, optional
+
+            List of allowed weights for the paths. Default is `None`. 
+            If set, the model will use the solution path weights only from this set, with the property that **every weight in this list
+            appears at most once in the solution weight**. That is, if you want to have more paths with the same weight, add it more times to `solution_weights_superset`.
 
         - `optimization_options : dict`, optional
             
@@ -89,62 +114,129 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - ValueError: If some edge does not have the flow attribute specified as `flow_attr`.
         - ValueError: If the graph does not satisfy flow conservation on nodes different from source or sink.
         - ValueError: If the graph contains edges with negative (<0) flow values.
+        - ValueError: If `flow_attr_origin` is not "node" or "edge".
         """
 
-        self.G = stdigraph.stDiGraph(G)
+        utils.logger.info(f"{__name__}: START initializing with graph id = {utils.fpid(G)}, k = {k}")
+
+        # Handling node-weighted graphs
+        self.flow_attr_origin = flow_attr_origin
+        if self.flow_attr_origin == "node":
+            if G.number_of_nodes() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
+                raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
+            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr)
+            subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
+            
+            edges_to_ignore_internal = self.G_internal.edges_to_ignore
+            if not all(isinstance(element_to_ignore, str) for element_to_ignore in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of nodes (i.e strings), not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of nodes (i.e strings), not {elements_to_ignore}")
+            edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
+            edges_to_ignore_internal = list(set(edges_to_ignore_internal))
+                
+        elif self.flow_attr_origin == "edge":
+            if G.number_of_edges() == 0:
+                utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
+                raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
+            self.G_internal = G
+            subpath_constraints_internal = subpath_constraints
+            if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):
+                utils.logger.error(f"elements_to_ignore must be a list of edges (i.e. tuples of nodes), not {elements_to_ignore}")
+                raise ValueError(f"elements_to_ignore must be a list of edges (i.e. tuples of nodes), not {elements_to_ignore}")
+            edges_to_ignore_internal = elements_to_ignore
+        else:
+            utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+            raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
+
+        self.G = stdag.stDAG(self.G_internal)
+        self.subpath_constraints = subpath_constraints_internal
+        self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
 
         if weight_type not in [int, float]:
-            raise ValueError(
-                f"weight_type must be either int or float, not {weight_type}"
-            )
+            utils.logger.error(f"weight_type must be either int or float, not {weight_type}")
+            raise ValueError(f"weight_type must be either int or float, not {weight_type}")
         self.weight_type = weight_type
 
         # Check requirements on input graph:
-        # Check flow conservation
-        if not gu.check_flow_conservation(G, flow_attr):
-            raise ValueError("The graph G does not satisfy flow conservation.")
+        # Check flow conservation only if there are no edges to ignore
+        satisfies_flow_conservation = gu.check_flow_conservation(G, flow_attr)
+        if len(edges_to_ignore_internal) == 0 and not satisfies_flow_conservation:
+            utils.logger.error(f"{__name__}: The graph G does not satisfy flow conservation or some edges have missing `flow_attr`. This is an error, unless you passed `edges_to_ignore` to include at least those edges with missing `flow_attr`.")
+            raise ValueError("The graph G does not satisfy flow conservation or some edges have missing `flow_attr`. This is an error, unless you passed `edges_to_ignore` to include at least those edges with missing `flow_attr`.")
 
         # Check that the flow is positive and get max flow value
-        self.edges_to_ignore = self.G.source_sink_edges
         self.flow_attr = flow_attr
         self.w_max = self.weight_type(
-            self.G.get_max_flow_value_and_check_positive_flow(
+            self.G.get_max_flow_value_and_check_non_negative_flow(
                 flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
             )
         )
 
+        if k <= 0 or not isinstance(k, int):
+            utils.logger.error(f"{__name__}: k must be a positive integer, not {k}")
+            raise ValueError(f"k must be a positive integer, not {k}")
         self.k = k
-        self.subpath_constraints = subpath_constraints
+        self.original_k = self.k
+        
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
-        self.edge_length_attr = edge_length_attr
+        self.length_attr = length_attr
 
         self.pi_vars = {}
         self.path_weights_vars = {}
 
         self.path_weights_sol = None
-        self.__solution = None
-        self.__lowerbound_k = None
+        self._solution = None
+        self._lowerbound_k = None
         
         self.solve_statistics = {}
-        self.optimization_options = optimization_options or {}
+        self.optimization_options = optimization_options.copy() or {}
 
         greedy_solution_paths = None
         self.optimize_with_greedy = self.optimization_options.get("optimize_with_greedy", kFlowDecomp.optimize_with_greedy)
-        if self.optimize_with_greedy:
-            if self.__get_solution_with_greedy():
-                greedy_solution_paths = self.__solution["paths"]
+        self.optimize_with_flow_safe_paths = self.optimization_options.get("optimize_with_flow_safe_paths", kFlowDecomp.optimize_with_flow_safe_paths)
+        
+        # We can apply the greedy algorithm only if 
+        # - there are no edges to ignore (in the original input graph), and 
+        # - the graph satisfies flow conservation
+        if self.optimize_with_greedy and len(edges_to_ignore_internal) == 0 and satisfies_flow_conservation:
+            if self._get_solution_with_greedy():
+                greedy_solution_paths = self._solution["paths"]
                 self.optimization_options["external_solution_paths"] = greedy_solution_paths
+        
+        if self.optimize_with_flow_safe_paths and satisfies_flow_conservation:
+            start_time = time.perf_counter()
+            self.optimization_options["external_safe_paths"] = sfd.compute_flow_decomp_safe_paths(G=G, flow_attr=self.flow_attr)
+            self.solve_statistics["flow_safe_paths_time"] = time.perf_counter() - start_time
+            # If we optimize with flow safe paths, we need to disable optimizing with safe paths and sequences
+            if self.optimization_options.get("optimize_with_safe_paths", False):
+                utils.logger.error(f"{__name__}: Cannot optimize with both flow safe paths and safe paths")
+                raise ValueError("Cannot optimize with both flow safe paths and safe paths")
+            if self.optimization_options.get("optimize_with_safe_sequences", False):
+                utils.logger.error(f"{__name__}: Cannot optimize with both flow safe paths and safe sequences")
+                raise ValueError("Cannot optimize with both flow safe paths and safe sequences")
+        
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
+
+        self.solution_weights_superset = solution_weights_superset
+        
+        if self.solution_weights_superset is not None:
+            self.k = len(self.solution_weights_superset)
+            self.optimization_options["allow_empty_paths"] = True
+            self.optimization_options["optimize_with_safe_paths"] = False
+            self.optimization_options["optimize_with_flow_safe_paths"] = False
+            self.optimization_options["optimize_with_safe_sequences"] = False
+            self.optimization_options["optimize_with_safe_zero_edges"] = False
 
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
-            self.G, 
-            k, 
+            G=self.G, 
+            k=self.k,
             subpath_constraints=self.subpath_constraints, 
             subpath_constraints_coverage=self.subpath_constraints_coverage, 
             subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
-            edge_length_attr=self.edge_length_attr, 
+            length_attr=self.length_attr, 
             optimization_options=self.optimization_options,
             solver_options=solver_options,
             solve_statistics=self.solve_statistics,
@@ -158,14 +250,18 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         self.create_solver_and_paths()
 
         # This method is called from the current class to encode the flow decomposition
-        self.__encode_flow_decomposition()
+        if self.solution_weights_superset is None:
+            self._encode_flow_decomposition()
+        else:
+            self._encode_flow_decomposition_with_given_weights()
 
-    def __encode_flow_decomposition(self):
+        utils.logger.info(f"{__name__}: END initialized with graph id = {utils.fpid(G)}, k = {self.k}")
+
+    def _encode_flow_decomposition(self):
         
         # Encodes the flow decomposition constraints for the given graph.
         # This method sets up the path weight variables and the edge variables encoding
         # the sum of the weights of the paths going through the edge.
-        
 
         # If already solved, no need to encode further
         if self.is_solved():
@@ -196,21 +292,87 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
             # assuming self.w_max is a bound for self.path_weights_vars[(i)]
             for i in range(self.k):
-                self.solver.add_binary_continuous_product_constraint(
-                    binary_var=self.edge_vars[(u, v, i)],
-                    continuous_var=self.path_weights_vars[(i)],
-                    product_var=self.pi_vars[(u, v, i)],
-                    lb=0,
-                    ub=self.w_max,
-                    name=f"10_u={u}_v={v}_i={i}",
-                )
+                if (u, v, i) in self.edges_set_to_zero:
+                    self.solver.add_constraint(
+                            self.pi_vars[(u, v, i)] == 0,
+                            name=f"i={i}_u={u}_v={v}_10b",
+                        )
+                elif (u, v, i) in self.edges_set_to_one:
+                    self.solver.add_constraint(
+                            self.pi_vars[(u, v, i)] == self.path_weights_vars[(i)],
+                            name=f"i={i}_u={u}_v={v}_10b",
+                        )
+                else:
+                    self.solver.add_binary_continuous_product_constraint(
+                        binary_var=self.edge_vars[(u, v, i)],
+                        continuous_var=self.path_weights_vars[(i)],
+                        product_var=self.pi_vars[(u, v, i)],
+                        lb=0,
+                        ub=self.w_max,
+                        name=f"10_u={u}_v={v}_i={i}",
+                    )
 
             self.solver.add_constraint(
-                sum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
-                name=f"10d_u={u}_v={v}_i={i}",
+                self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
+                name=f"10d_u={u}_v={v}",
             )
 
-    def __get_solution_with_greedy(self):
+    def _encode_flow_decomposition_with_given_weights(self):
+        
+        # If already solved, no need to encode further
+        if self.is_solved():
+            return
+
+        # Some checks
+        if self.optimization_options.get("optimize_with_safe_paths", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safe paths")
+            raise ValueError("Cannot optimize with both given weights and safe paths")
+        if self.optimization_options.get("optimize_with_safe_sequences", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safe sequences")
+            raise ValueError("Cannot optimize with both given weights and safe sequences")
+        if self.optimization_options.get("optimize_with_safe_zero_edges", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and safe zero edges")
+            raise ValueError("Cannot optimize with both given weights and safe zero edges")
+        if self.optimization_options.get("optimize_with_flow_safe_paths", False):
+            utils.logger.error(f"{__name__}: Cannot optimize with both given weights and flow safe paths")
+            raise ValueError("Cannot optimize with both given weights and flow safe paths")
+            
+        if len(self.solution_weights_superset) != self.k:
+            utils.logger.error(f"Length of given weights ({len(self.solution_weights_superset)}) is different from k ({self.k})")
+            raise ValueError(f"Length of given weights ({len(self.solution_weights_superset)}) is different from k ({self.k})")
+
+        # We encode that for each edge (u,v), the sum of the weights of the paths going through the edge is equal to the flow value of the edge.
+        for u, v, data in self.G.edges(data=True):
+            if (u, v) in self.edges_to_ignore:
+                continue
+            f_u_v = data[self.flow_attr]
+
+            self.solver.add_constraint(
+                self.solver.quicksum(self.solution_weights_superset[i] * self.edge_vars[(u, v, i)] for i in range(self.k)) == f_u_v,
+                name=f"10d_u={u}_v={v}",
+            )
+
+        # We state that at most self.original_k paths can be used
+        self.solver.add_constraint(            
+            self.solver.quicksum(
+                self.solver.quicksum(
+                        self.edge_vars[(self.G.source, v, i)]
+                        for v in self.G.successors(self.G.source)
+                ) for i in range(self.k)
+            ) <= self.original_k,
+            name="max_paths_original_k_paths",
+        )
+
+        self.solver.set_objective(
+            self.solver.quicksum(
+                self.edge_vars[(self.G.source, v, i)]
+                for v in self.G.successors(self.G.source)
+                for i in range(self.k)
+            ),
+            sense="minimize",
+        )
+
+    def _get_solution_with_greedy(self):
         
         # Attempts to find a solution using a greedy algorithm.
         # This method first decomposes the problem using the maximum bottleneck approach.
@@ -223,10 +385,10 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         # - bool: True if a solution is found using the greedy algorithm, False otherwise.
         
 
-        start_time = time.time()
-        (paths, weights) = self.G.decompose_using_max_bottleck(self.flow_attr)
+        start_time = time.perf_counter()
+        (paths, weights) = self.G.decompose_using_max_bottleneck(self.flow_attr)
 
-        # Check if the greedy decomposition satisfies the subpath contraints
+        # Check if the greedy decomposition satisfies the subpath constraints
         if self.subpath_constraints:
             for subpath in self.subpath_constraints:
                 if self.subpath_constraints_coverage_length is None:
@@ -235,10 +397,10 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                     # And the fraction of edges that we need to cover is self.subpath_constraints_coverage
                     coverage_fraction = self.subpath_constraints_coverage
                 else:
-                    constraint_length = sum(self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in subpath)
+                    constraint_length = sum(self.G[u][v].get(self.length_attr, 1) for (u,v) in subpath)
                     coverage_fraction = self.subpath_constraints_coverage_length
                 # If the subpath is not covered enough by the greedy decomposition, we return False
-                if gu.max_occurrence(subpath, paths, edge_lengths={(u,v): self.G[u][v].get(self.edge_length_attr, 1) for (u,v) in subpath}) < constraint_length * coverage_fraction:
+                if gu.max_occurrence(subpath, paths, edge_lengths={(u,v): self.G[u][v].get(self.length_attr, 1) for (u,v) in subpath}) < constraint_length * coverage_fraction:
                     return False
         
         if len(paths) <= self.k:
@@ -246,24 +408,69 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             # then we add arbitrary paths (i.e. we repeat the first path) with 0 weights to reach self.k paths.
             paths += [paths[0] for _ in range(self.k - len(paths))]
             weights += [0 for _ in range(self.k - len(weights))]
-            self.__solution = {
-                "paths": paths,
-                "weights": weights,
-            }
+            # self._solution = {
+            #     "paths": paths,
+            #     "weights": weights,
+            # }
+            if self.flow_attr_origin == "edge":
+                self._solution = {
+                    "paths": paths,
+                    "weights": weights,
+                }
+            elif self.flow_attr_origin == "node":
+                self._solution = {
+                    "_paths_internal": paths,
+                    "paths": self.G_internal.get_condensed_paths(paths),
+                    "weights": self.path_weights_sol,
+                }
             self.set_solved()
             self.solve_statistics = {}
-            self.solve_statistics["greedy_solve_time"] = time.time() - start_time
+            self.solve_statistics["greedy_solve_time"] = time.perf_counter() - start_time
             return True
 
         return False
 
-    def get_solution(self):
+    def _remove_empty_paths(self, solution):
+        """
+        Removes empty paths from the solution. Empty paths are those with 0 or 1 nodes.
+
+        Parameters
+        ----------
+        - `solution: dict`
+            
+            The solution dictionary containing paths and weights.
+
+        Returns
+        -------
+        - `solution: dict`
+            
+            The solution dictionary with empty paths removed.
+
+        """
+        non_empty_paths = []
+        non_empty_weights = []
+        for path, weight in zip(solution["paths"], solution["weights"]):
+            if len(path) > 1:
+                non_empty_paths.append(path)
+                non_empty_weights.append(weight)
+        return {"paths": non_empty_paths, "weights": non_empty_weights}
+    
+
+
+    def get_solution(self, remove_empty_paths=False):
         """
         Retrieves the solution for the flow decomposition problem.
 
         If the solution has already been computed and cached as `self.solution`, it returns the cached solution.
         Otherwise, it checks if the problem has been solved, computes the solution paths and weights,
         and caches the solution.
+
+        Parameters
+        ----------
+
+        - `remove_empty_paths: bool`, optional
+
+            If `True`, removes empty paths from the solution. Default is `False`. These can happen only if passed the optimization option `"allow_empty_paths" : True`.
 
         Returns
         -------
@@ -276,11 +483,16 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         - `exception` If model is not solved.
         """
 
-        if self.__solution is not None:
-            return self.__solution
+        if self._solution is not None:
+            return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
 
         self.check_is_solved()
-        weights_sol_dict = self.solver.get_variable_values("w", [int])
+    
+        if self.solution_weights_superset is None:
+            weights_sol_dict = self.solver.get_values(self.path_weights_vars)
+        else:
+            weights_sol_dict = {i: self.solution_weights_superset[i] for i in range(self.k)}
+
         self.path_weights_sol = [
             (
                 round(weights_sol_dict[i])
@@ -290,12 +502,17 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             for i in range(self.k)
         ]
 
-        self.__solution = {
-            "paths": self.get_solution_paths(),
-            "weights": self.path_weights_sol,
-        }
-
-        return self.__solution
+        if self.flow_attr_origin == "edge":
+            self._solution = {
+                "paths": self.get_solution_paths(),
+                "weights": self.path_weights_sol,
+            }
+        elif self.flow_attr_origin == "node":
+            self._solution = {
+                "_paths_internal": self.get_solution_paths(),
+                "paths": self.G_internal.get_condensed_paths(self.get_solution_paths()),
+                "weights": self.path_weights_sol,
+            }
 
     def is_valid_solution(self, tolerance=0.001):
         """
@@ -316,11 +533,12 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             (up to `TOLERANCE * num_paths_on_edges[(u, v)]`) to the flow value of the graph edges.
         """
 
-        if self.__solution is None:
+        if self._solution is None:
+            utils.logger.error(f"{__name__}: Solution is not available. Call get_solution() first.")
             raise ValueError("Solution is not available. Call get_solution() first.")
 
-        solution_paths = self.__solution["paths"]
-        solution_weights = self.__solution["weights"]
+        solution_paths = self._solution.get("_paths_internal", self._solution["paths"])
+        solution_weights = self._solution["weights"]
         solution_paths_of_edges = [
             [(path[i], path[i + 1]) for i in range(len(path) - 1)]
             for path in solution_paths
@@ -339,6 +557,7 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
                     abs(flow_from_paths[(u, v)] - data[self.flow_attr])
                     > tolerance * num_paths_on_edges[(u, v)]
                 ):
+                    utils.logger.error(f"Flow validation failed for edge ({u}, v): expected {data[self.flow_attr]}, got {flow_from_paths[(u, v)]}")
                     return False
 
         return True
@@ -347,21 +566,17 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
         
         self.check_is_solved()
 
-        if self.__solution is None:
+        if self._solution is None:
             self.get_solution()
 
         return self.k
     
     def get_lowerbound_k(self):
 
-        if self.__lowerbound_k != None:
-            return self.__lowerbound_k
+        if self._lowerbound_k != None:
+            return self._lowerbound_k
 
-        weight_function = dict()
-        for e in self.G.edges():
-            if e not in self.edges_to_ignore:
-                weight_function[e] = 1
+        self._lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
 
-        self.__lowerbound_k = self.G.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function)
+        return self._lowerbound_k
 
-        return self.__lowerbound_k

@@ -1,3 +1,8 @@
+!!! info inline end "See also"
+
+    - [k-Flow Decomposition](k-flow-decomposition.md)
+    - [Minimum Flow Decomposition with Cycles](minimum-flow-decomposition-cycles.md)
+
 # Minimum Flow Decomposition
 
 ## 1. Definition
@@ -11,12 +16,9 @@ $$
 f(u,v) = \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i, ~~\forall (u,v) \in E.
 $$
 
-!!! info "Note"
-    The graph may have more than one source or sink nodes. The solution paths are required to start in some source node, and end in some sink node.
-
-!!! info "See also"
-
-    [k-Flow Decomposition](k-flow-decomposition.md)
+!!! success "Note"
+    - This class support also graphs with **flow values on nodes**. Set the parameter `flow_attr_origin = "node"`. For details on how these are handled internally, see [Handling graphs with flows / weights on nodes](node-expanded-digraph.md).
+    - The graph may have more than one source or sink nodes, in which case the solution paths are just required to start in any source node, and end in any sink node.
 
 For example, the directed graph below satisfies the flow conservation property:
 ``` mermaid
@@ -88,13 +90,17 @@ mfd_model = fp.MinFlowDecomp(graph, flow_attr="flow")
 mfd_model.solve()
 ```
 
-The model might not be solved because the MILP solver couldn't do it in the time it had allocated, or other problems. Thus, you need to check if it was solved, and then get its solution. The solutoion of `MinFlowDecomp` is a tuple, where the first component is the list of paths (as lists of nodes), and the second component is a list of their corresponding weights.
+The model might not be solved because the MILP solver couldn't do it in the time it had allocated, or other problems. Thus, you need to check if it was solved, and then get its solution. The solution of `MinFlowDecomp` is a dictionary, with an key `'paths'`, and a key `'weights'`:
 
 ``` python
 if mfd_model.is_solved():
     solution = mfd_model.get_solution()
-    print("Paths, weights", solution["paths"], solution["weights"])
-    # [['s', 'b', 'c', 't'], ['s', 'a', 'c', 'd', 't'], ['s', 'a', 'b', 'c', 'd', 't']] [7, 4, 2]
+    print(solution)
+    # {'paths': [
+    #   ['s', 'b', 'c', 't'], 
+    #   ['s', 'a', 'c', 'd', 't'], 
+    #   ['s', 'a', 'b', 'c', 'd', 't']], 
+    # 'weights': [7, 4, 2]} 
 ```
 
 ## 3. References
@@ -109,4 +115,8 @@ There are several works on this problem, for example.
 
 4. See also flowpaths [References](references.md), and the other papers cited by these works.
 
-::: flowpaths.minflowdecomp
+::: flowpaths.MinFlowDecomp
+    options:
+      filters: 
+        - "!^_"
+        - "!solve_time_elapsed"

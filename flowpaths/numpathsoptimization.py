@@ -1,5 +1,6 @@
 import time
 import flowpaths.abstractpathmodeldag as pathmodel
+import flowpaths.utils as utils
 
 class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
     
@@ -91,6 +92,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         self.min_num_paths = min_num_paths
         self.max_num_paths = max_num_paths
         self.time_limit = time_limit
+        self.solve_time_start = None
         self.kwargs = kwargs
 
         # We allow only one of the stopping criteria to be set
@@ -100,11 +102,13 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             )
         
         if 'k' in self.kwargs:
-            raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths accoring to the stopping criteria.")
+            raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths according to the stopping criteria.")
         
         self.lowerbound_k = None
-        self.__solution = None
+        self._solution = None
         self.solve_statistics = None
+
+        utils.logger.info(f"{__name__}: created NumPathsOptimization with model_type = {model_type}")
 
     def solve(self) -> bool:
         """
@@ -144,36 +148,42 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             
         """
         
-        start_time = time.time()
+        self.solve_time_start = time.perf_counter()
         previous_solution_objective_value = None
         solve_status = None
         found_feasible = False
 
         for k in range(max(self.min_num_paths,self.get_lowerbound_k()), self.max_num_paths+1):
             # Create the model
+            utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}")
             model = self.model_type(**self.kwargs, k=k)
             model.solve()
             if model.is_solved():
                 found_feasible = True
+                current_solution_objective_value = model.get_objective_value()
+                utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, current_solution_objective_value = {current_solution_objective_value}")
                 if self.stop_on_first_feasible:
                     solve_status = NumPathsOptimization.solved_status_name
                     break
                 if self.stop_on_delta_abs:
                     if previous_solution_objective_value is None:
-                        previous_solution_objective_value = model.get_objective_value()
+                        previous_solution_objective_value = current_solution_objective_value
                     else:
-                        if abs(previous_solution_objective_value - model.get_objective_value()) <= self.stop_on_delta_abs:
+                        if abs(previous_solution_objective_value - current_solution_objective_value) <= self.stop_on_delta_abs:
                             solve_status = NumPathsOptimization.solved_status_name
                             break
                 if self.stop_on_delta_rel:
                     if previous_solution_objective_value is None:
-                        previous_solution_objective_value = model.get_objective_value()
+                        previous_solution_objective_value = current_solution_objective_value
                     else:
-                        if abs(previous_solution_objective_value - model.get_objective_value()) / previous_solution_objective_value <= self.stop_on_delta_rel:
+                        if abs(previous_solution_objective_value - current_solution_objective_value) / previous_solution_objective_value <= self.stop_on_delta_rel:
                             solve_status = NumPathsOptimization.solved_status_name
                             break
-            if time.time() - start_time > self.time_limit:
+            else:
+                utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, model is not solved")
+            if self.solve_time_elapsed > self.time_limit:
                 solve_status = NumPathsOptimization.timeout_status_name
+                utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, time out")
                 break
             
         if solve_status != NumPathsOptimization.timeout_status_name:
@@ -184,11 +194,11 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         
         self.solve_statistics = {
                 "solve_status": solve_status,
-                "solve_time": time.time() - start_time,
+                "solve_time": self.solve_time_elapsed,
             }
 
         if solve_status == NumPathsOptimization.solved_status_name:
-            self.__solution = model.get_solution()
+            self._solution = model.get_solution()
             self.set_solved()
             self.solve_statistics.update(model.solve_statistics)
             self.model = model
@@ -214,7 +224,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         """
 
         self.check_is_solved()
-        return self.__solution
+        return self._solution
     
     def get_objective_value(self):
         """
@@ -238,10 +248,23 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         if self.lowerbound_k != None:
             return self.lowerbound_k
         
-        tmp_model = self.model_type(**self.kwargs, k=1)
+        tmp_model = self.model_type(**self.kwargs, k = 1)
         self.lowerbound_k = tmp_model.get_lowerbound_k()
 
         return self.lowerbound_k
+    
+    @property
+    def solve_time_elapsed(self):
+        """
+        Returns the elapsed time since the start of the solve process.
+
+        Returns
+        -------
+        - `float`
+        
+            The elapsed time in seconds.
+        """
+        return time.perf_counter() - self.solve_time_start if self.solve_time_start is not None else 0
             
 
         

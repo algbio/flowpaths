@@ -2,6 +2,13 @@ import flowpaths as fp
 import networkx as nx
 
 def main():
+
+    # Configure logging
+    fp.utils.configure_logging(
+        level=fp.utils.logging.DEBUG,
+        log_to_console=True,
+    )
+
     # Create a simple graph
     graph = nx.DiGraph()
     graph.graph["id"] = "simple_graph"

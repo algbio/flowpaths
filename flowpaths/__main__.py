@@ -87,7 +87,7 @@ def main():
         flow_attr="flow",
         weight_type=int,
         k=3,
-        edges_to_ignore=[("a", "c")],
+        elements_to_ignore=[("a", "c")],
         optimization_options={
             "optimize_with_safe_paths": False,
             "optimize_with_safe_sequences": True,
