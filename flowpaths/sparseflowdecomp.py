@@ -79,7 +79,7 @@ class SparseFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit f
         """
         start_time = time.time()
         
-        v0 = nx SHORTEST PATH
+        v0 = _pathindex_to_sparsevec(self.G, nx.shortest_path(self.G, 1, self.G.number_of_nodes()))
         path_set = [v0]
         path_weights = [1.0]
         x = ... sparse copy of v0
@@ -146,12 +146,7 @@ class SparseFlowDecomp(pathmodel.AbstractPathModelDAG): # Note that we inherit f
                     if path_weights[i] < 0:
                         path_weights[i] = 0
                 x = sum(path_weights[i] * path_set[i] for i in range(len(path_weights)))
-            
-
-
-
-
-
+                
 
         return True
 
