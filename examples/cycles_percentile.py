@@ -35,7 +35,7 @@ def test():
         G=graph, 
         flow_attr="flow",
         weight_type=int,
-        trusted_edges_for_safety_percentile=0,
+        elements_to_ignore_percentile=50,
         )
     mpe_model.solve()
     process_solution(graph, "test_mpe_percentile", mpe_model)

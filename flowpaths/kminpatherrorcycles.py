@@ -178,7 +178,9 @@ class kMinPathErrorCycles(walkmodel.AbstractWalkModelDiGraph):
             # Select edges where the flow_attr value is >= elements_to_ignore_percentile (using self.G)
             flow_values = [self.G.edges[edge][flow_attr] for edge in self.G.edges() if flow_attr in self.G.edges[edge]]
             percentile = np.percentile(flow_values, elements_to_ignore_percentile) if flow_values else 0
-            edges_to_ignore_internal = [edge for edge in edges_to_ignore_internal if self.G.edges[edge][flow_attr] < percentile]
+            edges_to_ignore_internal = [edge for edge in self.G.edges() if flow_attr in self.G.edges[edge] and self.G.edges[edge][flow_attr] < percentile]
+
+        utils.logger.debug(f"{__name__}: edges_to_ignore_internal set to {edges_to_ignore_internal}")
 
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
         self.edge_error_scaling = error_scaling_internal
