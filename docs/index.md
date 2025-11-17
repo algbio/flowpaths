@@ -10,7 +10,11 @@ This package implements solvers for decomposing weighted directed graphs into we
 pip install flowpaths
 ```
 
-### Basic usage example
+!!! info 
+    
+    Flowpaths is being developed on [GitHub](https://github.com/algbio/flowpaths/).
+
+### Basic usage examples
 
 ```python
 import flowpaths as fp
@@ -53,6 +57,10 @@ if mfd_solver.is_solved():
     # {'walks': [['s', 'a', 'b', 'a', 'b', 'a', 't']], 'weights': [1]}
 ```
 
+!!! note "More examples"
+
+    For more examples, see GitHub [examples/](https://github.com/algbio/flowpaths/tree/main/examples).
+
 ### Design principles
 
 1. **Easy to use**: You pass a directed graph (as a [networkx](https://networkx.org) [DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html)), and the solvers return optimal weighted paths (or walks for cyclic models). See the [examples](examples/) folder.
@@ -66,7 +74,7 @@ if mfd_solver.is_solved():
     
     You can inherit from these classes to add weights and model-specific constraints/objectives. See [a basic example](https://github.com/algbio/flowpaths/blob/main/examples/inexact_flow_solver.py). These abstract classes interface with a wrapper for popular MILP solvers, so you don't need to worry about solver-specific details.
 
-4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` means that any optimization to the path-finding mechanisms benefits **all** solvers that inherit from this class. We implement some "safety optimizations" described in [this paper](https://doi.org/10.48550/arXiv.2411.03871), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
+4. **Fast**: Having solvers implemented using `AbstractPathModelDAG` means that any optimization to the path-finding mechanisms benefits **all** solvers that inherit from this class. We implement some "safety optimizations" described in [this paper](https://doi.org/10.4230/LIPIcs.ESA.2025.55), based on ideas first introduced in [this paper](https://doi.org/10.4230/LIPIcs.SEA.2024.14), which can provide up to **1000x speedups**, depending on the graph instance, while preserving global optimality (under some simple assumptions).
 
 5. **Flexible inputs**: The models support graphs with flows/weights on either edges or nodes, and additional real use-case input features, such as subpath or subset constraints.
 
