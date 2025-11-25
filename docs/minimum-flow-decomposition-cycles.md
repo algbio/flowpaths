@@ -95,7 +95,7 @@ flowchart LR
 
 ## 2. Solving the problem
 
-We create the graph as a [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html). In real project, you will likely have a method that transforms your graph to a DiGraph. We also give an attribute `flow` for every edge storing its flow value.
+We create the graph as a [networkx DiGraph](https://networkx.org/documentation/stable/reference/classes/digraph.html). In a real project, you will likely have a method that transforms your graph to a networkx DiGraph. We also give an attribute `flow` for every edge storing its flow value.
 
 ``` python
 import flowpaths as fp
@@ -145,6 +145,9 @@ There are several works on this problem, for example.
 1. Vatinlen, Benedicte, et al. [**Simple bounds and greedy algorithms for decomposing a flow into a minimal set of paths**](https://fc.isima.fr/~mahey/ejor_2008.pdf). European Journal of Operational Research 185.3 (2008): 1390-1401.
 
 2. Fernando H. C. Dias, Lucia Williams, Brendan Mumey, Alexandru I. Tomescu [**Minimum Flow Decomposition in Graphs with Cycles using Integer Linear Programming**](https://arxiv.org/abs/2209.00042), arXiv, 2022
+
+2. Francisco Sena, Alexandru I. Tomescu
+[**Fast and Flexible Flow Decompositions in General Graphs via Dominators**](https://arxiv.org/abs/2511.19153), arXiv, 2025
 
 3. See also flowpaths [References](references.md), and the other papers cited by these works.
 

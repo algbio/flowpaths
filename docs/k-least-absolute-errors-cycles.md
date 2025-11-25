@@ -27,7 +27,7 @@ $$
 
 This class implements a more general version, as follows:
 
-1. This class supports adding subpath constraints, that is, lists of edges that must appear in some solution path. See [Subpath constraints](subpath-constraints.md) for details.
+1. This class supports adding subset constraints, that is, lists of edges that must appear in some solution path. See [Subset constraints](subset-constraints.md) for details.
 2. The paths can start/end not only in source/sink nodes, but also in given sets of start/end nodes (set parameters `additional_starts` and `additional_ends`). See also [Additional start/end nodes](additional-start-end-nodes.md).
 3. The above summation can happen only over a given subset $E' \subseteq E$ of the edges (set parameter `elements_to_ignore` to be $E \setminus E'$), 
 4. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ is equivalent to adding the edge $(u,v)$ to `elements_to_ignore`; the latter option is more efficient, as it results in a smaller model.
