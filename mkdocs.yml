@@ -6,7 +6,6 @@ nav:
     - About: index.md
     - FAQ: faq.md
     - References: references.md
-    - Contributing: contributing.md
   - Acyclic Decomposition Models:
     - Minimum Flow Decomposition: minimum-flow-decomposition.md
     - $k$-Flow Decomposition: k-flow-decomposition.md
