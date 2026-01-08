@@ -1,5 +1,6 @@
 import flowpaths.stdag as stdag
 from flowpaths.utils import safetypathcovers
+from flowpaths.utils import safetypathcoverscycles
 from flowpaths.utils import solverwrapper as sw
 import flowpaths.utils as utils
 import time
@@ -248,11 +249,15 @@ class AbstractPathModelDAG(ABC):
 
         if self.optimize_with_safe_sequences and not self.is_solved():
             start_time = time.perf_counter()
-            self.safe_lists += safetypathcovers.safe_sequences(
+            # self.safe_lists += safetypathcovers.safe_sequences(
+            #     G=self.G,
+            #     edges_or_subpath_constraints_to_cover=self.trusted_edges_for_safety,
+            #     no_duplicates=False,
+            #     threads=self.threads,
+            # )
+            self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
                 G=self.G,
-                edges_or_subpath_constraints_to_cover=self.trusted_edges_for_safety,
-                no_duplicates=False,
-                threads=self.threads,
+                X=self.trusted_edges_for_safety,
             )
             self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
 

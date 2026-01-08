@@ -129,8 +129,7 @@ class kInexactFlowDecomposition(fp.AbstractPathModelDAG):
         if self._solution is not None:
             return self._solution
     
-        solution_weights_dict = self.solver.get_variable_values("w", [int])
-        # solution_weights_dict = self.solver.get_values(self.path_weights_vars)
+        solution_weights_dict = self.solver.get_values(self.path_weights_vars)
         self._solution = {
             "paths": self.get_solution_paths(),
             "weights": [solution_weights_dict[i] for i in range(self.k)],

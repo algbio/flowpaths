@@ -1,4 +1,6 @@
 import flowpaths.stdigraph as stdigraph
+import flowpaths.stdag as stdag
+import flowpaths.abstractsourcesinkgraph as abssg
 import flowpaths.utils.dominators as dominators
 from queue import Queue
 
@@ -69,7 +71,7 @@ def find_idom(adj_dict, s, t) -> list:
 
     return first_bridge
 
-def maximal_safe_sequences_via_dominators(G : stdigraph.stDiGraph, X = set()) -> list :
+def maximal_safe_sequences_via_dominators(G : abssg.AbstractSourceSinkGraph, X = set()) -> list :
 
     if X == None or len(X) == 0:
         return []
