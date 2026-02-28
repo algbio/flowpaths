@@ -501,7 +501,7 @@ def draw(
                 "rgba(0, 191, 255, 0.4)",    # deepskyblue
                 "rgba(95, 158, 160, 0.4)",   # cadetblue
                 "rgba(139, 0, 139, 0.4)",    # darkmagenta
-                "rgba(255, 193, 37, 0.4)",   # goldenrod
+                "rgba(255, 193, 37, 0.4)",   # goldenrod 
             ]
             
             # Build links with path information to maintain consistent ordering at nodes
