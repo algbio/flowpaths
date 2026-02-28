@@ -124,7 +124,7 @@ def example_real_graph():
         k=k,
         weight_type=float
     )
-    solver.solve()
+    solver.solve() 
     
     if solver.is_solved():
         solution = solver.get_solution()
