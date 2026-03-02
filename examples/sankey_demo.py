@@ -68,7 +68,10 @@ def main():
         paths=paths,
         weights=weights,
         draw_options={
-            "style": "sankey"
+            "style": "sankey",
+            # "sankey_arrowlen": 15,
+            "sankey_color_toggle": True,
+            "sankey_arrow_toggle": True,
         }
     )
     print("✓ Both interactive (HTML) and static (PDF) versions have been created")

@@ -20,7 +20,7 @@ dependencies = [
     "highspy",
     "graphviz",
     "numpy",
-    "plotly>=5.0",
+    "plotly>=6.5.2",
     "kaleido",
 ]
 
