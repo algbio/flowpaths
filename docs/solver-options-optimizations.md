@@ -39,6 +39,7 @@ Flowpaths implements several optimizations that reduce the search space for the 
 - `"optimize_with_flow_safe_paths"` (bool): Whether to optimize with flow-safe paths. This applied only to the Minimum Flow Decomposition problem and defaults to `True`. This overrides `"optimize_with_safe_paths"`.
 - `"optimize_with_safe_sequences"` (bool): Whether to optimize with safe sequences. Defaults to `False`. At the moment, you cannot set both `"optimize_with_safe_paths"` and `"optimize_with_safe_sequences"`.
 - `"optimize_with_safe_zero_edges"` (bool): Whether to optimize with safe zero edges. Defaults to `False`. You cannot set this without setting one of the above.
+- `"optimize_with_symmetry_breaking"` (bool): Whether to break symmetries by adding relevant constraints to the model. Defaults to `True`.
 
 Example:
 

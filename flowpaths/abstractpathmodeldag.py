@@ -59,6 +59,7 @@ class AbstractPathModelDAG(ABC):
     optimize_with_subpath_constraints_as_safe_sequences = True
     optimize_with_safety_as_subpath_constraints = False
     optimize_with_safety_from_largest_antichain = False
+    optimize_with_symmetry_breaking = True
 
     def __init__(
         self,
@@ -139,7 +140,7 @@ class AbstractPathModelDAG(ABC):
             
                 External solution paths, as a list of paths, where every path is a list of nodes. Defaults to `None`.
                 If you provide this, this class skip the solver creation and encoding of paths, and just return these paths. 
-                This is useful when the child class managed to solver the problem in a different way, 
+                This is useful when the child class managed to solve the problem in a different way, 
                 and needs to let this class know them, in order to have a consistent API.
 
         - `solver_options: dict`, optional
@@ -211,6 +212,7 @@ class AbstractPathModelDAG(ABC):
         self.external_safe_paths = optimization_options.get("external_safe_paths", None)
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDAG.optimize_with_safe_sequences)
         self.optimize_with_subpath_constraints_as_safe_sequences = optimization_options.get("optimize_with_subpath_constraints_as_safe_sequences", AbstractPathModelDAG.optimize_with_subpath_constraints_as_safe_sequences)
+        self.optimize_with_symmetry_breaking = optimization_options.get("optimize_with_symmetry_breaking", AbstractPathModelDAG.optimize_with_symmetry_breaking)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
@@ -297,6 +299,8 @@ class AbstractPathModelDAG(ABC):
         self._encode_paths()
 
         self._apply_safety_optimizations_fix_zero_edges()
+
+        self._apply_symmetry_breaking()
 
     def _encode_paths(self):
         
@@ -655,6 +659,105 @@ class AbstractPathModelDAG(ABC):
                     utils.logger.error(f"{__name__}: subpath {subpath} contains the edge {e} which is not in the graph.")
                     raise ValueError(f"Subpath {subpath} contains the edge {e} which is not in the graph.")
 
+    def _apply_symmetry_breaking(self):
+        """
+        Add constraints that break symmetry among paths that are not already ordered through the safety optimisations.
+
+        Imposes a lexicographic ordering x^i >=_lex x^{i-1} on the binary edge vectors of
+        consecutive free paths with O(|E| * k) constraints.
+
+        For each consecutive free pair of paths (i-1, i) and each edge position p:
+          - tied[(p, i)] = 1 iff paths i-1 and i agree on all edges before position p
+          - diff[(p, i)] >= |x[edge_p, i] - x[edge_p, i-1]|  (unsigned difference)
+
+        tied[(0, i)] = 1, per definition, so only p = 1..m are variables.
+
+        Constraints per position p, per pair (i-1, i):
+          (1) x[p,i] - x[p,i-1]         >= tied[p,i] - 1          (lex: if still tied, can't decrease)
+          (2) diff[p,i]                 >= x[p,i] - x[p,i-1]      (diff captures increase)
+          (3) diff[p,i]                 >= x[p,i-1] - x[p,i]      (diff captures decrease)
+          (4) tied[p+1,i]               <= tied[p,i]              (monotone: once untied, stays untied)
+          (5) tied[p+1,i] + diff[p,i]   <= 1                      (tie breaks on any difference)
+          (6) tied[p+1,i]               >= tied[p,i] - diff[p,i]  (tie persists when equal)
+        """
+        if not self.optimize_with_symmetry_breaking:
+            return
+
+        utils.logger.info(f"Applying symmetry breaking (lex, tie-propagation). Solver size before: {len(self.solver.get_all_variable_names())}")
+
+        edge_list = list(self.G.edges())
+        m = len(edge_list)
+
+        # safe_lists may contain many more entries than k; cap it so the range below is never empty
+        # when there are genuinely free paths to order.
+        if hasattr(self, "paths_to_fix") and self.paths_to_fix is not None:
+            n_fixed = len(self.paths_to_fix)
+        else:
+            # quite likely, this is higher than k, so then this method has no effect.
+            n_fixed = len(self.safe_lists)
+
+        free_pair_indices = list(range(n_fixed + 1, self.k))
+
+        if len(free_pair_indices) >= 1:
+            utils.logger.info(f"Symmetry breaking: breaking symmetry between {len(free_pair_indices)} path pairs")
+        else:
+            utils.logger.info("Symmetry breaking: no free path pairs to order.")
+            return
+
+        # sym_tied[(p, i)]: 1 iff paths i-1 and i agree on edges 0..p-1.
+        # p=0 is always 1 (constant), so variables run from p=1 to p=m.
+        tied_indexes = [(p, i) for i in free_pair_indices for p in range(1, m + 1)]
+        self.symmetry_tied_vars = self.solver.add_variables(
+            tied_indexes, name_prefix="sym_tied", lb=0, ub=1, var_type="integer"
+        )
+
+        # sym_diff[(p, i)]: |x[edge_p, i] - x[edge_p, i-1]|, one per edge position.
+        diff_indexes = [(p, i) for i in free_pair_indices for p in range(m)]
+        self.symmetry_diff_vars = self.solver.add_variables(
+            diff_indexes, name_prefix="sym_diff", lb=0, ub=1, var_type="integer"
+        )
+
+        for i in free_pair_indices:
+            for p, (u, v) in enumerate(edge_list):
+                x_i   = self.edge_vars[(u, v, i)]
+                x_im1 = self.edge_vars[(u, v, i - 1)]
+                diff   = self.symmetry_diff_vars[(p, i)]
+                # tied[0] = 1 is a constant; for p >= 1 use the variable
+                tied_p  = 1 if p == 0 else self.symmetry_tied_vars[(p, i)]
+                tied_p1 = self.symmetry_tied_vars[(p + 1, i)]
+
+                # (1) lex: if still tied at p, x[i] cannot go below x[i-1]
+                self.solver.add_constraint(
+                    x_i - x_im1 >= tied_p - 1,
+                    name=f"sym_lex_p={p}_i={i}",
+                )
+                # (2) diff captures increase
+                self.solver.add_constraint(
+                    diff >= x_i - x_im1,
+                    name=f"sym_diff_up_p={p}_i={i}",
+                )
+                # (3) diff captures decrease
+                self.solver.add_constraint(
+                    diff >= x_im1 - x_i,
+                    name=f"sym_diff_dn_p={p}_i={i}",
+                )
+                # (4) tied is monotone
+                self.solver.add_constraint(
+                    tied_p1 <= tied_p,
+                    name=f"sym_tied_mono_p={p}_i={i}",
+                )
+                # (5) tie breaks on any difference
+                self.solver.add_constraint(
+                    tied_p1 + diff <= 1,
+                    name=f"sym_tied_break_p={p}_i={i}",
+                )
+                # (6) tie persists when equal
+                self.solver.add_constraint(
+                    tied_p1 >= tied_p - diff,
+                    name=f"sym_tied_persist_p={p}_i={i}",
+                )
+
+        utils.logger.info(f"Solver size after: {len(self.solver.get_all_variable_names())}")
 
     def solve(self) -> bool:
         """
