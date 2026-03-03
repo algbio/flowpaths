@@ -172,7 +172,7 @@ def test6():
             "optimize_with_safe_sequences": True, # set to false to deactivate the safe sequences optimization
         },
         solver_options={
-            "external_solver": "gurobi", # we can try also "highs" at some point
+            "external_solver": "highs", # we can try also "gurobi" at some point
             "time_limit": 300, # 300s = 5min, is it ok?
         },
     )

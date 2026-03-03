@@ -46,7 +46,7 @@ def main():
     # For example, if a path has length in the range [0, 15], its slack will be multiplied by 1.6 when comparing the 
     # flow value of the edge to the sum of path slacks, but this multiplier will have no effect on the objective function.
 
-    solver_options = {"external_solver": "gurobi"}
+    solver_options = {"external_solver": "highs"}
     mpe_model_5 = fp.kMinPathError(
         graph, 
         flow_attr="flow", 
