@@ -26,6 +26,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         optimization_options: dict = None,
         solver_options: dict = {},
         trusted_edges_for_safety: list = None,
+        cover_every_edge: bool = False,
     ):
         """
         This class implements the k-LeastAbsoluteErrors problem, namely it looks for a decomposition of a weighted DAG into 
@@ -125,6 +126,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             If set, the model can apply the safety optimizations for these edges, so it can be significantly faster.
             See [optimizations documentation](solver-options-optimizations.md#2-optimizations)
 
+        - `cover_every_edge: bool`, optional
+
+            If set to `True`, every edge must be covered by at least one path in the solution. Default is `False`.
+
         Raises
         ------
         - `ValueError`
@@ -201,7 +206,8 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self.k = k
         self.original_k = k
         self.solution_weights_superset = solution_weights_superset
-        self.optimization_options = optimization_options or {}        
+        self.optimization_options = optimization_options or {}
+        self.cover_every_edge = cover_every_edge        
 
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
@@ -269,6 +275,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
         # This method is called from the current class to add the objective function
         self._encode_objective()
+
+        # Add cover every edge constraints if requested
+        if self.cover_every_edge:
+            self._encode_cover_every_edge_constraints()
 
         utils.logger.info(f"{__name__}: END initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
@@ -400,6 +410,22 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 for (u,v) in self.edge_indexes_basic), 
             sense="minimize"
         )
+
+    def _encode_cover_every_edge_constraints(self):
+        """
+        Adds constraints to ensure that every edge (not in edges_to_ignore) is covered by at least one path.
+        """
+        for u, v in self.G.edges():
+            if (u, v) in self.edges_to_ignore:
+                continue
+            
+            # At least one path must cover this edge
+            self.solver.add_constraint(
+                self.solver.quicksum(
+                    self.edge_vars[(u, v, i)] for i in range(self.k)
+                ) >= 1,
+                name=f"cover_edge_u={u}_v={v}",
+            )
 
     def _remove_empty_paths(self, solution):
         """
