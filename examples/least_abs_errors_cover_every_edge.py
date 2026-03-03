@@ -37,26 +37,23 @@ def create_bubble_graph(pairs):
         end_node = str(bubble_idx + 1)
         
         # Create intermediate nodes for the two parallel paths
-        upper_middle = f"u{bubble_idx}"
-        lower_middle = f"l{bubble_idx}"
+        top_middle = f"t{bubble_idx}"
+        bottom_middle = f"b{bubble_idx}"
         
-        # Upper path (high flow): start -> upper_middle -> end
-        G.add_edge(start_node, upper_middle, flow=val1)
-        G.add_edge(upper_middle, end_node, flow=val1)
+        # Top path: start -> top_middle -> end
+        G.add_edge(start_node, top_middle, flow=val1)
+        G.add_edge(top_middle, end_node, flow=val1)
         
-        # Lower path (low flow): start -> lower_middle -> end
-        G.add_edge(start_node, lower_middle, flow=val2)
-        G.add_edge(lower_middle, end_node, flow=val2)
+        # Bottom path: start -> bottom_middle -> end
+        G.add_edge(start_node, bottom_middle, flow=val2)
+        G.add_edge(bottom_middle, end_node, flow=val2)
     
     return G
 
 
 def main():
-    print("kLeastAbsErrors with cover_every_edge Example")
-    print("=" * 70)
-    
     # Create bubble graph with different flow pairs
-    pairs = [(10, 3), (12, 5), (8, 4)]
+    pairs = [(10, 3), (12, 5), (8, 4), (12, 0), (11, 3)]
     G = create_bubble_graph(pairs)
     
     # Solve with k=2 paths and cover_every_edge=True
