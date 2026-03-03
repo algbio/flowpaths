@@ -3,7 +3,7 @@ import itertools
 import flowpaths as fp
 
 weight_type = [int]
-solvers = ["highs", "gurobi"]
+solvers = ["highs"]
 
 tolerance = 1
 
@@ -86,7 +86,7 @@ def run_test(graph, test_index, params):
             flow_attr="flow",
             weight_type=first_weight_type,
             solution_weights_superset=solution_weights_superset,
-            solver_options={"external_solver": "gurobi"},
+            solver_options={"external_solver": "highs"},
         )
     lae_model.solve() 
     print(lae_model.solve_statistics)
@@ -114,7 +114,7 @@ def run_test(graph, test_index, params):
             weight_type=first_weight_type,
             solution_weights_superset=solution_weights_superset,
             subpath_constraints=subpath_constraints,
-            solver_options={"external_solver": "gurobi"},
+            solver_options={"external_solver": "highs"},
         )
     lae_model.solve() 
     print(lae_model.solve_statistics)

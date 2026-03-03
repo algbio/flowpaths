@@ -5,7 +5,7 @@ import networkx as nx
 from pathlib import Path
 
 weight_type = [float]
-solvers = ["gurobi"]
+solvers = ["highs"]
 settings_flags = {
     "optimize_with_safety_as_subset_constraints": [True, False],
 }
