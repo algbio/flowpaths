@@ -53,7 +53,7 @@ def create_bubble_graph(pairs):
 
 def main():
     # Create bubble graph with different flow pairs
-    pairs = [(10, 3), (12, 5), (8, 4), (12, 0), (11, 3)]
+    pairs = [(10, 3), (5, 12), (8, 4), (0, 12), (11, 3)]
     G = create_bubble_graph(pairs)
     
     # Solve with k=2 paths and cover_every_edge=True
