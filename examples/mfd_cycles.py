@@ -77,7 +77,7 @@ def test3(filename: str):
             "optimize_with_safety_as_subset_constraints": False,
         },
         solver_options={
-            "external_solver": "gurobi",
+            "external_solver": "highs",
             "time_limit": 300,
         },
     )

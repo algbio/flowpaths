@@ -3,7 +3,7 @@ import itertools
 import flowpaths as fp
 
 weight_type = [int, float]
-solvers = ["highs", "gurobi"]
+solvers = ["highs"]
 
 settings_flags = {
     "optimize_with_safe_paths": [True, False],

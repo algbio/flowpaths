@@ -124,6 +124,8 @@ These examples work with general directed graphs that may contain cycles and dec
 
 ## Utility and Advanced Examples
 
+- [**sankey_demo.py**](sankey_demo.py) - Interactive Sankey diagram visualization (generates both HTML and static images)
+- [**sankey_demo.ipynb**](sankey_demo.ipynb) - Jupyter notebook demonstrating interactive Sankey diagrams with inline display
 - [**condensation.py**](condensation.py) - Working with strongly connected components and graph condensation
 - [**timeout.py**](timeout.py) - Utility for running solvers with time limits using signals/multiprocessing
 - [**utils.py**](utils.py) - Helper functions used across examples

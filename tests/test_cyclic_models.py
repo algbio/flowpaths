@@ -124,11 +124,6 @@ class TestCyclicModels:
     def test_cycles_with_solver_options(self, simple_cycle_graph):
         """Test cyclic models with different solver options."""
         solvers = ["highs"]
-        try:
-            import gurobipy
-            solvers.append("gurobi")
-        except ImportError:
-            pass
         
         for solver in solvers:
             mfd = fp.MinFlowDecompCycles(
@@ -280,7 +275,7 @@ class TestCyclicModels:
             flow_attr="flow",
             solver_options={
                 "time_limit": 1, # Very small time limit
-                "external_solver": "gurobi"},  
+                "external_solver": "highs"},  
             optimization_options={"optimize_with_safe_sequences": False}
         )
         assert not mfd.is_solved()

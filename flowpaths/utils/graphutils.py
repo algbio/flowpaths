@@ -366,10 +366,15 @@ def draw(
             "show_graph_edges": True,
             "show_edge_weights": False,
             "show_node_weights": False,
+            "show_graph_title": False,
             "show_path_weights": False,
             "show_path_weight_on_first_edge": True,
             "pathwidth": 3.0,
             "style": "default",
+            "color_nodes": False,
+            "sankey_arrowlen": 0,
+            "sankey_color_toggle": False,
+            "sankey_arrow_toggle": False,
         },
         ):
         """
@@ -426,6 +431,11 @@ def draw(
 
                 Whether to show the node weights in the graph from the `flow_attr`. Default is `False`.
 
+            - `show_graph_title`: bool
+
+                Whether to show the graph title (from graph id) in the figure.
+                Default is `False`.
+
             - `show_path_weights`: bool
 
                 Whether to show the path weights in the graph on every edge. Default is `False`.
@@ -440,20 +450,270 @@ def draw(
 
             - `style`: str
 
-                The style of the drawing. Available options: `default`, `points`.
+                The style of the drawing. Available options: `default`, `points`, `sankey`.
+                
+                - `default`: Standard graphviz rendering with nodes as rounded rectangles
+                - `points`: Graphviz rendering with nodes as points
+                - `sankey`: Interactive Sankey diagram using plotly (requires acyclic graph). 
+                  Saves as HTML by default (interactive) or static image formats (png, pdf, svg) if kaleido is installed.
+                  Automatically displays in Jupyter notebooks.
+
+            - `color_nodes`: bool
+
+                    Whether to use the existing node coloring behavior.
+                    If `False` (default), all nodes use a neutral color.
+                    If `True`, nodes are colored as before (including `additional_starts`
+                    in green and `additional_ends` in red for graphviz styles).
+
+            - `sankey_arrowlen`: float
+
+                Length of arrowheads for Sankey links (Plotly `arrowlen`).
+                Default is `0` (no arrowheads).
+
+            - `sankey_color_toggle`: bool
+
+                Whether to add an interactive toggle (buttons) to switch Sankey
+                links between colored and monochrome gray.
+                Default is `False`.
+
+            - `sankey_arrow_toggle`: bool
+
+                Whether to add an interactive toggle (buttons) to switch Sankey
+                link arrowheads on/off.
+                Default is `False`.
 
         """
 
         if len(paths) != len(weights) and len(weights) > 0:
             raise ValueError(f"{__name__}: Paths and weights must have the same length, if provided.")
 
+        style = draw_options.get("style", "default")
+        
+        # Handle Sankey diagram separately
+        if style == "sankey":
+            # Check if graph is acyclic
+            if not nx.is_directed_acyclic_graph(G):
+                utils.logger.error(f"{__name__}: Sankey diagram requires an acyclic graph.")
+                raise ValueError("Sankey diagram requires an acyclic graph.")
+
+            try:
+                sankey_arrowlen = float(draw_options.get("sankey_arrowlen", 0))
+            except (TypeError, ValueError):
+                utils.logger.error(f"{__name__}: draw_options['sankey_arrowlen'] must be numeric.")
+                raise ValueError("draw_options['sankey_arrowlen'] must be numeric.")
+
+            if sankey_arrowlen < 0:
+                utils.logger.error(f"{__name__}: draw_options['sankey_arrowlen'] must be >= 0.")
+                raise ValueError("draw_options['sankey_arrowlen'] must be >= 0.")
+
+            sankey_color_toggle = bool(draw_options.get("sankey_color_toggle", False))
+            sankey_arrow_toggle = bool(draw_options.get("sankey_arrow_toggle", False))
+            color_nodes = bool(draw_options.get("color_nodes", False))
+            show_graph_title = bool(draw_options.get("show_graph_title", False))
+            default_arrowlen_for_toggle = sankey_arrowlen if sankey_arrowlen > 0 else 15.0
+            
+            try:
+                import plotly.graph_objects as go
+            except ImportError:
+                utils.logger.error(f"{__name__}: plotly module not found. It should be installed with flowpaths. Try reinstalling: pip install --force-reinstall flowpaths")
+                raise ImportError("plotly module not found. It should be installed with flowpaths. Try reinstalling: pip install --force-reinstall flowpaths")
+            
+            # Create node list in topological order, with sources and sinks at the end
+            # This ordering can help preserve link ordering in the Sankey layout
+            topo_order = list(nx.topological_sort(G))
+            longest_path_len = nx.algorithms.dag.dag_longest_path_length(G)
+            sankey_width = max(900, 500 + 50 * max(1, longest_path_len))
+            
+            # Identify sources (in-degree 0) and sinks (out-degree 0)
+            sources = [node for node in topo_order if G.in_degree(node) == 0]
+            sinks = [node for node in topo_order if G.out_degree(node) == 0]
+            
+            # Middle nodes (neither pure source nor pure sink)
+            middle_nodes = [node for node in topo_order if node not in sources and node not in sinks]
+            
+            # Build node list: middle nodes in topo order, then sources, then sinks
+            node_list = middle_nodes + sources + sinks
+            node_dict = {node: idx for idx, node in enumerate(node_list)}
+            
+            # Define colors for paths (with transparency for blending)
+            colors = [
+                "rgba(255, 0, 0, 0.4)",      # red
+                "rgba(0, 0, 255, 0.4)",      # blue
+                "rgba(0, 128, 0, 0.4)",      # green
+                "rgba(128, 0, 128, 0.4)",    # purple
+                "rgba(165, 42, 42, 0.4)",    # brown
+                "rgba(0, 255, 255, 0.4)",    # cyan
+                "rgba(255, 255, 0, 0.4)",    # yellow
+                "rgba(255, 192, 203, 0.4)",  # pink
+                "rgba(128, 128, 128, 0.4)",  # grey
+                "rgba(210, 105, 30, 0.4)",   # chocolate
+                "rgba(0, 0, 139, 0.4)",      # darkblue
+                "rgba(85, 107, 47, 0.4)",    # darkolivegreen
+                "rgba(47, 79, 79, 0.4)",     # darkslategray
+                "rgba(0, 191, 255, 0.4)",    # deepskyblue
+                "rgba(95, 158, 160, 0.4)",   # cadetblue
+                "rgba(139, 0, 139, 0.4)",    # darkmagenta
+                "rgba(255, 193, 37, 0.4)",   # goldenrod 
+            ]
+            
+            # Build links with path information to maintain consistent ordering at nodes
+            # Structure: list of (source, target, weight, color, path_idx)
+            links_with_metadata = []
+            
+            for path_idx, path in enumerate(paths):
+                path_weight = weights[path_idx] if path_idx < len(weights) else 1
+                path_color = colors[path_idx % len(colors)]
+                
+                # Add each edge in the path
+                for i in range(len(path) - 1):
+                    source = node_dict[path[i]]
+                    target = node_dict[path[i + 1]]
+                    links_with_metadata.append((source, target, path_weight, path_color, path_idx))
+            
+            # Sort links by path index to maintain consistent ordering throughout the diagram
+            # This ensures edges from the same path appear in the same relative order at all nodes
+            links_with_metadata.sort(key=lambda x: x[4])
+            
+            # Extract sorted components
+            link_sources = [link[0] for link in links_with_metadata]
+            link_targets = [link[1] for link in links_with_metadata]
+            link_values = [link[2] for link in links_with_metadata]
+            link_colors = [link[3] for link in links_with_metadata]
+            
+            # Create Sankey diagram
+            link_dict = dict(
+                source=link_sources,
+                target=link_targets,
+                value=link_values,
+                color=link_colors,
+            )
+            if sankey_arrowlen > 0:
+                link_dict["arrowlen"] = sankey_arrowlen
+
+            node_color = "rgba(99, 110, 120, 0.85)" if not color_nodes else "rgba(31, 119, 180, 0.8)"
+
+            base_fig = go.Figure(data=[go.Sankey(
+                node=dict(
+                    pad=15,
+                    thickness=20,
+                    line=dict(color="black", width=0.5),
+                    label=[str(node) for node in node_list],
+                    color=[node_color] * len(node_list),
+                ),
+                link=link_dict
+            )])
+            
+            # Use graph ID as title if available
+            graph_id = G.graph.get("id", fpid(G))
+            title_text = f"{graph_id}" if show_graph_title and graph_id and graph_id != str(id(G)) else ""
+            
+            base_fig.update_layout(
+                title_text=title_text,
+                font_size=10,
+                width=sankey_width,
+                height=600,
+            )
+
+            fig = go.Figure(base_fig)
+
+            updatemenus = []
+
+            if sankey_color_toggle and len(link_colors) > 0:
+                monochrome_colors = ["rgba(150, 150, 150, 0.6)"] * len(link_colors)
+                updatemenus.append(
+                    dict(
+                        type="buttons",
+                        direction="left",
+                        x=0.0,
+                        y=1.12,
+                        showactive=True,
+                        buttons=[
+                            dict(
+                                label="Colored links",
+                                method="restyle",
+                                args=[{"link.color": [link_colors]}],
+                            ),
+                            dict(
+                                label="Monochrome links",
+                                method="restyle",
+                                args=[{"link.color": [monochrome_colors]}],
+                            ),
+                        ],
+                    )
+                )
+
+            if sankey_arrow_toggle:
+                updatemenus.append(
+                    dict(
+                        type="buttons",
+                        direction="left",
+                        x=0.0,
+                        y=1.05,
+                        showactive=True,
+                        buttons=[
+                            dict(
+                                label="Arrowheads on",
+                                method="restyle",
+                                args=[{"link.arrowlen": [default_arrowlen_for_toggle]}],
+                            ),
+                            dict(
+                                label="Arrowheads off",
+                                method="restyle",
+                                args=[{"link.arrowlen": [0]}],
+                            ),
+                        ],
+                    )
+                )
+
+            if len(updatemenus) > 0:
+                fig.update_layout(updatemenus=updatemenus)
+            
+            # Determine base filename and extension
+            file_ext = filename.split('.')[-1].lower() if '.' in filename else ''
+            base_filename = filename.rsplit('.', 1)[0] if '.' in filename else filename
+            
+            # Always save HTML (interactive version)
+            html_filename = base_filename + '.html'
+            fig.write_html(html_filename)
+            utils.logger.info(f"{__name__}: Sankey diagram (HTML) saved as {html_filename}")
+            
+            # Also save static image (PDF by default, or specified format)
+            static_format = file_ext if file_ext in ['png', 'pdf', 'svg', 'jpg', 'jpeg'] else 'pdf'
+            static_filename = base_filename + '.' + static_format
+            
+            try:
+                static_fig = go.Figure(base_fig)
+                if static_format == 'pdf':
+                    static_fig.update_layout(
+                        width=sankey_width,
+                        height=900,
+                    )
+
+                static_fig.write_image(static_filename, format=static_format)
+                utils.logger.info(f"{__name__}: Sankey diagram (static) saved as {static_filename}")
+            except Exception as e:
+                utils.logger.warning(f"{__name__}: Could not save static image. Error: {e}")
+                utils.logger.warning(f"{__name__}: Static image export may require additional system dependencies.")
+            
+            # Check if we're in a Jupyter notebook and show the figure
+            if "get_ipython" in globals():
+                try:
+                    if globals()["get_ipython"]() is not None:
+                        fig.show()
+                except Exception:
+                    pass  # Not in a notebook, just save
+            
+            return
+
         try:
             import graphviz as gv
+
+            color_nodes = bool(draw_options.get("color_nodes", False))
         
             dot = gv.Digraph(format="pdf")
             dot.graph_attr["rankdir"] = "LR"  # Display the graph in landscape mode
             
-            style = draw_options.get("style", "default")
+            # style already extracted above
             if style == "default":
                 dot.node_attr["shape"] = "rectangle"  # Rectangle nodes
                 dot.node_attr["style"] = "rounded"  # Rounded rectangle nodes
@@ -488,14 +748,17 @@ def draw(
             if draw_options.get("show_graph_edges", True):
                 # drawing nodes
                 for node in G.nodes():
-                    color = "black"
+                    neutral_node_color = "gray40"
+                    color = neutral_node_color
                     penwidth = "1.0"
-                    if node in additional_starts:
-                        color = "green"
-                        penwidth = "2.0"
-                    elif node in additional_ends:
-                        color = "red"
-                        penwidth = "2.0"
+                    if color_nodes:
+                        color = "black"
+                        if node in additional_starts:
+                            color = "green"
+                            penwidth = "2.0"
+                        elif node in additional_ends:
+                            color = "red"
+                            penwidth = "2.0"
 
                     if draw_options.get("show_node_weights", False) and flow_attr is not None and flow_attr in G.nodes[node]:
                         label = f"{G.nodes[node][flow_attr]}\\n{node}" if style != "points" else ""

@@ -41,7 +41,7 @@ def main():
         flow_attr="flow",
         weight_type=int,
         optimization_options={"optimize_with_greedy": False},
-        solver_options={"external_solver": "gurobi"},
+        solver_options={"external_solver": "highs"},
     )
     mfd_model_int_gurobi.solve()
     process_solution(mfd_model_int_gurobi)

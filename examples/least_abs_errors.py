@@ -40,7 +40,7 @@ def main():
         k=3, 
         weight_type=float, 
         elements_to_ignore=[("a", "c")],
-        solver_options={"external_solver": "gurobi"}
+        solver_options={"external_solver": "highs"}
         )
     lae_model_2.solve()
     process_solution(lae_model_2)
@@ -54,7 +54,7 @@ def main():
         weight_type=float, 
         elements_to_ignore=[("a", "c")],
         trusted_edges_for_safety=[("a", "b")],
-        solver_options={"external_solver": "gurobi"}
+        solver_options={"external_solver": "highs"}
         )
     lae_model_3.solve()
     process_solution(lae_model_3)
@@ -68,7 +68,7 @@ def main():
         weight_type=float, 
         subpath_constraints=[[("a", "b")]],
         elements_to_ignore=[("a", "c")],
-        solver_options={"external_solver": "gurobi"}
+        solver_options={"external_solver": "highs"}
         )
     lae_model_4.solve()
     process_solution(lae_model_4)

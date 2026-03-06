@@ -1,6 +1,10 @@
 [project]
 name = "flowpaths"
+<<<<<<< symmetry-breaking
 version = "0.2.14" 
+=======
+version = "0.2.13" 
+>>>>>>> main
 description = "A Python package to quickly decompose weighted graphs into weights paths, under various models."
 readme = "README.md"
 authors = [{name="Graph Algorithms and Bioinformatics Group @ University of Helsinki, and external collaborators"}]
@@ -20,6 +24,8 @@ dependencies = [
     "highspy",
     "graphviz",
     "numpy",
+    "plotly>=6.5.2",
+    "kaleido",
 ]
 
 [build-system]
