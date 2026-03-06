@@ -200,6 +200,8 @@ def safe_paths(
 ) -> list:
 
     paths = set() if no_duplicates else []
+    if edges_to_cover is None:
+        return paths
 
     import concurrent.futures
 

@@ -59,7 +59,7 @@ class AbstractPathModelDAG(ABC):
     optimize_with_subpath_constraints_as_safe_sequences = True
     optimize_with_safety_as_subpath_constraints = False
     optimize_with_safety_from_largest_antichain = False
-    optimize_with_symmetry_breaking = True
+    optimize_with_symmetry_breaking_lexicographic_paths = True
 
     def __init__(
         self,
@@ -212,7 +212,7 @@ class AbstractPathModelDAG(ABC):
         self.external_safe_paths = optimization_options.get("external_safe_paths", None)
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDAG.optimize_with_safe_sequences)
         self.optimize_with_subpath_constraints_as_safe_sequences = optimization_options.get("optimize_with_subpath_constraints_as_safe_sequences", AbstractPathModelDAG.optimize_with_subpath_constraints_as_safe_sequences)
-        self.optimize_with_symmetry_breaking = optimization_options.get("optimize_with_symmetry_breaking", AbstractPathModelDAG.optimize_with_symmetry_breaking)
+        self.optimize_with_symmetry_breaking_lexicographic_paths = optimization_options.get("optimize_with_symmetry_breaking_lexicographic_paths", AbstractPathModelDAG.optimize_with_symmetry_breaking_lexicographic_paths)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
@@ -223,59 +223,6 @@ class AbstractPathModelDAG(ABC):
         self._is_solved = False
         if self.external_solution_paths is not None:
             self._is_solved = True
-
-        # some checks
-        if self.optimize_with_safe_paths and self.external_safe_paths is None and self.trusted_edges_for_safety is None:
-            utils.logger.error(f"{__name__}: trusted_edges_for_safety must be provided when optimizing with safe paths")
-            raise ValueError("trusted_edges_for_safety must be provided when optimizing with safe lists")        
-        if self.optimize_with_safe_sequences and self.external_safe_paths is not None:
-            utils.logger.error(f"{__name__}: Cannot optimize with both external safe paths and safe sequences")
-            raise ValueError("Cannot optimize with both external safe paths and safe sequences")
-
-        if self.optimize_with_safe_paths and self.optimize_with_safe_sequences:
-            utils.logger.error(f"{__name__}: Cannot optimize with both safe paths and safe sequences")
-            raise ValueError("Cannot optimize with both safe paths and safe sequences")        
-                
-        self.safe_lists = []
-        if self.external_safe_paths is not None:
-            self.safe_lists = self.external_safe_paths
-        elif self.optimize_with_safe_paths and not self.is_solved() and self.trusted_edges_for_safety is not None:
-            start_time = time.perf_counter()
-            self.safe_lists += safetypathcovers.safe_paths(
-                G=self.G,
-                edges_to_cover=self.trusted_edges_for_safety,
-                no_duplicates=False,
-                threads=self.threads,
-            )
-            self.solve_statistics["safe_paths_time"] = time.perf_counter() - start_time
-
-        if self.optimize_with_safe_sequences and not self.is_solved():
-            start_time = time.perf_counter()
-            # self.safe_lists += safetypathcovers.safe_sequences(
-            #     G=self.G,
-            #     edges_or_subpath_constraints_to_cover=self.trusted_edges_for_safety,
-            #     no_duplicates=False,
-            #     threads=self.threads,
-            # )
-            self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
-                G=self.G,
-                X=self.trusted_edges_for_safety,
-            )
-            self.solve_statistics["safe_sequences_time"] = time.perf_counter() - start_time
-
-        if self.optimize_with_subpath_constraints_as_safe_sequences and len(self.subpath_constraints) > 0 and not self.is_solved():
-            if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
-                start_time = time.perf_counter()
-                self.safe_lists += safetypathcovers.safe_sequences(
-                    G=self.G,
-                    edges_or_subpath_constraints_to_cover=self.subpath_constraints,
-                    no_duplicates=False,
-                    threads=self.threads,
-                )
-                self.solve_statistics["optimize_with_subpath_constraints_as_safe_sequences"] = time.perf_counter() - start_time
-
-        if self.optimize_with_safety_as_subpath_constraints:
-            self.subpath_constraints += self.safe_lists
 
     def create_solver_and_paths(self):
         """
@@ -297,10 +244,19 @@ class AbstractPathModelDAG(ABC):
         self.solver = sw.SolverWrapper(**self.solver_options)
 
         self._encode_paths()
+        self._encode_subpath_constraints()
+        self._encode_edge_position_variables()
 
-        self._apply_safety_optimizations_fix_zero_edges()
+        start_time = time.perf_counter()
+        self._apply_safety_optimizations()
+        self.solve_statistics["safety_optimizations_time"] = time.perf_counter() - start_time
+        utils.logger.debug(f"{__name__}: Applied safety optimizations in {self.solve_statistics['safety_optimizations_time']} seconds.")
 
-        self._apply_symmetry_breaking()
+        self._apply_symmetry_breaking_lexicographic_paths()
+
+        self.solve_statistics["graph_width"] = self.G.get_width()
+        self.solve_statistics["edge_number"] = self.G.number_of_edges()
+        self.solve_statistics["node_number"] = self.G.number_of_nodes()
 
     def _encode_paths(self):
         
@@ -370,6 +326,8 @@ class AbstractPathModelDAG(ABC):
                     f"10c_v={v}_i={i}",
                 )
 
+    def _encode_subpath_constraints(self):
+
         ################################
         #                              #
         # Encoding subpath constraints #
@@ -414,6 +372,8 @@ class AbstractPathModelDAG(ABC):
                     self.solver.quicksum(self.subpaths_vars[(i, j)] for i in range(self.k)) >= 1,
                     name=f"7b_j={j}",
                 )
+
+    def _encode_edge_position_variables(self):
 
         ###############################
         #                             #
@@ -461,12 +421,70 @@ class AbstractPathModelDAG(ABC):
                     name=f"path_length_constr_i={i}"
                 )
 
+    def _get_safe_lists(self):
+        """
+            Build and return the aggregated list of "safe" edge/path constraints used by optimization.
+
+            This method combines multiple optional sources into a single list:
+
+                - `self.external_safe_paths` (if provided),
+                - safe paths computed when `self.optimize_with_safe_paths` is enabled,
+                - maximal safe sequences via dominators when `self.optimize_with_safe_sequences` is enabled,
+                - safe sequences derived by extending each subpath constraint in `self.subpath_constraints` when `self.optimize_with_subpath_constraints_as_safe_sequences` is enabled 
+                (and coverage settings match: `self.subpath_constraints_coverage == 1` and `self.subpath_constraints_coverage_length in [1, None]`).
+
+            If `self.trusted_edges_for_safety` is not set, a warning is logged.
+
+            Returns:
+                    list: A concatenated list of safe path/sequence collections to be used by downstream optimization routines. If no safe paths or sequences are generated, returns an empty list.
+        """
+
+        safe_lists = []
+        
+        if self.external_safe_paths is not None:
+            safe_lists += self.external_safe_paths
+
+        if self.trusted_edges_for_safety is None:
+            utils.logger.warning(f"{__name__}: No trusted edges provided for safety optimizations.")
+
+        if self.optimize_with_safe_paths:
+            safe_lists += safetypathcovers.safe_paths(
+                G=self.G,
+                edges_to_cover=self.trusted_edges_for_safety,
+                no_duplicates=False,
+                threads=self.threads,
+            )
+
+        if self.optimize_with_safe_sequences:
+            safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
+                G=self.G,
+                X=self.trusted_edges_for_safety,
+            )
+
+        if self.optimize_with_subpath_constraints_as_safe_sequences and len(self.subpath_constraints) > 0:
+            if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
+                safe_lists += safetypathcovers.safe_sequences(
+                    G=self.G,
+                    edges_or_subpath_constraints_to_cover=self.subpath_constraints,
+                    no_duplicates=False,
+                    threads=self.threads,
+                )
+
+        return safe_lists
+
     def _apply_safety_optimizations(self):
 
-        if self.safe_lists is not None:
+        if self.is_solved():
+            return
+
+        self.safe_lists = self._get_safe_lists()
+        self.paths_to_fix = []
+
+        if self.optimize_with_safety_as_subpath_constraints:
+            self.subpath_constraints += self.safe_lists
+        else:
             self.paths_to_fix = self._get_paths_to_fix_from_safe_lists()
 
-        if not self.optimize_with_safety_as_subpath_constraints:
             # iterating over safe lists
             for i in range(min(len(self.paths_to_fix), self.k)):
                 # print("Fixing variables for safe list #", i)
@@ -482,13 +500,13 @@ class AbstractPathModelDAG(ABC):
 
     def _apply_safety_optimizations_fix_zero_edges(self):
         """
-        Prune layer-edge variables to zero using safe-walk reachability while
-        preserving edges that can be part of the walk or its connectors.
+        Prune layer-edge variables to zero using safe path/sequence reachability while
+        preserving edges that can be part of the path/sequence or its connectors.
 
-        For each walk i in `walks_to_fix` we build a protection set of edges that
+        For each path/sequence i in `self.paths_to_fix` we build a protection set of edges that
         must not be fixed to 0 for layer i:
-            1) Protect all edges that appear in the walk itself.
-            2) Whole-walk reachability: let first_node be the first node of the walk
+            1) Protect all edges that appear in the path/sequence itself.
+            2) Whole path/sequence reachability: let first_node be the first node of the path/sequence
                     and last_node the last node. Protect any edge (u,v) such that
                         - u is reachable (forward) from last_node, OR
                         - v can reach (backward) first_node.
@@ -506,6 +524,10 @@ class AbstractPathModelDAG(ABC):
         Notes:
         - Requires `self.paths_to_fix` already computed and `self.edge_vars` created.
         """
+        
+        if not self.optimize_with_safe_zero_edges:
+            return
+
         if not hasattr(self, "paths_to_fix") or self.paths_to_fix is None:
             return
 
@@ -525,7 +547,7 @@ class AbstractPathModelDAG(ABC):
             first_node = path[0][0]
             last_node = path[-1][1]
             for (u, v) in self.G.edges:
-                if (u in self.G.reachable_nodes_from[last_node]) or (v in self.G.nodes_reaching(first_node)):
+                if (u in self.G.reachable_nodes_from[last_node]) or (v in self.G.nodes_reaching[first_node]):
                     protected_edges.add((u, v))
 
             # Collect pairs of non-contiguous consecutive edges (gaps)
@@ -541,7 +563,7 @@ class AbstractPathModelDAG(ABC):
             # For each gap, add edges that can lie on some path bridging the gap
             for (current_last, current_start) in gap_pairs:
                 for (u, v) in self.G.edges:
-                    if (u in self.G.nodes_reachable(current_last)) and (v in self.G.nodes_reaching(current_start)):
+                    if (u in self.G.reachable_nodes_from[current_last]) and (v in self.G.nodes_reaching[current_start]):
                     # if (u in reachable_from_last) and (v in can_reach_start):
                         protected_edges.add((u, v))
 
@@ -564,7 +586,6 @@ class AbstractPathModelDAG(ABC):
             utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
 
 
-
     def _get_paths_to_fix_from_safe_lists(self) -> list:
         
         # Returns the paths to fix based on the safe lists.
@@ -573,13 +594,6 @@ class AbstractPathModelDAG(ABC):
         # If we have no safe lists, we return an empty list
         if self.safe_lists is None or len(self.safe_lists) == 0:
             return []
-
-        # for i, safe_list in enumerate(self.safe_lists):
-        #     utils.logger.debug(f"{__name__}: safe_list {i}: {safe_list}")        
-
-        # utils.draw(self.G, 
-        #            filename = "debug_safe_lists.pdf", 
-        #            subpath_constraints = self.safe_lists)
 
         large_constant = 0
         if self.optimize_with_safety_from_largest_antichain:
@@ -606,60 +620,16 @@ class AbstractPathModelDAG(ABC):
         utils.logger.debug(f"{__name__}: edge_antichain from safe lists SIZE: {len(edge_antichain)}")
         # utils.logger.debug(f"{__name__}: edge_antichain from safe lists: {len(edge_antichain)}")
 
-        # paths_to_fix = list(
-        #     map(lambda edge: self.safe_lists[longest_safe_list[edge]], edge_antichain)
-        # )
         paths_to_fix = []
         for edge in edge_antichain:
             # utils.logger.debug(f"{__name__}: edge {edge} in edge_antichain, longest safe list idx: {longest_safe_list[edge]}, safe list: {self.safe_lists[longest_safe_list[edge]]}")
             paths_to_fix.append(self.safe_lists[longest_safe_list[edge]])
 
         utils.logger.debug(f"{__name__}: paths_to_fix from safe lists SIZE: {len(paths_to_fix)}")
-        # utils.logger.debug(f"{__name__}: paths_to_fix from safe lists: {paths_to_fix}")
-        
-        # utils.draw(self.G, 
-        #            filename = "debug_paths_to_fix.pdf", 
-        #            subpath_constraints = paths_to_fix)
 
         return paths_to_fix
     
-    def _check_valid_subpath_constraints(self):
-        """
-        Checks if the subpath constraints are valid.
-
-        Parameters
-        ----------
-        - subpath_constraints (list): The subpath constraints to be checked.
-
-        Returns
-        ----------
-        - True if the subpath constraints are valid, False otherwise.
-
-        The method checks if the subpath constraints are valid by ensuring that each subpath
-        is a valid path in the graph.
-        """
-
-        # Check that self.subpath_constraints is a list of lists
-        if not all(isinstance(subpath, list) for subpath in self.subpath_constraints):
-            utils.logger.error(f"{__name__}: subpath_constraints must be a list of lists of edges.")
-            raise ValueError("subpath_constraints must be a list of lists of edges.")
-
-        for subpath in self.subpath_constraints:
-            # Check that each subpath has at least one edge
-            if len(subpath) == 0:
-                utils.logger.error(f"{__name__}: subpath {subpath} must have at least 1 edge.")
-                raise ValueError(f"Subpath {subpath} must have at least 1 edge.")
-            # Check that each subpath is a list of tuples of two nodes (edges)
-            if not all(isinstance(e, tuple) and len(e) == 2 for e in subpath):
-                utils.logger.error(f"{__name__}: each subpath must be a list of edges, where each edge is a tuple of two nodes.")
-                raise ValueError("Each subpath must be a list of edges, where each edge is a tuple of two nodes.")
-            # Check that each edge in the subpath is in the graph
-            for e in subpath:
-                if not self.G.has_edge(e[0], e[1]):
-                    utils.logger.error(f"{__name__}: subpath {subpath} contains the edge {e} which is not in the graph.")
-                    raise ValueError(f"Subpath {subpath} contains the edge {e} which is not in the graph.")
-
-    def _apply_symmetry_breaking(self):
+    def _apply_symmetry_breaking_lexicographic_paths(self):
         """
         Add constraints that break symmetry among paths that are not already ordered through the safety optimisations.
 
@@ -680,28 +650,27 @@ class AbstractPathModelDAG(ABC):
           (5) tied[p+1,i] + diff[p,i]   <= 1                      (tie breaks on any difference)
           (6) tied[p+1,i]               >= tied[p,i] - diff[p,i]  (tie persists when equal)
         """
-        if not self.optimize_with_symmetry_breaking:
+        if self.is_solved():
             return
+        
+        if not self.optimize_with_symmetry_breaking_lexicographic_paths:
+            return    
 
-        utils.logger.info(f"Applying symmetry breaking (lex, tie-propagation). Solver size before: {len(self.solver.get_all_variable_names())}")
+        utils.logger.info(f"{__name__}: Applying symmetry breaking (lex, tie-propagation). Solver size before: {len(self.solver.get_all_variable_names())}")
 
         edge_list = list(self.G.edges())
         m = len(edge_list)
 
-        # safe_lists may contain many more entries than k; cap it so the range below is never empty
-        # when there are genuinely free paths to order.
+        # We store the number of paths that have already been fixed (e.g. by the safety optimizations)
         if hasattr(self, "paths_to_fix") and self.paths_to_fix is not None:
             n_fixed = len(self.paths_to_fix)
-        else:
-            # quite likely, this is higher than k, so then this method has no effect.
-            n_fixed = len(self.safe_lists)
 
         free_pair_indices = list(range(n_fixed + 1, self.k))
 
         if len(free_pair_indices) >= 1:
-            utils.logger.info(f"Symmetry breaking: breaking symmetry between {len(free_pair_indices)} path pairs")
+            utils.logger.info(f"{__name__}: Symmetry breaking: breaking symmetry between {len(free_pair_indices)} path pairs")
         else:
-            utils.logger.info("Symmetry breaking: no free path pairs to order.")
+            utils.logger.info(f"{__name__}: Symmetry breaking: no free path pairs to order.")
             return
 
         # sym_tied[(p, i)]: 1 iff paths i-1 and i agree on edges 0..p-1.
@@ -757,7 +726,43 @@ class AbstractPathModelDAG(ABC):
                     name=f"sym_tied_persist_p={p}_i={i}",
                 )
 
-        utils.logger.info(f"Solver size after: {len(self.solver.get_all_variable_names())}")
+        utils.logger.info(f"{__name__}: Solver size after: {len(self.solver.get_all_variable_names())}")
+    
+    def _check_valid_subpath_constraints(self):
+        """
+        Checks if the subpath constraints are valid.
+
+        Parameters
+        ----------
+        - subpath_constraints (list): The subpath constraints to be checked.
+
+        Returns
+        ----------
+        - True if the subpath constraints are valid, False otherwise.
+
+        The method checks if the subpath constraints are valid by ensuring that each subpath
+        is a valid path in the graph.
+        """
+
+        # Check that self.subpath_constraints is a list of lists
+        if not all(isinstance(subpath, list) for subpath in self.subpath_constraints):
+            utils.logger.error(f"{__name__}: subpath_constraints must be a list of lists of edges.")
+            raise ValueError("subpath_constraints must be a list of lists of edges.")
+
+        for subpath in self.subpath_constraints:
+            # Check that each subpath has at least one edge
+            if len(subpath) == 0:
+                utils.logger.error(f"{__name__}: subpath {subpath} must have at least 1 edge.")
+                raise ValueError(f"Subpath {subpath} must have at least 1 edge.")
+            # Check that each subpath is a list of tuples of two nodes (edges)
+            if not all(isinstance(e, tuple) and len(e) == 2 for e in subpath):
+                utils.logger.error(f"{__name__}: each subpath must be a list of edges, where each edge is a tuple of two nodes.")
+                raise ValueError("Each subpath must be a list of edges, where each edge is a tuple of two nodes.")
+            # Check that each edge in the subpath is in the graph
+            for e in subpath:
+                if not self.G.has_edge(e[0], e[1]):
+                    utils.logger.error(f"{__name__}: subpath {subpath} contains the edge {e} which is not in the graph.")
+                    raise ValueError(f"Subpath {subpath} contains the edge {e} which is not in the graph.")
 
     def solve(self) -> bool:
         """
