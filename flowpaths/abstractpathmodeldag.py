@@ -53,8 +53,8 @@ class AbstractPathModelDAG(ABC):
         which can speed up the solving process, while guaranteeing global optimality.
     """
     # storing some defaults
-    optimize_with_safe_paths = True
-    optimize_with_safe_sequences = False
+    optimize_with_safe_paths = False
+    optimize_with_safe_sequences = True
     optimize_with_safe_zero_edges = True
     optimize_with_subpath_constraints_as_safe_sequences = True
     optimize_with_safety_as_subpath_constraints = False
@@ -190,6 +190,7 @@ class AbstractPathModelDAG(ABC):
                     raise ValueError("If subpath_constraints_coverage_length is set, you cannot set also subpath_constraints_coverage.")
 
         self.solve_statistics = solve_statistics
+        self.solve_statistics["optimizations_applied"] = set()
         self.edge_vars = {}
         self.edge_vars_sol = {}
         self.subpaths_vars = {}
@@ -454,12 +455,14 @@ class AbstractPathModelDAG(ABC):
                 no_duplicates=False,
                 threads=self.threads,
             )
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safe_paths")
 
         if self.optimize_with_safe_sequences:
             safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
                 G=self.G,
                 X=self.trusted_edges_for_safety,
             )
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safe_sequences")
 
         if self.optimize_with_subpath_constraints_as_safe_sequences and len(self.subpath_constraints) > 0:
             if self.subpath_constraints_coverage == 1 and self.subpath_constraints_coverage_length in [1, None]:
@@ -469,6 +472,7 @@ class AbstractPathModelDAG(ABC):
                     no_duplicates=False,
                     threads=self.threads,
                 )
+                self.solve_statistics["optimizations_applied"].add("optimize_with_subpath_constraints_as_safe_sequences")
 
         return safe_lists
 
@@ -482,8 +486,10 @@ class AbstractPathModelDAG(ABC):
 
         if self.optimize_with_safety_as_subpath_constraints:
             self.subpath_constraints += self.safe_lists
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safety_as_subpath_constraints")
         else:
             self.paths_to_fix = self._get_paths_to_fix_from_safe_lists()
+            self.solve_statistics["edge_variables=1"] = 0
 
             # iterating over safe lists
             for i in range(min(len(self.paths_to_fix), self.k)):
@@ -495,6 +501,9 @@ class AbstractPathModelDAG(ABC):
                         name=f"safe_list_u={u}_v={v}_i={i}",
                     )
                     self.edges_set_to_one[(u, v, i)] = True
+                    self.solve_statistics["edge_variables=1"] += 1
+            if len(self.paths_to_fix) > 0:
+                self.solve_statistics["optimizations_applied"].add("optimize_with_safe_lists")
 
             self._apply_safety_optimizations_fix_zero_edges()
 
@@ -580,10 +589,10 @@ class AbstractPathModelDAG(ABC):
                 self.edges_set_to_zero[(u, v, i)] = True
                 fixed_zero_count += 1
 
-        if fixed_zero_count:
-            # Accumulate into solve statistics
-            self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
-            utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
+        # Accumulate into solve statistics
+        self.solve_statistics["optimizations_applied"].add("optimize_with_safe_zero_edges")
+        self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
+        utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
 
 
     def _get_paths_to_fix_from_safe_lists(self) -> list:
@@ -617,6 +626,8 @@ class AbstractPathModelDAG(ABC):
         _, edge_antichain = self.G.compute_max_edge_antichain(
             get_antichain=True, weight_function=len_of_longest_safe_list
         )
+        if self.optimize_with_safety_from_largest_antichain:
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safety_from_largest_antichain")
         utils.logger.debug(f"{__name__}: edge_antichain from safe lists SIZE: {len(edge_antichain)}")
         # utils.logger.debug(f"{__name__}: edge_antichain from safe lists: {len(edge_antichain)}")
 
@@ -626,6 +637,7 @@ class AbstractPathModelDAG(ABC):
             paths_to_fix.append(self.safe_lists[longest_safe_list[edge]])
 
         utils.logger.debug(f"{__name__}: paths_to_fix from safe lists SIZE: {len(paths_to_fix)}")
+        utils.logger.debug(f"{__name__}: paths_to_fix from safe lists: {paths_to_fix}")
 
         return paths_to_fix
     
@@ -667,6 +679,7 @@ class AbstractPathModelDAG(ABC):
 
         free_pair_indices = list(range(n_fixed + 1, self.k))
 
+        self.solve_statistics["optimizations_applied"].add("optimize_with_symmetry_breaking_lexicographic_paths")
         if len(free_pair_indices) >= 1:
             utils.logger.info(f"{__name__}: Symmetry breaking: breaking symmetry between {len(free_pair_indices)} path pairs")
         else:

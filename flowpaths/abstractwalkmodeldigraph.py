@@ -138,7 +138,8 @@ class AbstractWalkModelDiGraph(ABC):
                 utils.logger.error(f"{__name__}: subset_constraints_coverage must be in the range (0, 1]")
                 raise ValueError("subset_constraints_coverage must be in the range (0, 1]")
 
-        self.solve_statistics = solve_statistics
+        self.solve_statistics = solve_statistics if solve_statistics is not None else {}
+        self.solve_statistics["optimizations_applied"] = set()
         self.edge_vars = {}
         self.edge_vars_sol = {}
         self.subset_vars = {}
@@ -380,6 +381,13 @@ class AbstractWalkModelDiGraph(ABC):
 
         self.safe_lists = []
 
+        if self.optimize_with_safe_sequences:
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safe_sequences")
+        if self.optimize_with_safety_as_subset_constraints:
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safety_as_subset_constraints")
+        if self.optimize_with_max_safe_antichain_as_subset_constraints:
+            self.solve_statistics["optimizations_applied"].add("optimize_with_max_safe_antichain_as_subset_constraints")
+
         if self.optimize_with_safe_sequences or self.optimize_with_safety_as_subset_constraints or self.optimize_with_max_safe_antichain_as_subset_constraints:
             self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
                 G=self.G,
@@ -410,6 +418,7 @@ class AbstractWalkModelDiGraph(ABC):
 
         # Otherwise, we fix variables using the walks to fix
         if self.optimize_with_safe_sequences:
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safe_lists")
             # Iterate over walks to fix (up to k layers) and enforce per-edge multiplicity
             for i in range(min(len(self.walks_to_fix), self.k)):
                 walk = self.walks_to_fix[i]
@@ -478,6 +487,8 @@ class AbstractWalkModelDiGraph(ABC):
         if not hasattr(self, "walks_to_fix") or self.walks_to_fix is None:
             return
 
+        self.solve_statistics["optimizations_applied"].add("optimize_with_safe_sequences_fix_zero_edges")
+
         fixed_zero_count = 0
         # Ensure we don't go beyond k layers
         for i in range(min(len(self.walks_to_fix), self.k)):
@@ -527,12 +538,9 @@ class AbstractWalkModelDiGraph(ABC):
                 self.edges_set_to_zero[(u, v, i)] = True
                 fixed_zero_count += 1
 
-        if fixed_zero_count:
-            # Accumulate into solve statistics
-            self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
-            utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
-
-
+        # Accumulate into solve statistics
+        self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
+        utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
 
     def _get_walks_to_fix_from_safe_lists(self) -> list:
      

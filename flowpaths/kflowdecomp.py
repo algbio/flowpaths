@@ -209,13 +209,6 @@ class kFlowDecomp(pathmodel.AbstractPathModelDAG):
             start_time = time.perf_counter()
             self.optimization_options["external_safe_paths"] = sfd.compute_flow_decomp_safe_paths(G=G, flow_attr=self.flow_attr)
             self.solve_statistics["flow_safe_paths_time"] = time.perf_counter() - start_time
-            # If we optimize with flow safe paths, we need to disable optimizing with safe paths and sequences
-            if self.optimization_options.get("optimize_with_safe_paths", False):
-                utils.logger.error(f"{__name__}: Cannot optimize with both flow safe paths and safe paths")
-                raise ValueError("Cannot optimize with both flow safe paths and safe paths")
-            if self.optimization_options.get("optimize_with_safe_sequences", False):
-                utils.logger.error(f"{__name__}: Cannot optimize with both flow safe paths and safe sequences")
-                raise ValueError("Cannot optimize with both flow safe paths and safe sequences")
         
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore)
 
