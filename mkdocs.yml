@@ -5,6 +5,7 @@ nav:
   - Home: 
     - About: index.md
     - FAQ: faq.md
+    - Benchmarks: benchmarks.md
     - References: references.md
   - Acyclic Decomposition Models:
     - Minimum Flow Decomposition: minimum-flow-decomposition.md

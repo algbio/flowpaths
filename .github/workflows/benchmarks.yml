@@ -1,0 +1,57 @@
+name: Run Benchmarks
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/BENCHMARK_VERSION'
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  benchmark:
+    runs-on: dx3
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install -e .
+    
+    - name: Create results directory
+      run: mkdir -p benchmarks/results
+    
+    - name: Run benchmark on 50 dataset
+      working-directory: benchmarks
+      run: |
+        echo "Running benchmark on 50 dataset..."
+        python benchmark_minflowdecomp.py \
+          --datasets datasets/small/Mouse.PacBio_reads_50.flow_corrected.grp.gz \
+          --min-width 1 \
+          --max-width 100
+    
+    - name: Generate markdown results for 50 dataset
+      working-directory: benchmarks
+      run: |
+        python aggregate_results.py MinFlowDecomp \
+          --format markdown \
+          --output results/benchmark_50.md \
+          --metric mean
+        
+    - name: Commit benchmark results
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add benchmarks/results/benchmark_50.md
+        git diff --staged --quiet || git commit -m "Update benchmark results [skip ci]"
+        git push
