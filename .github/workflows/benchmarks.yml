@@ -45,13 +45,13 @@ jobs:
       run: |
         python aggregate_results.py MinFlowDecomp \
           --format markdown \
-          --output results/benchmark_50.md \
+          --output results-docs/benchmark_50.md \
           --metric mean
         
     - name: Commit benchmark results
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add benchmarks/results/benchmark_50.md
+        git add benchmarks/results-docs/benchmark_50.md
         git diff --staged --quiet || git commit -m "Update benchmark results [skip ci]"
         git push

@@ -4,4 +4,4 @@ This page shows the latest benchmark results for the MinFlowDecomp solver on sma
 
 ## Dataset: Mouse.PacBio_reads_50
 
---8<-- "benchmarks/results/benchmark_50.md"
+--8<-- "benchmarks/results-docs/benchmark_50.md"
