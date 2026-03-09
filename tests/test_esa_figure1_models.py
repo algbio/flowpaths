@@ -104,7 +104,7 @@ def test_esa_figure1_kflow_decomp(esa_figure1):
 
     solution = kfd.get_solution()
     assert len(solution["paths"]) == 7
-    assert len(solution["weights"]) == 17
+    assert sum(solution["weights"]) == 17
 
 
 def test_esa_figure1_kmin_path_error(esa_figure1):
