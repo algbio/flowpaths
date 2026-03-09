@@ -29,7 +29,7 @@ jobs:
         pip install -e .
     
     - name: Create results directory
-      run: mkdir -p benchmarks/results
+      run: mkdir -p benchmarks/results benchmarks/results-docs
     
     - name: Run benchmark on 50 dataset
       working-directory: benchmarks
