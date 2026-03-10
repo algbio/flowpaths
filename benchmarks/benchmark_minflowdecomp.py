@@ -45,6 +45,16 @@ OPTIMIZATION_CONFIGS = {
     'default': {
         # Default settings
     },
+    'given_weights+min_gen_set': {
+        'optimize_with_greedy': False,
+        'optimize_with_flow_safe_paths': False,
+        'optimize_with_safe_paths': False,
+        'optimize_with_safe_sequences': False,
+        'optimize_with_safe_zero_edges': False,
+        'optimize_with_symmetry_breaking': True,
+        'use_min_gen_set_lowerbound': True,
+        'optimize_with_given_weights': True,
+    },
 }
 
 

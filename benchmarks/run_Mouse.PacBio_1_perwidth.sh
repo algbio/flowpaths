@@ -26,7 +26,7 @@ echo ""
 python benchmark_minflowdecomp.py \
     --datasets datasets/esa2025/Mouse.PacBio_reads_1_perwidth.flow_corrected.grp.gz \
     --min-width 1 \
-    --max-width 6 \
+    --max-width 9 \
     --time-limit "$TIME_LIMIT"
 
 echo ""
