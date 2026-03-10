@@ -24,7 +24,7 @@ echo ""
 
 # Run benchmark on the small dataset
 python benchmark_minflowdecomp.py \
-    --datasets datasets/esa2025/Mouse.PacBio_reads_5_perwidth.flow_corrected.grp.gz \
+    --datasets datasets/esa2025/Mouse.PacBio_reads_1_perwidth.flow_corrected.grp.gz \
     --min-width 1 \
     --max-width 6 \
     --time-limit "$TIME_LIMIT"
