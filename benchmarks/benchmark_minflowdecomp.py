@@ -45,18 +45,46 @@ OPTIMIZATION_CONFIGS = {
     'default': {
         # Default settings
     },
-    'given_weights+min_gen_set': {
+    'no_optimizations': {
         'optimize_with_greedy': False,
         'optimize_with_flow_safe_paths': False,
         'optimize_with_safe_paths': False,
-        'optimize_with_safe_sequences': False,
+        'optimize_with_safe_sequences': True,
         'optimize_with_safe_zero_edges': False,
+        'optimize_with_symmetry_breaking': False,
+    },
+    'given_weights+min_gen_set+safety': {
+        'optimize_with_greedy': False,
+        'optimize_with_flow_safe_paths': False,
+        'optimize_with_safe_paths': False,
+        'optimize_with_safe_sequences': True,
+        'optimize_with_safe_zero_edges': True,
         'optimize_with_symmetry_breaking': True,
         'use_min_gen_set_lowerbound': True,
         'optimize_with_given_weights': True,
     },
+    'given_weights+min_gen_set+safety+partition_constraints': {
+        'optimize_with_greedy': False,
+        'optimize_with_flow_safe_paths': False,
+        'optimize_with_safe_paths': False,
+        'optimize_with_safe_sequences': True,
+        'optimize_with_safe_zero_edges': True,
+        'optimize_with_symmetry_breaking': True,
+        'use_min_gen_set_lowerbound': True,
+        'optimize_with_given_weights': True,
+        'use_min_gen_set_lowerbound_partition_constraints': True,
+    },
+    'greedy+min_gen_set': {
+        'optimize_with_greedy': True,
+        'optimize_with_flow_safe_paths': False,
+        'optimize_with_safe_paths': False,
+        'optimize_with_safe_sequences': True,
+        'optimize_with_safe_zero_edges': True,
+        'optimize_with_symmetry_breaking': True,
+        'use_min_gen_set_lowerbound': True,
+        'use_min_gen_set_lowerbound_partition_constraints': True,
+    },
 }
-
 
 # Solver options
 SOLVER_OPTIONS = {
