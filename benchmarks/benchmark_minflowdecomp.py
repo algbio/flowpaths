@@ -74,6 +74,16 @@ OPTIMIZATION_CONFIGS = {
         'optimize_with_given_weights': True,
         'use_min_gen_set_lowerbound_partition_constraints': True,
     },
+    'greedy': {
+        'optimize_with_greedy': True,
+        'optimize_with_flow_safe_paths': False,
+        'optimize_with_safe_paths': False,
+        'optimize_with_safe_sequences': True,
+        'optimize_with_safe_zero_edges': True,
+        'optimize_with_symmetry_breaking': False,
+        'use_min_gen_set_lowerbound': False,
+        'use_min_gen_set_lowerbound_partition_constraints': False,
+    },
     'greedy+min_gen_set': {
         'optimize_with_greedy': True,
         'optimize_with_flow_safe_paths': False,
