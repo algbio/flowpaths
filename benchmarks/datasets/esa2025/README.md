@@ -5,3 +5,9 @@ This dataset contains the following files:
 - **`Mouse.PacBio_reads.grp.gz`**: This is the same file as `Mouse.PacBio_reads.grp.gz` from the [Zenodo dataset](https://doi.org/10.5281/zenodo.13987687) by Andrey Prjibelski and was used in the paper [arXiv:2411.03871](https://doi.org/10.48550/arXiv.2411.03871).
 
 - **`Mouse.PacBio_reads.flow_corrected.grp.gz`**: This file was obtained from `Mouse.PacBio_reads.grp.gz` using the `MinErrorFlow` class of flowpaths. For more information, see the [Minimum Error Flow documentation](https://algbio.github.io/flowpaths/minimum-error-flow.html).
+
+- **`*_1_perwidth*` files** (for example, `Mouse.PacBio_reads_1_perwidth.grp.gz` and `Mouse.PacBio_reads_1_perwidth.flow_corrected.grp.gz`): Subsampled datasets containing **1 graph per width value**, taking the first graph encountered for each width.
+
+- **`*_5_perwidth*` files** (for example, `Mouse.PacBio_reads_5_perwidth.grp.gz` and `Mouse.PacBio_reads_5_perwidth.flow_corrected.grp.gz`): Subsampled datasets containing **5 graphs per width value**, taking the first 5 graphs encountered for each width.
+
+These subsets are produced with `benchmarks/create_small_dataset.py` via the `--graphs-per-width` option.

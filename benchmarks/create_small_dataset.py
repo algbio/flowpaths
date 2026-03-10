@@ -1,19 +1,42 @@
 #!/usr/bin/env python
 """
-Create a small dataset by sampling random graphs from a larger dataset.
+Create a small dataset by selecting graphs per width from a larger dataset.
+
+For each unique width value found in the input dataset, selects a specified
+number of graphs (first ones encountered) and saves them to a new file.
 
 Usage:
     python create_small_dataset.py
 """
 
-import random
 import gzip
+import argparse
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from benchmark_utils import DatasetLoader
+
+
+def derive_output_path(input_path: str, graphs_per_width: int) -> str:
+    """Derive output dataset path from input path and sampling parameter."""
+    input_file = Path(input_path)
+    suffixes = input_file.suffixes
+
+    # Preserve historical format for .grp.gz files.
+    if suffixes[-2:] == ['.grp', '.gz']:
+        base_name = input_file.name[:-len('.grp.gz')]
+        output_name = f"{base_name}_{graphs_per_width}_perwidth.grp.gz"
+    elif suffixes:
+        # Keep existing extension for other file types.
+        ext = ''.join(suffixes)
+        base_name = input_file.name[:-len(ext)]
+        output_name = f"{base_name}_{graphs_per_width}_perwidth{ext}"
+    else:
+        output_name = f"{input_file.name}_{graphs_per_width}_perwidth"
+
+    return str(input_file.with_name(output_name))
 
 
 def write_graph_to_lines(graph):
@@ -50,11 +73,10 @@ def write_graph_to_lines(graph):
 def create_small_dataset(
     input_path: str,
     output_path: str,
-    num_graphs: int = 50,
-    seed: int = 42
+    graphs_per_width: int = 5
 ):
     """
-    Sample random graphs from a dataset and save to a new file.
+    Select graphs from a dataset by taking a fixed number per width value.
     
     Parameters
     ----------
@@ -62,26 +84,33 @@ def create_small_dataset(
         Path to input dataset
     output_path : str
         Path to output dataset
-    num_graphs : int
-        Number of graphs to sample
-    seed : int
-        Random seed for reproducibility
+    graphs_per_width : int
+        Number of graphs to select for each unique width value (default: 5)
     """
     print(f"Loading graphs from {input_path}...")
     loader = DatasetLoader(input_path)
     graphs = loader.load_graphs()
     print(f"Loaded {len(graphs)} graphs")
     
-    # Set random seed for reproducibility
-    random.seed(seed)
+    # Group graphs by width
+    width_groups = {}
+    for graph in graphs:
+        width = graph.graph.get('w', 0)
+        if width not in width_groups:
+            width_groups[width] = []
+        width_groups[width].append(graph)
     
-    # Sample graphs
-    if num_graphs >= len(graphs):
-        print(f"Warning: Requested {num_graphs} graphs but dataset only has {len(graphs)}")
-        sampled_graphs = graphs
-    else:
-        sampled_graphs = random.sample(graphs, num_graphs)
-        print(f"Sampled {len(sampled_graphs)} random graphs")
+    print(f"Found {len(width_groups)} unique width values")
+    
+    # Select first graphs_per_width graphs for each width
+    sampled_graphs = []
+    for width in sorted(width_groups.keys()):
+        graphs_with_width = width_groups[width]
+        selected = graphs_with_width[:graphs_per_width]
+        sampled_graphs.extend(selected)
+        print(f"  Width {width}: selected {len(selected)} of {len(graphs_with_width)} graphs")
+    
+    print(f"\nTotal selected: {len(sampled_graphs)} graphs")
     
     # Create output directory if needed
     output_file = Path(output_path)
@@ -119,18 +148,46 @@ def create_small_dataset(
 
 def main():
     """Main function."""
-    # Configuration
-    input_path = "datasets/esa2025/Mouse.PacBio_reads.grp.gz"
-    output_path = "datasets/small/Mouse.PacBio_reads_500.grp.gz"
-    num_graphs = 500
-    seed = 42
+    parser = argparse.ArgumentParser(
+        description="Create a smaller dataset by sampling a fixed number of graphs per width"
+    )
+    parser.add_argument(
+        "--input",
+        default="datasets/esa2025/Mouse.PacBio_reads.grp.gz",
+        help="Path to input dataset (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--graphs-per-width",
+        type=int,
+        default=5,
+        help="Number of graphs to select per width value (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help=(
+            "Path to output dataset. If omitted, it is derived from --input as "
+            "<input>_<graphs-per-width>_perwidth with the same extension(s)."
+        ),
+    )
+    args = parser.parse_args()
+
+    if args.graphs_per_width <= 0:
+        parser.error("--graphs-per-width must be a positive integer")
+
+    input_path = args.input
+    graphs_per_width = args.graphs_per_width
+    output_path = args.output or derive_output_path(input_path, graphs_per_width)
     
     print("="*70)
     print("Creating small dataset")
     print("="*70)
+    print(f"Input: {input_path}")
+    print(f"Output: {output_path}")
+    print(f"Graphs per width: {graphs_per_width}")
     
     try:
-        create_small_dataset(input_path, output_path, num_graphs, seed)
+        create_small_dataset(input_path, output_path, graphs_per_width)
         
         # Verify the output
         print("\nVerifying output...")

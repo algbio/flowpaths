@@ -12,7 +12,6 @@ Usage:
 import argparse
 from pathlib import Path
 import sys
-import time
 
 # Add parent directory to path to import benchmark_utils
 sys.path.insert(0, str(Path(__file__).parent))
@@ -53,7 +52,6 @@ OPTIMIZATION_CONFIGS = {
 SOLVER_OPTIONS = {
     'threads': 1,
     'log_to_console': 'false',
-    'time_limit': 300,  # 5 minutes per instance
 }
 
 
@@ -89,7 +87,8 @@ def run_benchmarks(
     dataset_paths: list,
     min_width: int = None,
     max_width: int = None,
-    results_dir: str = 'results'
+    results_dir: str = 'results',
+    time_limit: int = 300,
 ):
     """
     Run benchmarks on specified datasets.
@@ -104,7 +103,14 @@ def run_benchmarks(
         Maximum width to include
     results_dir : str
         Directory to save results
+    time_limit : int
+        Solver time limit per instance in seconds
     """
+    solver_options = {
+        **SOLVER_OPTIONS,
+        'time_limit': time_limit,
+    }
+
     # Initialize components
     width_filter = WidthFilter(min_width, max_width)
     runner = BenchmarkRunner(
@@ -157,7 +163,7 @@ def run_benchmarks(
                     graph=graph,
                     optimization_config_name=config_name,
                     optimization_options=optimization_options,
-                    solver_options=SOLVER_OPTIONS
+                    solver_options=solver_options
                 )
                 
                 all_results.append(result)
@@ -221,6 +227,12 @@ Examples:
         default='results',
         help='Directory to save results (default: results)'
     )
+    parser.add_argument(
+        '--time-limit',
+        type=int,
+        default=300,
+        help='Solver time limit per instance in seconds (default: 300)'
+    )
     
     args = parser.parse_args()
     
@@ -264,13 +276,15 @@ Examples:
     print(f"  Datasets: {len(valid_paths)} file(s)")
     print(f"  Width range: {args.min_width}-{args.max_width}")
     print(f"  Optimization configs: {len(OPTIMIZATION_CONFIGS)}")
+    print(f"  Time limit: {args.time_limit}s")
     print(f"  Results directory: {args.results_dir}")
     
     run_benchmarks(
         dataset_paths=valid_paths,
         min_width=args.min_width,
         max_width=args.max_width,
-        results_dir=args.results_dir
+        results_dir=args.results_dir,
+        time_limit=args.time_limit,
     )
     
     print("\n" + "="*80)

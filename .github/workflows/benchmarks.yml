@@ -28,30 +28,19 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install -e .
     
-    - name: Create results directory
-      run: mkdir -p benchmarks/results benchmarks/results-docs
-    
-    - name: Run benchmark on 50 dataset
+    - name: Run benchmark script
       working-directory: benchmarks
-      run: |
-        echo "Running benchmark on 50 dataset..."
-        python benchmark_minflowdecomp.py \
-          --datasets datasets/small/Mouse.PacBio_reads_50.flow_corrected.grp.gz \
-          --min-width 1 \
-          --max-width 100
-    
-    - name: Generate markdown results for 50 dataset
-      working-directory: benchmarks
-      run: |
-        python aggregate_results.py MinFlowDecomp \
-          --format markdown \
-          --output results-docs/benchmark_50.md \
-          --metric mean
+      run: bash run_Mouse.PacBio_1_perwidth.sh results-docs 120
         
     - name: Commit benchmark results
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add benchmarks/results-docs/benchmark_50.md
+        git add benchmarks/results-docs/Mouse.PacBio_reads_1_perwidth.flow_corrected.grp.md
         git diff --staged --quiet || git commit -m "Update benchmark results [skip ci]"
         git push
+    
+    - name: Trigger documentation workflow
+      run: gh workflow run docs.yml
+      env:
+        GH_TOKEN: ${{ github.token }}
