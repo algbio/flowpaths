@@ -24,9 +24,7 @@ echo ""
 
 # Run benchmark on the small dataset
 python benchmark_minflowdecomp.py \
-    --datasets datasets/esa2025/Mouse.PacBio_reads_1_perwidth.flow_corrected.grp.gz \
-    --min-width 1 \
-    --max-width 6 \
+    --datasets datasets/catfish-data/rnaseq/salmon/sparse_quant_SRR020730.graph.gz \
     --time-limit "$TIME_LIMIT"
 
 echo ""
@@ -34,7 +32,7 @@ echo "Step 2: Viewing results in console"
 echo ""
 
 # Display results in console
-python aggregate_results.py --results-file "results/MinFlowDecomp_Mouse.PacBio_reads_1_perwidth.flow_corrected.json"
+python aggregate_results.py --results-file "results/MinFlowDecomp_sparse_quant_SRR020730.json"
 
 echo ""
 echo "Step 3: Generating markdown table"
@@ -42,7 +40,7 @@ echo ""
 
 # Generate markdown table
 python aggregate_results.py \
-    --results-file "results/MinFlowDecomp_Mouse.PacBio_reads_1_perwidth.flow_corrected.json" \
+    --results-file "results/MinFlowDecomp_sparse_quant_SRR020730.json" \
     --format markdown \
-    --output "$OUTPUT_DIR/Mouse.PacBio_reads_1_perwidth.flow_corrected.grp.md" \
+    --output "$OUTPUT_DIR/sparse_quant_SRR020730.md" \
     --metric mean

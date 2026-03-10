@@ -29,9 +29,13 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install -e .
     
-    - name: Run benchmark script
+    - name: Run benchmark script Mouse.PacBio_1_perwidth
       working-directory: benchmarks
-      run: bash run_Mouse.PacBio_1_perwidth.sh results-docs 120
+      run: bash run_Mouse.PacBio_1_perwidth.sh results-docs 180
+
+    - name: Run benchmark script SRR020730
+      working-directory: benchmarks
+      run: bash run_SRR020730.sh results-docs 180
         
     - name: Commit benchmark results
       run: |
@@ -40,7 +44,26 @@ jobs:
         git add benchmarks/results-docs/Mouse.PacBio_reads_1_perwidth.flow_corrected.grp.md
         git diff --staged --quiet || git commit -m "Update benchmark results [skip ci]"
         git push
-    
+
+    - name: Trigger documentation workflow
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'docs.yml',
+            ref: 'main'
+          })
+
+    - name: Commit benchmark results
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add benchmarks/results-docs/SRR020730.md
+        git diff --staged --quiet || git commit -m "Update benchmark results [skip ci]"
+        git push
+        
     - name: Trigger documentation workflow
       uses: actions/github-script@v7
       with:

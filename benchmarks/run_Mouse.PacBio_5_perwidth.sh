@@ -28,14 +28,15 @@ echo "Step 2: Viewing results in console"
 echo ""
 
 # Display results in console
-python aggregate_results.py MinFlowDecomp
+python aggregate_results.py --results-file "results/MinFlowDecomp_Mouse.PacBio_reads_5_perwidth.flow_corrected.json"
 
 echo ""
 echo "Step 3: Generating markdown table"
 echo ""
 
 # Generate markdown table
-python aggregate_results.py MinFlowDecomp \
+python aggregate_results.py \
+    --results-file "results/MinFlowDecomp_Mouse.PacBio_reads_5_perwidth.flow_corrected.json" \
     --format markdown \
     --output results/Mouse.PacBio_reads_5_perwidth.flow_corrected.grp.md \
     --metric mean

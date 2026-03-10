@@ -181,6 +181,32 @@ class ResultsAggregator:
 
         return dict(speedups_by_interval)
     
+    def load_from_file(self, file_path: str) -> Tuple[str, str, List[BenchmarkResult]]:
+        """
+        Load results from a specific JSON file.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to the results JSON file
+
+        Returns
+        -------
+        tuple
+            (model_name, dataset_name, list of BenchmarkResult)
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Results file not found: {file_path}")
+
+        with open(path, 'r') as f:
+            data = json.load(f)
+
+        model_name = data['model']
+        dataset_name = data['dataset']
+        results = [BenchmarkResult.from_dict(r) for r in data['results']]
+        return model_name, dataset_name, results
+
     def load_model_results(self, model_name: str) -> Dict[str, List[BenchmarkResult]]:
         """
         Load all results for a specific model across all datasets.
@@ -755,7 +781,13 @@ def main():
     
     parser.add_argument(
         'model',
-        help='Model name (e.g., MinFlowDecomp)'
+        nargs='?',
+        help='Model name (e.g., MinFlowDecomp). Required unless --results-file is given.'
+    )
+    parser.add_argument(
+        '--results-file',
+        help='Path to a specific results JSON file. When provided, a table is generated '
+             'from that file only and --results-dir / model are ignored.'
     )
     parser.add_argument(
         '--results-dir',
@@ -789,10 +821,20 @@ def main():
     
     # Load results
     aggregator = ResultsAggregator(args.results_dir)
-    results_by_dataset = aggregator.load_model_results(args.model)
+
+    if args.results_file:
+        # Load from a specific JSON file
+        model_name, dataset_name, results = aggregator.load_from_file(args.results_file)
+        results_by_dataset = {dataset_name: results}
+        effective_model = model_name
+    else:
+        if not args.model:
+            parser.error("model is required when --results-file is not provided")
+        results_by_dataset = aggregator.load_model_results(args.model)
+        effective_model = args.model
     
     if not results_by_dataset:
-        print(f"No results found for model: {args.model}")
+        print(f"No results found")
         return
     
     # Generate output
@@ -801,17 +843,17 @@ def main():
     for dataset_name, results in sorted(results_by_dataset.items()):
         if args.format == 'markdown':
             table = aggregator.generate_markdown_table(
-                args.model, dataset_name, results, args.interval_size, args.metric
+                effective_model, dataset_name, results, args.interval_size, args.metric
             )
             output_lines.append(table)
         elif args.format == 'latex':
             table = aggregator.generate_latex_table(
-                args.model, dataset_name, results, args.interval_size, args.metric
+                effective_model, dataset_name, results, args.interval_size, args.metric
             )
             output_lines.append(table)
         else:  # console
             aggregator.print_console_table(
-                args.model, dataset_name, results, args.interval_size, args.metric
+                effective_model, dataset_name, results, args.interval_size, args.metric
             )
     
     # Write to file if specified, or default to results directory
@@ -823,7 +865,7 @@ def main():
             output_dir = Path(args.results_dir)
             output_dir.mkdir(exist_ok=True)
             ext = 'md' if args.format == 'markdown' else 'tex'
-            output_path = output_dir / f"{args.model}.{ext}"
+            output_path = output_dir / f"{effective_model}.{ext}"
         
         if output_lines:
             # Make overwrite behavior explicit for generated markdown/latex exports.
