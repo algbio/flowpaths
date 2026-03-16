@@ -40,18 +40,20 @@ OPTIMIZATION_CONFIGS = {
         'optimize_with_safe_paths': False,
         'optimize_with_safe_sequences': False,
         'optimize_with_safe_zero_edges': False,
+        'optimize_with_subpath_constraints_as_safe_sequences': False,
         'optimize_with_symmetry_breaking': False,
     },
     'default': {
         # Default settings
     },
-    'no_optimizations': {
+    'safety_from_largest_antichain': {
         'optimize_with_greedy': False,
-        'optimize_with_flow_safe_paths': False,
+        'optimize_with_flow_safe_paths': True,
         'optimize_with_safe_paths': False,
         'optimize_with_safe_sequences': True,
-        'optimize_with_safe_zero_edges': False,
+        'optimize_with_safe_zero_edges': True,
         'optimize_with_symmetry_breaking': False,
+        'optimize_with_safety_from_largest_antichain': True,
     },
     'given_weights+min_gen_set+safety': {
         'optimize_with_greedy': False,
