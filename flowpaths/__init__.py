@@ -5,6 +5,8 @@ from .minflowdecompcycles import MinFlowDecompCycles
 from .kflowdecomp import kFlowDecomp
 from .kflowdecompcycles import kFlowDecompCycles
 from .kminpatherror import kMinPathError
+from .kmindiscordantnodes import kMinDiscordantNodes
+from .minpathsmindiscordantnodes import MinPathsMinDiscordantNodes
 from .kminpatherrorcycles import kMinPathErrorCycles
 from .kleastabserrors import kLeastAbsErrors
 from .kleastabserrorscycles import kLeastAbsErrorsCycles
@@ -25,10 +27,12 @@ __all__ = [
     "AbstractPathModelDAG",
     "AbstractWalkModelDiGraph",
     "MinFlowDecomp",
-    "MinFlowDecompCycles"
+    "MinFlowDecompCycles",
     "kFlowDecomp",
     "kFlowDecompCycles",
     "kMinPathError",
+    "kMinDiscordantNodes",
+    "MinPathsMinDiscordantNodes",
     "kMinPathErrorCycles",
     "kLeastAbsErrors",
     "kLeastAbsErrorsCycles",

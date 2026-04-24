@@ -107,6 +107,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         self.lowerbound_k = None
         self._solution = None
         self.solve_statistics = None
+        self._is_solved = False
 
         utils.logger.info(f"{__name__}: created NumPathsOptimization with model_type = {model_type}")
 
@@ -152,6 +153,8 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         previous_solution_objective_value = None
         solve_status = None
         found_feasible = False
+        previous_feasible_model = None
+        selected_model = None
 
         for k in range(max(self.min_num_paths,self.get_lowerbound_k()), self.max_num_paths+1):
             # Create the model
@@ -164,21 +167,28 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, current_solution_objective_value = {current_solution_objective_value}")
                 if self.stop_on_first_feasible:
                     solve_status = NumPathsOptimization.solved_status_name
+                    selected_model = model
                     break
-                if self.stop_on_delta_abs:
-                    if previous_solution_objective_value is None:
-                        previous_solution_objective_value = current_solution_objective_value
-                    else:
+                if previous_solution_objective_value is not None:
+                    if self.stop_on_delta_abs is not None:
                         if abs(previous_solution_objective_value - current_solution_objective_value) <= self.stop_on_delta_abs:
                             solve_status = NumPathsOptimization.solved_status_name
+                            selected_model = previous_feasible_model
                             break
-                if self.stop_on_delta_rel:
-                    if previous_solution_objective_value is None:
-                        previous_solution_objective_value = current_solution_objective_value
-                    else:
-                        if abs(previous_solution_objective_value - current_solution_objective_value) / previous_solution_objective_value <= self.stop_on_delta_rel:
+                    if self.stop_on_delta_rel is not None:
+                        abs_delta = abs(previous_solution_objective_value - current_solution_objective_value)
+                        if previous_solution_objective_value == 0:
+                            if abs_delta == 0:
+                                solve_status = NumPathsOptimization.solved_status_name
+                                selected_model = previous_feasible_model
+                                break
+                        elif abs_delta / abs(previous_solution_objective_value) <= self.stop_on_delta_rel:
                             solve_status = NumPathsOptimization.solved_status_name
+                            selected_model = previous_feasible_model
                             break
+
+                previous_feasible_model = model
+                previous_solution_objective_value = current_solution_objective_value
             else:
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, model is not solved")
             if self.solve_time_elapsed > self.time_limit:
@@ -198,10 +208,12 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             }
 
         if solve_status == NumPathsOptimization.solved_status_name:
-            self._solution = model.get_solution()
+            if selected_model is None:
+                selected_model = model
+            self._solution = selected_model.get_solution()
             self.set_solved()
-            self.solve_statistics.update(model.solve_statistics)
-            self.model = model
+            self.solve_statistics.update(selected_model.solve_statistics)
+            self.model = selected_model
             return True
             
         return False

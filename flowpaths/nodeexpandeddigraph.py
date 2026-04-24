@@ -465,4 +465,46 @@ class NodeExpandedDiGraph(nx.DiGraph):
                     condensed_graph.nodes[node][self.node_length_attr] = self.edges[expanded_edge][self.node_length_attr]
                 
         return condensed_graph
+
+    def get_condensed_node(self, expanded_edge):
+        """
+        Condense a single expanded-graph edge to the corresponding original node.
+
+        If `expanded_edge` is not an expanded node-edge of the form `(node.0, node.1)`,
+        this returns `None`.
+
+        Parameters
+        ----------
+        - `expanded_edge : tuple`
+
+            Expanded-graph edge `(u, v)`.
+
+        Returns
+        -------
+        - `str | None`
+
+            Original node name if `expanded_edge` corresponds to a node edge,
+            otherwise `None`.
+        """
+
+        if not (isinstance(expanded_edge, tuple) and len(expanded_edge) == 2):
+            utils.logger.error(f"{__name__}: expanded_edge must be a tuple (u, v), not {expanded_edge}.")
+            raise ValueError(f"expanded_edge must be a tuple (u, v), not {expanded_edge}.")
+
+        u, v = expanded_edge
+        if not (isinstance(u, str) and isinstance(v, str)):
+            return None
+        if not (u.endswith('.0') and v.endswith('.1')):
+            return None
+
+        original_u = u[:-2]
+        original_v = v[:-2]
+        if original_u != original_v:
+            return None
+        if original_u in [self.global_source_id, self.global_sink_id]:
+            return None
+        if original_u not in self.original_G.nodes:
+            return None
+
+        return original_u
     
