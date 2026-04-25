@@ -174,3 +174,67 @@ def test_num_paths_optimization_delta_rel_branching_graph_keeps_previous_k():
     # k=1 infeasible due branching edge coverage, k=2 feasible, and first small relative delta is between k=2 and k=3.
     assert model.model.k == 2
     assert model.get_objective_value() == 1
+
+
+def test_num_paths_optimization_get_solution_accepts_remove_empty_paths_flag():
+    graph = nx.DiGraph()
+    graph.add_node("s", flow=5)
+    graph.add_node("a", flow=10)
+    graph.add_node("t", flow=5)
+    graph.add_edge("s", "a")
+    graph.add_edge("a", "t")
+
+    model = fp.NumPathsOptimization(
+        model_type=fp.kMinDiscordantNodes,
+        stop_on_delta_rel=0.01,
+        min_num_paths=1,
+        max_num_paths=4,
+        G=graph,
+        flow_attr="flow",
+        weight_type=int,
+        discordance_tolerance=0.0,
+        solver_options=SOLVER_OPTIONS,
+    )
+
+    model.solve()
+
+    assert model.is_solved()
+    solution = model.get_solution(remove_empty_paths=True)
+    assert "paths" in solution
+    assert "weights" in solution
+
+
+def test_num_paths_optimization_remove_empty_paths_filters_aligned_lists():
+    graph = nx.DiGraph()
+    graph.add_node("s", flow=1)
+    graph.add_node("t", flow=1)
+    graph.add_edge("s", "t")
+
+    model = fp.NumPathsOptimization(
+        model_type=fp.kMinDiscordantNodes,
+        stop_on_delta_abs=0,
+        min_num_paths=1,
+        max_num_paths=2,
+        G=graph,
+        flow_attr="flow",
+        weight_type=int,
+        discordance_tolerance=0.0,
+        solver_options=SOLVER_OPTIONS,
+    )
+
+    model._solution = {
+        "paths": [["s"], ["s", "t"]],
+        "weights": [3, 7],
+        "slacks": [1, 2],
+        "discordant_nodes": ["x", "y"],
+    }
+    model.set_solved()
+
+    filtered = model.get_solution(remove_empty_paths=True)
+    unfiltered = model.get_solution(remove_empty_paths=False)
+
+    assert filtered["paths"] == [["s", "t"]]
+    assert filtered["weights"] == [7]
+    assert filtered["slacks"] == [2]
+    assert filtered["discordant_nodes"] == ["y"]
+    assert unfiltered["paths"] == [["s"], ["s", "t"]]

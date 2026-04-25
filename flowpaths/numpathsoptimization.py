@@ -1,4 +1,5 @@
 import time
+import copy
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils as utils
 
@@ -210,7 +211,12 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         if solve_status == NumPathsOptimization.solved_status_name:
             if selected_model is None:
                 selected_model = model
-            self._solution = selected_model.get_solution()
+            try:
+                # Store the unfiltered solution when the wrapped model supports it,
+                # so callers can decide whether to remove empty paths.
+                self._solution = selected_model.get_solution(remove_empty_paths=False)
+            except TypeError:
+                self._solution = selected_model.get_solution()
             self.set_solved()
             self.solve_statistics.update(selected_model.solve_statistics)
             self.model = selected_model
@@ -218,9 +224,41 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             
         return False
 
-    def get_solution(self):
+    def _remove_empty_paths(self, solution):
+        """
+        Removes empty paths from a solution dictionary.
+
+        A path is considered non-empty if it has at least two nodes.
+        Lists aligned with "paths" (for example, "weights" and "slacks")
+        are filtered consistently.
+        """
+
+        if solution is None or "paths" not in solution:
+            return solution
+
+        solution_copy = copy.deepcopy(solution)
+        keep_indices = [idx for idx, path in enumerate(solution_copy["paths"]) if len(path) > 1]
+
+        solution_copy["paths"] = [solution_copy["paths"][idx] for idx in keep_indices]
+
+        for key, value in solution_copy.items():
+            if key == "paths":
+                continue
+            if isinstance(value, list) and len(value) == len(solution["paths"]):
+                solution_copy[key] = [value[idx] for idx in keep_indices]
+
+        return solution_copy
+
+    def get_solution(self, remove_empty_paths=False):
         """
         Retrieves the solution for the flow decomposition problem.
+
+        Parameters
+        ----------
+        - `remove_empty_paths: bool`, optional
+
+            If True, remove empty paths (paths with fewer than two nodes)
+            and filter aligned list fields consistently. Default is False.
 
         Returns
         -------
@@ -236,7 +274,15 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         """
 
         self.check_is_solved()
-        return self._solution
+        if self._solution is not None:
+            return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
+
+        try:
+            self._solution = self.model.get_solution(remove_empty_paths=False)
+        except TypeError:
+            self._solution = self.model.get_solution()
+
+        return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
     
     def get_objective_value(self):
         """

@@ -182,6 +182,201 @@ def read_graphs(filename):
     return graphs
 
 
+def read_ngraph(graph_raw) -> nx.DiGraph:
+    """
+    Parse a single node-weighted ngraph block from a list of lines.
+
+    Expected block structure:
+        - one or more leading header lines starting with '#'
+          (optional #S constraints can appear here)
+        - one line with the number of nodes n
+        - a marker line starting with '#NODES'
+        - exactly n node lines: "node_id node_weight"
+        - a marker line starting with '#EDGES'
+        - zero or more edge lines: "u v edge_weight"
+
+    Constraint lines:
+        - '#S n1 n2 n3 ...' lines define subpath constraints.
+        - Duplicates are filtered by exact node sequence.
+        - Constraints are stored in G.graph['constraints'] as edge lists.
+    """
+
+    idx = 0
+    header_lines = []
+    constraint_subpaths = []
+    subpaths_seen = set()
+
+    # Parse leading header lines and #S constraints.
+    while idx < len(graph_raw) and graph_raw[idx].lstrip().startswith("#"):
+        stripped = graph_raw[idx].lstrip()
+        if stripped.startswith("#S"):
+            nodes_part = stripped[2:].strip()
+            if nodes_part:
+                nodes_seq = nodes_part.split()
+                seq_key = tuple(nodes_seq)
+                if seq_key not in subpaths_seen:
+                    subpaths_seen.add(seq_key)
+                    edges_list = [(u, v) for u, v in zip(nodes_seq, nodes_seq[1:])]
+                    if edges_list:
+                        constraint_subpaths.append(edges_list)
+        else:
+            header_lines.append(stripped.lstrip("#").strip())
+        idx += 1
+
+    graph_id = header_lines[0] if header_lines else str(id(graph_raw))
+
+    while idx < len(graph_raw) and graph_raw[idx].strip() == "":
+        idx += 1
+
+    if idx >= len(graph_raw):
+        error_msg = "ngraph block missing node-count line."
+        utils.logger.error(f"{__name__}: {error_msg}")
+        raise ValueError(error_msg)
+
+    try:
+        n = int(graph_raw[idx].strip())
+    except ValueError:
+        utils.logger.error(f"{__name__}: Invalid ngraph node-count line: {graph_raw[idx].rstrip()}.")
+        raise
+
+    idx += 1
+    while idx < len(graph_raw) and graph_raw[idx].strip() == "":
+        idx += 1
+
+    if idx >= len(graph_raw) or not graph_raw[idx].lstrip().startswith("#NODES"):
+        error_msg = "ngraph block missing #NODES section marker."
+        utils.logger.error(f"{__name__}: {error_msg}")
+        raise ValueError(error_msg)
+    idx += 1
+
+    G = nx.DiGraph()
+    G.graph["id"] = graph_id
+    G.graph["constraints"] = constraint_subpaths
+
+    # Read exactly n node lines.
+    nodes_read = 0
+    while idx < len(graph_raw) and nodes_read < n:
+        line = graph_raw[idx].strip()
+        idx += 1
+        if line == "":
+            continue
+        if line.lstrip().startswith("#"):
+            utils.logger.error(f"{__name__}: Unexpected comment in #NODES section: {line}")
+            raise ValueError(f"Unexpected comment in #NODES section: {line}")
+        elements = line.split()
+        if len(elements) != 2:
+            utils.logger.error(f"{__name__}: Invalid node format in ngraph: {line}")
+            raise ValueError(f"Invalid node format in ngraph: {line}")
+        node_id, weight_str = elements
+        try:
+            weight = float(weight_str)
+        except ValueError:
+            utils.logger.error(f"{__name__}: Invalid node weight in ngraph: {line}")
+            raise
+        G.add_node(node_id.strip(), flow=weight)
+        nodes_read += 1
+
+    if nodes_read != n:
+        error_msg = f"ngraph node section ended early: expected {n}, read {nodes_read}."
+        utils.logger.error(f"{__name__}: {error_msg}")
+        raise ValueError(error_msg)
+
+    while idx < len(graph_raw) and graph_raw[idx].strip() == "":
+        idx += 1
+
+    if idx >= len(graph_raw) or not graph_raw[idx].lstrip().startswith("#EDGES"):
+        error_msg = "ngraph block missing #EDGES section marker."
+        utils.logger.error(f"{__name__}: {error_msg}")
+        raise ValueError(error_msg)
+    idx += 1
+
+    # Parse edges until the end of the block.
+    for line in graph_raw[idx:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if line.lstrip().startswith("#"):
+            comment = line.lstrip()
+            # Allow additional #S lines after #EDGES for flexibility.
+            if comment.startswith("#S"):
+                nodes_part = comment[2:].strip()
+                if nodes_part:
+                    nodes_seq = nodes_part.split()
+                    seq_key = tuple(nodes_seq)
+                    if seq_key not in subpaths_seen:
+                        subpaths_seen.add(seq_key)
+                        edges_list = [(u, v) for u, v in zip(nodes_seq, nodes_seq[1:])]
+                        if edges_list:
+                            constraint_subpaths.append(edges_list)
+            continue
+
+        elements = stripped.split()
+        if len(elements) != 3:
+            utils.logger.error(f"{__name__}: Invalid edge format in ngraph: {line.rstrip()}")
+            raise ValueError(f"Invalid edge format in ngraph: {line.rstrip()}")
+
+        u, v, w_str = elements
+        try:
+            w = float(w_str)
+        except ValueError:
+            utils.logger.error(f"{__name__}: Invalid edge weight in ngraph: {line.rstrip()}")
+            raise
+
+        if u not in G.nodes or v not in G.nodes:
+            utils.logger.error(
+                f"{__name__}: Edge ({u}, {v}) references unknown node in graph {graph_id}."
+            )
+            raise ValueError(f"Edge ({u}, {v}) references unknown node in ngraph.")
+
+        G.add_edge(u.strip(), v.strip(), flow=w)
+
+    # For ngraph, constraints can encode node-pair evidence (MultiTrans R),
+    # which is not necessarily an existing edge. Validate only node existence.
+    for subpath in constraint_subpaths:
+        for (u, v) in subpath:
+            if u not in G.nodes or v not in G.nodes:
+                utils.logger.error(
+                    f"{__name__}: Constraint references unknown nodes ({u}, {v}) in ngraph {graph_id}."
+                )
+                raise ValueError(f"Constraint references unknown nodes ({u}, {v}).")
+
+    G.graph["n"] = G.number_of_nodes()
+    G.graph["m"] = G.number_of_edges()
+    from flowpaths import stdigraph as _stdigraph  # type: ignore
+    G.graph["w"] = _stdigraph.stDiGraph(G).get_width()
+
+    return G
+
+
+def read_ngraphs(filename):
+    """
+    Read one or more ngraph blocks from a file.
+
+    Graph blocks are delimited by lines starting with '# graph' (case-insensitive).
+    If no such delimiter exists, the whole file is parsed as one ngraph block.
+    """
+
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    starts = []
+    for i, line in enumerate(lines):
+        stripped = line.lstrip().lower()
+        if stripped.startswith("# graph") or stripped.startswith("#graph"):
+            starts.append(i)
+
+    if len(starts) == 0:
+        return [read_ngraph(lines)]
+
+    graphs = []
+    for idx, start in enumerate(starts):
+        end = starts[idx + 1] if idx + 1 < len(starts) else len(lines)
+        graphs.append(read_ngraph(lines[start:end]))
+
+    return graphs
+
+
 def min_cost_flow(G: nx.DiGraph, s, t, demands_attr = 'l', capacities_attr = 'u', costs_attr = 'c') -> tuple:
 
     flowNetwork = nx.DiGraph()
