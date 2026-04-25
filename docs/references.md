@@ -16,6 +16,10 @@ Journal of Computational Biology 29(11), 1--16, 2022
 [**Accurate Flow Decomposition via Robust Integer Linear Programming**](https://doi.org/10.1109/TCBB.2024.3433523)
 IEEE/ACM Transactions on Computational Biology and Bioinformatics 21(6), 1955-1964, 2024 [**(preprint)**](https://researchportal.helsinki.fi/files/325850154/TCBB3433523.pdf)
 
+5. Jin Zhao, Haodi Feng, Daming Zhu, Yu Lin,
+[**MultiTrans: An Algorithm for Path Extraction Through Mixed Integer Linear Programming for Transcriptome Assembly**](https://doi.org/10.1109/TCBB.2021.3083277),
+IEEE/ACM Transactions on Computational Biology and Bioinformatics 19(1), 48-56, 2022
+
 
 The flow decomposition with subpath constraints problem was formalized in:
 

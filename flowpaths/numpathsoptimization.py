@@ -1,9 +1,12 @@
 import time
 import copy
 import flowpaths.abstractpathmodeldag as pathmodel
+import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
 
-class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inherit from AbstractPathModelDAG to be able to use this class to also compute safe paths, 
+class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWalkModelDiGraph):
+    # We inherit both abstract bases so this optimizer can wrap either DAG path
+    # models or cyclic walk models while exposing a unified API.
     
     # Storing some status names
     solved_status_name = "solved"
@@ -13,7 +16,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
     def __init__(
         self,
-        model_type: pathmodel.AbstractPathModelDAG,
+        model_type,
         stop_on_first_feasible: bool = None,
         stop_on_delta_abs: float = None,
         stop_on_delta_rel: float = None,
@@ -23,15 +26,17 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         **kwargs,
     ):
         """
-        This is a generic class to find the "best" number of paths optimization problems implemented using `AbstractPathModelDAG`,
-        and which are parameterized by the number of paths to be considered.
-        The class iterates over a range of path numbers `k`, creating and  
-        solving a model for each path number until one of the stopping conditions is met.
+        This is a generic class to find the "best" number of path/walks for optimization
+        problems implemented using `AbstractPathModelDAG` or
+        `AbstractWalkModelDiGraph`, and parameterized by the number of
+        paths/walks considered.
+        The class iterates over a range of `k` values, creating and
+        solving a model for each path/walk count until one of the stopping conditions is met.
         
         Parameters
         ----------
 
-        - `model_type : AbstractPathModelDAG`
+        - `model_type`
 
             The type of the model used for optimization.
 
@@ -56,12 +61,13 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
         - `min_num_paths : int`, optional
 
-            Minimum number of paths to be considered in the optimization.
-            Default is 1. The class will also call `get_lowerbound_k()` on the `model_type` and the provided arguments to get a better lower bound for the number of paths.
+            Minimum number of paths/walks to be considered in the optimization.
+            Default is 1. The class will also call `get_lowerbound_k()` on the
+            `model_type` and the provided arguments to get a better lower bound.
 
         - `max_num_paths : int`, optional
             
-            Maximum number of paths to be computed.
+            Maximum number of paths/walks to be computed.
             Default is `2**64`.
 
         - `time_limit : float`, optional
@@ -103,7 +109,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             )
         
         if 'k' in self.kwargs:
-            raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths according to the stopping criteria.")
+            raise ValueError("Do not pass the parameter `k` in the keyword arguments of NumPathsOptimization. This will be iterated over internally to find the best number of paths/walks according to the stopping criteria.")
         
         self.lowerbound_k = None
         self._solution = None
@@ -112,14 +118,33 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
         utils.logger.info(f"{__name__}: created NumPathsOptimization with model_type = {model_type}")
 
+    def _get_unfiltered_solution_from_model(self, model):
+        """
+        Retrieve solution from wrapped model without removing empty paths/walks,
+        regardless of whether the model exposes `remove_empty_paths` or
+        `remove_empty_walks`.
+        """
+
+        try:
+            return model.get_solution(remove_empty_paths=False)
+        except TypeError:
+            pass
+
+        try:
+            return model.get_solution(remove_empty_walks=False)
+        except TypeError:
+            pass
+
+        return model.get_solution()
+
     def solve(self) -> bool:
         """
-        Attempts to solve the optimization problem by iterating over a range of path counts, creating and
+        Attempts to solve the optimization problem by iterating over a range of `k` values, creating and
         solving a model for each count until one of the stopping conditions is met.
         The method iterates from the maximum between the minimum allowed paths and a lower bound (via
         `get_lowerbound_k()` of the model) to the maximum allowed paths. For each iteration:
 
-        - Creates a model instance with the current number of paths (`k`).
+        - Creates a model instance with the current number of paths/walks (`k`).
         - Solves the model, and checks if it has been successfully solved.
         - Applies various stopping criteria including:
 
@@ -211,12 +236,9 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
         if solve_status == NumPathsOptimization.solved_status_name:
             if selected_model is None:
                 selected_model = model
-            try:
-                # Store the unfiltered solution when the wrapped model supports it,
-                # so callers can decide whether to remove empty paths.
-                self._solution = selected_model.get_solution(remove_empty_paths=False)
-            except TypeError:
-                self._solution = selected_model.get_solution()
+            # Store the unfiltered solution when the wrapped model supports it,
+            # so callers can decide whether to remove empty paths/walks.
+            self._solution = self._get_unfiltered_solution_from_model(selected_model)
             self.set_solved()
             self.solve_statistics.update(selected_model.solve_statistics)
             self.model = selected_model
@@ -224,40 +246,54 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
             
         return False
 
-    def _remove_empty_paths(self, solution):
+    def _remove_empty_sequences(self, solution):
         """
-        Removes empty paths from a solution dictionary.
+        Removes empty paths/walks from a solution dictionary.
 
-        A path is considered non-empty if it has at least two nodes.
-        Lists aligned with "paths" (for example, "weights" and "slacks")
+        A path/walk is considered non-empty if it has at least two nodes.
+        Lists aligned with the sequence list (for example, "weights" and
+        "slacks")
         are filtered consistently.
         """
 
-        if solution is None or "paths" not in solution:
+        if solution is None:
+            return solution
+
+        sequence_key = None
+        if "paths" in solution:
+            sequence_key = "paths"
+        elif "walks" in solution:
+            sequence_key = "walks"
+
+        if sequence_key is None:
             return solution
 
         solution_copy = copy.deepcopy(solution)
-        keep_indices = [idx for idx, path in enumerate(solution_copy["paths"]) if len(path) > 1]
+        keep_indices = [
+            idx
+            for idx, seq in enumerate(solution_copy[sequence_key])
+            if len(seq) > 1
+        ]
 
-        solution_copy["paths"] = [solution_copy["paths"][idx] for idx in keep_indices]
+        solution_copy[sequence_key] = [solution_copy[sequence_key][idx] for idx in keep_indices]
 
         for key, value in solution_copy.items():
-            if key == "paths":
+            if key == sequence_key:
                 continue
-            if isinstance(value, list) and len(value) == len(solution["paths"]):
+            if isinstance(value, list) and len(value) == len(solution[sequence_key]):
                 solution_copy[key] = [value[idx] for idx in keep_indices]
 
         return solution_copy
 
     def get_solution(self, remove_empty_paths=False):
         """
-        Retrieves the solution for the flow decomposition problem.
+        Retrieves the solution from the wrapped model.
 
         Parameters
         ----------
         - `remove_empty_paths: bool`, optional
 
-            If True, remove empty paths (paths with fewer than two nodes)
+            If True, remove empty paths/walks (fewer than two nodes)
             and filter aligned list fields consistently. Default is False.
 
         Returns
@@ -265,7 +301,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
         - `solution: dict`
         
-            The solution obtained from the model
+            The solution obtained from the wrapped model.
 
         Raises
         -------
@@ -275,14 +311,11 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
 
         self.check_is_solved()
         if self._solution is not None:
-            return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
+            return self._remove_empty_sequences(self._solution) if remove_empty_paths else self._solution
 
-        try:
-            self._solution = self.model.get_solution(remove_empty_paths=False)
-        except TypeError:
-            self._solution = self.model.get_solution()
+        self._solution = self._get_unfiltered_solution_from_model(self.model)
 
-        return self._remove_empty_paths(self._solution) if remove_empty_paths else self._solution
+        return self._remove_empty_sequences(self._solution) if remove_empty_paths else self._solution
     
     def get_objective_value(self):
         """
@@ -301,7 +334,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG): # Note that we inher
     
     def get_lowerbound_k(self):
         
-        # Returns the lowerbound for the number of paths, by calling the `get_lowerbound_k()` method of the model.
+        # Returns the lower bound for number of paths/walks using wrapped model's `get_lowerbound_k()`.
 
         if self.lowerbound_k != None:
             return self.lowerbound_k

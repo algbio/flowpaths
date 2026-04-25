@@ -87,6 +87,10 @@ if mfd_solver.is_solved():
 - [**_k_-Minimum Path Error**](https://algbio.github.io/flowpaths/k-min-path-error.html): Given a graph with weights on its edges, and a number $k$, find $k$ weighted paths / walks, with associated *slack* values, such that:
     - The error of each edge (defined as in $k$-Least Absolute Errors above) is at most the sum of the slacks of the paths / walks going through the edge, and
     - The sum of path / walk slacks is minimized.
+
+- [**_k_-Minimum Discordant Nodes**](https://algbio.github.io/flowpaths/k-min-discordant-nodes.html): Given a graph with flows on nodes and a number $k$, find $k$ weighted paths / walks minimizing the number of nodes whose explained flow deviates from the observed node flow beyond a tolerance.
+
+- [**Minimum-Paths Minimum Discordant Nodes**](https://algbio.github.io/flowpaths/min-paths-min-discordant-nodes.html): Automatically optimize over $k$ (with `NumPathsOptimization`) for the k-Minimum Discordant Nodes objective, in both DAG and cyclic-graph variants.
  
 - [**Minimum Path Cover**](https://algbio.github.io/flowpaths/minimum-path-cover.html): Given a graph and node sets _S_ and _T_, find a minimum number of _S-T_ paths (if the graph is acyclic) or _S-T_ walks (if the graph has cycles) such that every edge appears in at least one path or walk.
 

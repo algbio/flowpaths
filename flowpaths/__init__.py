@@ -6,7 +6,9 @@ from .kflowdecomp import kFlowDecomp
 from .kflowdecompcycles import kFlowDecompCycles
 from .kminpatherror import kMinPathError
 from .kmindiscordantnodes import kMinDiscordantNodes
+from .kmindiscordantnodescycles import kMinDiscordantNodesCycles
 from .minpathsmindiscordantnodes import MinPathsMinDiscordantNodes
+from .minpathsmindiscordantnodescycles import MinPathsMinDiscordantNodesCycles
 from .kminpatherrorcycles import kMinPathErrorCycles
 from .kleastabserrors import kLeastAbsErrors
 from .kleastabserrorscycles import kLeastAbsErrorsCycles
@@ -32,7 +34,9 @@ __all__ = [
     "kFlowDecompCycles",
     "kMinPathError",
     "kMinDiscordantNodes",
+    "kMinDiscordantNodesCycles",
     "MinPathsMinDiscordantNodes",
+    "MinPathsMinDiscordantNodesCycles",
     "kMinPathErrorCycles",
     "kLeastAbsErrors",
     "kLeastAbsErrorsCycles",

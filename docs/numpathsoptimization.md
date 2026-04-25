@@ -27,4 +27,9 @@ mfd_model = fp.NumPathsOptimization(
         )
 ```
 
+This routine is also used by specialized wrappers that optimize $k$ automatically for the Minimum Discordant Nodes objective:
+
+- [Minimum-Paths Minimum Discordant Nodes](min-paths-min-discordant-nodes.md)
+- [Minimum-Paths Minimum Discordant Nodes in General Graphs](min-paths-min-discordant-nodes-cycles.md)
+
 ::: flowpaths.numpathsoptimization
