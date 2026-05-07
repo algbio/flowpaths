@@ -31,12 +31,19 @@ This class implements a more general version, as follows:
 2. The paths can start/end not only in source/sink nodes, but also in given sets of start/end nodes (set parameters `additional_starts` and `additional_ends`). See also [Additional start/end nodes](additional-start-end-nodes.md).
 3. The above summation can happen only over a given subset $E' \subseteq E$ of the edges (set parameter `elements_to_ignore` to be $E \setminus E'$), 
 4. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ is equivalent to adding the edge $(u,v)$ to `elements_to_ignore`; the latter option is more efficient, as it results in a smaller model.
+5. You can optionally add extra candidate edges not present in the original graph via `additional_edges` $E_{\mathrm{add}}$. Their usage can be penalized in the objective via `additional_edges_lambda` $\lambda_{\mathrm{add}}$, where each additional edge is counted at most once, even if multiple paths use it. See also [additional edges and usage penalty documentation](additional-edges-penalty.md).
 
 !!! info "Generalized objective function"
-    Formally, the minimized objective function generalized as in 3. and 4. above is:
+    Formally, with 3.-5. above, the minimized objective function is:
     $$
-    \sum_{(u,v) \in E'} \lambda_{(u,v)} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right|.
+    \sum_{(u,v) \in E'} \lambda_{(u,v)} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right|
+    + \lambda_{\mathrm{add}} \cdot \sum_{e \in E_{\mathrm{add}}} \mathbf{1}[e\ \text{is used by at least one path}].
     $$
+
+!!! note "About additional edges"
+    - Additional edges must not already exist in the original graph.
+    - Both endpoints of each additional edge must be present in the graph.
+    - Additional edges are not included in the edge-error term; they only contribute through the penalty term above.
 
 
 ::: flowpaths.kleastabserrors

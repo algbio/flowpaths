@@ -61,7 +61,6 @@ class AbstractPathModelDAG(ABC):
     optimize_with_safety_from_largest_antichain = False
     optimize_with_symmetry_breaking_lexicographic_paths = True
     optimize_with_lp_tightening_constraints = True
-    optimize_with_deterministic_propagation_from_fixed_edges = True
 
     def __init__(
         self,
@@ -217,7 +216,6 @@ class AbstractPathModelDAG(ABC):
         self.optimize_with_subpath_constraints_as_safe_sequences = optimization_options.get("optimize_with_subpath_constraints_as_safe_sequences", AbstractPathModelDAG.optimize_with_subpath_constraints_as_safe_sequences)
         self.optimize_with_symmetry_breaking_lexicographic_paths = optimization_options.get("optimize_with_symmetry_breaking_lexicographic_paths", AbstractPathModelDAG.optimize_with_symmetry_breaking_lexicographic_paths)
         self.optimize_with_lp_tightening_constraints = optimization_options.get("optimize_with_lp_tightening_constraints", AbstractPathModelDAG.optimize_with_lp_tightening_constraints)
-        self.optimize_with_deterministic_propagation_from_fixed_edges = optimization_options.get("optimize_with_deterministic_propagation_from_fixed_edges", AbstractPathModelDAG.optimize_with_deterministic_propagation_from_fixed_edges)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
@@ -561,7 +559,6 @@ class AbstractPathModelDAG(ABC):
             utils.logger.debug(f"{__name__}: Fixed {self.solve_statistics['edge_variables=1']} edge variables to 1 via safety optimizations.")
 
             self._apply_safety_optimizations_fix_zero_edges()
-            self._apply_deterministic_propagation_from_fixed_edges()
 
     def _apply_safety_optimizations_fix_zero_edges(self):
         """
@@ -649,184 +646,6 @@ class AbstractPathModelDAG(ABC):
         self.solve_statistics["optimizations_applied"].add("optimize_with_safe_zero_edges")
         self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
         utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
-
-    def _apply_deterministic_propagation_from_fixed_edges(self):
-        """
-        Apply deterministic fixed-point propagation on edge binaries using already fixed
-        values and hard path constraints.
-
-        It can derive additional fixes to 0 and 1 from:
-        - source-outgoing cardinality constraints,
-        - internal flow conservation constraints,
-        - and optional LP-tightening caps/source-sink balance when enabled.
-        """
-
-        if not self.optimize_with_deterministic_propagation_from_fixed_edges:
-            return
-
-        if self.is_solved():
-            return
-
-        propagated_zero_count = 0
-        propagated_one_count = 0
-
-        def _status(edge_key):
-            if edge_key in self.edges_set_to_one:
-                return 1
-            if edge_key in self.edges_set_to_zero:
-                return 0
-            return None
-
-        def _fix(edge_key, value):
-            nonlocal propagated_zero_count, propagated_one_count
-
-            current = _status(edge_key)
-            if current == value:
-                return False
-            if current is not None and current != value:
-                utils.logger.error(
-                    f"{__name__}: inconsistent deterministic propagation on edge {edge_key}, "
-                    f"existing={current}, new={value}."
-                )
-                raise ValueError(
-                    f"Inconsistent deterministic propagation on edge {edge_key}, existing={current}, new={value}."
-                )
-
-            u, v, i = edge_key
-            self.solver.add_constraint(
-                self.edge_vars[edge_key] == value,
-                name=f"det_prop_i={i}_u={u}_v={v}_val={value}",
-            )
-
-            if value == 1:
-                self.edges_set_to_one[edge_key] = True
-                propagated_one_count += 1
-            else:
-                self.edges_set_to_zero[edge_key] = True
-                propagated_zero_count += 1
-
-            return True
-
-        def _bounds(edge_keys, cap=None):
-            fixed_ones = 0
-            unfixed = 0
-            for edge_key in edge_keys:
-                s = _status(edge_key)
-                if s == 1:
-                    fixed_ones += 1
-                elif s is None:
-                    unfixed += 1
-
-            lb = fixed_ones
-            ub = fixed_ones + unfixed
-            if cap is not None:
-                ub = min(ub, cap)
-            return lb, ub
-
-        def _propagate_group(edge_keys, required_lb, required_ub):
-            changed_group = False
-
-            while True:
-                fixed_ones = 0
-                unfixed_keys = []
-                for edge_key in edge_keys:
-                    s = _status(edge_key)
-                    if s == 1:
-                        fixed_ones += 1
-                    elif s is None:
-                        unfixed_keys.append(edge_key)
-
-                if fixed_ones > required_ub or fixed_ones + len(unfixed_keys) < required_lb:
-                    utils.logger.error(
-                        f"{__name__}: deterministic propagation found infeasible cardinality "
-                        f"range [{required_lb},{required_ub}] with fixed_ones={fixed_ones}, "
-                        f"unfixed={len(unfixed_keys)}."
-                    )
-                    raise ValueError(
-                        f"Deterministic propagation found infeasible cardinality range [{required_lb},{required_ub}] "
-                        f"with fixed_ones={fixed_ones}, unfixed={len(unfixed_keys)}."
-                    )
-
-                local_changed = False
-                for edge_key in list(unfixed_keys):
-                    # If keeping edge_key at 0 makes lower bound unreachable, edge_key must be 1.
-                    if fixed_ones + (len(unfixed_keys) - 1) < required_lb:
-                        if _fix(edge_key, 1):
-                            fixed_ones += 1
-                            unfixed_keys.remove(edge_key)
-                            local_changed = True
-                            changed_group = True
-                        continue
-
-                    # If upper bound is already met by fixed 1s, all remaining are forced to 0.
-                    if fixed_ones >= required_ub:
-                        if _fix(edge_key, 0):
-                            unfixed_keys.remove(edge_key)
-                            local_changed = True
-                            changed_group = True
-
-                if not local_changed:
-                    break
-
-            return changed_group
-
-        changed = True
-        while changed:
-            changed = False
-
-            for i in range(self.k):
-                source_out_keys = [(self.G.source, v, i) for v in self.G.successors(self.G.source)]
-                source_lb = 0 if self.allow_empty_paths else 1
-                source_ub = 1
-                if _propagate_group(source_out_keys, source_lb, source_ub):
-                    changed = True
-
-                if self.optimize_with_lp_tightening_constraints:
-                    sink_in_keys = [(u, self.G.sink, i) for u in self.G.predecessors(self.G.sink)]
-                    if _propagate_group(sink_in_keys, source_lb, source_ub):
-                        changed = True
-
-                for v in self.G.nodes:
-                    if v == self.G.source or v == self.G.sink:
-                        continue
-
-                    in_keys = [(u, v, i) for u in self.G.predecessors(v)]
-                    out_keys = [(v, w, i) for w in self.G.successors(v)]
-
-                    cap = 1 if self.optimize_with_lp_tightening_constraints else None
-                    min_in, max_in = _bounds(in_keys, cap=cap)
-                    min_out, max_out = _bounds(out_keys, cap=cap)
-
-                    required_lb = max(min_in, min_out)
-                    required_ub = min(max_in, max_out)
-                    if required_lb > required_ub:
-                        utils.logger.error(
-                            f"{__name__}: deterministic propagation found no feasible balance at node={v}, layer={i}, "
-                            f"in=[{min_in},{max_in}] out=[{min_out},{max_out}]."
-                        )
-                        raise ValueError(
-                            f"Deterministic propagation found no feasible balance at node={v}, layer={i}, "
-                            f"in=[{min_in},{max_in}] out=[{min_out},{max_out}]."
-                        )
-
-                    if _propagate_group(in_keys, required_lb, required_ub):
-                        changed = True
-                    if _propagate_group(out_keys, required_lb, required_ub):
-                        changed = True
-
-        if propagated_zero_count > 0 or propagated_one_count > 0:
-            self.solve_statistics["optimizations_applied"].add("optimize_with_deterministic_propagation_from_fixed_edges")
-
-        self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + propagated_zero_count
-        self.solve_statistics["edge_variables=1"] = self.solve_statistics.get("edge_variables=1", 0) + propagated_one_count
-        self.solve_statistics["edge_variables_propagated=0"] = self.solve_statistics.get("edge_variables_propagated=0", 0) + propagated_zero_count
-        self.solve_statistics["edge_variables_propagated=1"] = self.solve_statistics.get("edge_variables_propagated=1", 0) + propagated_one_count
-
-        utils.logger.debug(
-            f"{__name__}: Deterministic propagation fixed {propagated_zero_count} edge variables to 0 and "
-            f"{propagated_one_count} edge variables to 1."
-        )
-
 
     def _get_paths_to_fix_from_safe_lists(self) -> list:
         

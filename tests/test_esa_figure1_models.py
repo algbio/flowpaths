@@ -91,7 +91,7 @@ def test_esa_figure1_min_flow_decomp(esa_figure1):
     assert len(solution["paths"]) == len(solution["weights"])
     assert sum(solution["weights"]) == 17
 
-    assert mfd.solve_statistics["edge_variables=1"] == 39
+    assert mfd.solve_statistics["edge_variables=1"] == 37
     assert mfd.solve_statistics["edge_variables=0"] == 78
 
 

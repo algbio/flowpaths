@@ -6,7 +6,7 @@ from multiprocessing import cpu_count
 # --- hardcoded settings ---
 NGRAPH = "tests/acyclic_graphs/multitrans.82.ngraph"
 GRAPH_INDEX = 0
-TIME_LIMIT = 1200.0
+TIME_LIMIT = 10.0
 THREADS = max(1, min(8, cpu_count()))
 DRAW_INPUT_FILENAME = "multitrans82_input.pdf"
 DRAW_SOLUTION_FILENAME = "multitrans82_solution.pdf"

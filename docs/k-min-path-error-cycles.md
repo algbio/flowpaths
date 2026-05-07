@@ -40,12 +40,26 @@ This class implements a more general version, as follows:
 2. This class supports adding subset constraints, that is, lists of edges that must appear in some solution walks. See [Subset constraints](subset-constraints.md) for details.
 3. The above constraint can happen only over a given subset $E' \subseteq E$ of the edges (set parameter `elements_to_ignore` to be $E \setminus E'$). See also [ignoring edges documentation](ignoring-edges.md).
 4. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ will add the edge $(u,v)$ to `elements_to_ignore`, because the constraint for $(u,v)$ becomes always true. See also [ignoring edges documentation](ignoring-edges.md).
+5. You can optionally add extra candidate edges not present in the original graph via `additional_edges` $E_{\mathrm{add}}$. Their usage can be penalized in the objective via `additional_edges_lambda` $\lambda_{\mathrm{add}}$, where each additional edge is counted at most once, even if it is used multiple times across one or more walks. See also [additional edges and usage penalty documentation](additional-edges-penalty.md).
 
 !!! info "Generalized constraint"
-    Formally, the constraint generalized as in 3., 4. and 5. above is:
+    Formally, the constraint generalized as in 3. and 4. above is:
     $$
     \lambda_{(u,v)} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\}}w_i \cdot W_i(u,v)\right| \leq \sum_{i \in \\{1,\dots,k\\}}\rho_i \cdot W_i(u,v), ~\forall (u,v) \in E'.
     $$
+
+!!! info "Generalized objective function"
+    With additional edges enabled, the minimized objective becomes:
+    $$
+    \rho_1 + \cdots + \rho_k
+    + \lambda_{\mathrm{add}} \cdot \sum_{e \in E_{\mathrm{add}}} \mathbf{1}[e\ \text{is used by at least one walk}].
+    $$
+
+!!! note "About additional edges"
+    - Additional edges must not already exist in the original graph.
+    - Both endpoints of each additional edge must be present in the graph.
+    - Additional edges are not included in the edge-error constraints; they only contribute through the penalty term above.
+    - In node-weighted mode, additional edges are interpreted in the original graph and then expanded internally in the node-expanded graph.
 
 !!! warning "A lowerbound on $k$"
     The value of $k$ must be at least the edge width of graph, meaning the minimum number of walks to cover all the edges in $E'$, except those edges $(u,v)$ for which $\lambda_{u,v} = 0$. This value always gives a feasible model. 

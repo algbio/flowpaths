@@ -29,6 +29,7 @@ nav:
     - Subpath constraints: subpath-constraints.md
     - Subset constraints: subset-constraints.md
     - Ignoring edges: ignoring-edges.md
+    - Additional edges penalty: additional-edges-penalty.md
     - Additional start/end nodes: additional-start-end-nodes.md
     - Correcting weights: minimum-error-flow.md
     - Solver options and optimizations: solver-options-optimizations.md

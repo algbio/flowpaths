@@ -39,12 +39,26 @@ This class implements a more general version, as follows:
 3. The above constraint can happen only over a given subset $E' \subseteq E$ of the edges (set parameter `elements_to_ignore` to be $E \setminus E'$). See also [ignoring edges documentation](ignoring-edges.md).
 4. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ will add the edge $(u,v)$ to `elements_to_ignore`, because the constraint for $(u,v)$ becomes always true. See also [ignoring edges documentation](ignoring-edges.md).
 5. Another way to relax the constraint is to allow also some looseness in the slack value, based on the length of the solution path. Intuitively, suppose that longer paths have even higher variance in their weight across the edges of the path, while shorter paths less. Formally, suppose that we have a function $\alpha : \mathbb{N} \rightarrow \mathbb{R}^+$ that for every solution path length $\ell$, it returns a multiplicative factor $\alpha(\ell)$. Then, we can multiply each path slack $\rho_i$ by $\alpha(|P_i|)$ in the constraint of the problem (where $|P_i|$ denotes the length of solution path $P_i$). In the above example, we could set $\alpha(\ell) > 1$ for "large" lengths $\ell$. Note that in this model we keep the same objective function (i.e. sum of slacks), and thus this multiplier has no effect on the objective value. You can pass the function $\alpha$ to the class as a piecewise encoding, via parameters `path_length_ranges` and `path_length_factors`, see [kMinPathError()](k-min-path-error.md#flowpaths.kminpatherror.kMinPathError).
+6. You can optionally add extra candidate edges not present in the original graph via `additional_edges` $E_{\mathrm{add}}$. Their usage can be penalized in the objective via `additional_edges_lambda` $\lambda_{\mathrm{add}}$, where each additional edge is counted at most once, even if multiple paths use it. See also [additional edges and usage penalty documentation](additional-edges-penalty.md).
 
 !!! info "Generalized constraint"
     Formally, the constraint generalized as in 3., 4. and 5. above is:
     $$
     \lambda_{(u,v)} \cdot \left|f(u,v) - \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }w_i\right| \leq \sum_{i \in \\{1,\dots,k\\} : (u,v) \in P_i }\rho_i \cdot \alpha(|P_i|), ~\forall (u,v) \in E'.
     $$
+
+!!! info "Generalized objective function"
+    With additional edges enabled, the minimized objective becomes:
+    $$
+    \rho_1 + \cdots + \rho_k
+    + \lambda_{\mathrm{add}} \cdot \sum_{e \in E_{\mathrm{add}}} \mathbf{1}[e\ \text{is used by at least one path}].
+    $$
+
+!!! note "About additional edges"
+    - Additional edges must not already exist in the original graph.
+    - Both endpoints of each additional edge must be present in the graph.
+    - Additional edges are not included in the edge-error constraints; they only contribute through the penalty term above.
+    - In node-weighted mode, additional edges are interpreted in the original graph and then expanded internally in the node-expanded graph.
 
 !!! warning "A lowerbound on $k$"
     The value of $k$ must be at least the edge width of graph, meaning the minimum number of paths to cover all the edges in $E'$, except those edges $(u,v)$ for which $\lambda_{u,v} = 0$. This value always gives a feasible model. 

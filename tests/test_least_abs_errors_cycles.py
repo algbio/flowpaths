@@ -62,3 +62,47 @@ for graph_file in sorted(graphs_dir.glob("*.graph")):
 @pytest.mark.parametrize("graph, idx", [(g, i) for i, g in enumerate(graphs)])
 def test(graph, idx):
     run_test(graph, idx, params)
+
+
+def test_additional_edges_lambda_validation_cycles():
+    G = nx.DiGraph()
+    G.add_edge("s", "a", flow=2)
+    G.add_edge("a", "t", flow=2)
+
+    with pytest.raises(ValueError, match="additional_edges_lambda must be non-negative"):
+        fp.kLeastAbsErrorsCycles(
+            G=G,
+            flow_attr="flow",
+            k=1,
+            additional_edges_lambda=-1,
+        )
+
+    with pytest.raises(ValueError, match=r"endpoint\(s\) not in the input graph"):
+        fp.kLeastAbsErrorsCycles(
+            G=G,
+            flow_attr="flow",
+            k=1,
+            additional_edges=[("s", "x")],
+        )
+
+
+def test_additional_edges_objective_cycles():
+    G = nx.DiGraph()
+    G.add_edge("s", "a", flow=3)
+    G.add_edge("a", "b", flow=3)
+    G.add_edge("b", "a", flow=3)
+    G.add_edge("b", "t", flow=3)
+
+    model = fp.kLeastAbsErrorsCycles(
+        G=G,
+        flow_attr="flow",
+        k=2,
+        additional_edges=[("a", "t")],
+        additional_edges_lambda=2.0,
+        solver_options={"external_solver": "highs"},
+    )
+    model.solve()
+
+    assert model.is_solved()
+    assert model.is_valid_solution()
+    assert abs(model.get_objective_value() - model.solver.get_objective_value()) < 1e-6

@@ -24,6 +24,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         path_length_factors: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
+        additional_edges: list = [],
+        additional_edges_lambda: float = 1.0,
         solution_weights_superset: list = None,
         optimization_options: dict = None,
         solver_options: dict = None,
@@ -134,6 +136,16 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             
             List of additional end nodes of the paths. Default is an empty list. See [additional start/end nodes documentation](additional-start-end-nodes.md).
 
+        - `additional_edges: list`, optional
+
+            List of additional edges that can be used in the solution, but are not in the original graph. Default is an empty list.
+            See [additional edges and usage penalty documentation](additional-edges-penalty.md).
+
+        - `additional_edges_lambda: float`, optional
+
+            Multiplicative penalty weight for selecting additional edges in the objective. Default is `1.0`.
+            See [additional edges and usage penalty documentation](additional-edges-penalty.md).
+
         - `solution_weights_superset: list`, optional
 
             List of allowed weights for the paths. Default is `None`. 
@@ -158,10 +170,33 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             - If the number of path length ranges is not equal to the number of error scale factors.
             - If the edge error scaling factor is not between 0 and 1.
             - If the graph contains edges with negative (<0) flow values.  
+            - If `additional_edges_lambda` is not numeric or is negative.
             - ValueError: If `flow_attr_origin` is not "node" or "edge".          
         """
 
         utils.logger.info(f"{__name__}: START initialized with graph id = {utils.fpid(G)}, k = {k}")
+
+        # Validate additional_edges_lambda early before any graph processing
+        if not isinstance(additional_edges_lambda, (int, float)):
+            utils.logger.error(f"{__name__}: additional_edges_lambda must be numeric, not {type(additional_edges_lambda)}")
+            raise ValueError(f"additional_edges_lambda must be numeric, not {type(additional_edges_lambda)}")
+        if additional_edges_lambda < 0:
+            utils.logger.error(f"{__name__}: additional_edges_lambda must be non-negative, not {additional_edges_lambda}")
+            raise ValueError(f"additional_edges_lambda must be non-negative, not {additional_edges_lambda}")
+        self.additional_edges_lambda = float(additional_edges_lambda)
+
+        # Handle additional edges
+        self.additional_edges = set(additional_edges or [])
+        for edge in self.additional_edges:
+            if not isinstance(edge, tuple) or len(edge) != 2:
+                utils.logger.error(f"{__name__}: additional_edges must be a list of edges (i.e. tuples of nodes), not {additional_edges}")
+                raise ValueError(f"additional_edges must be a list of edges (i.e. tuples of nodes), not {additional_edges}")
+            if edge[0] not in G.nodes() or edge[1] not in G.nodes():
+                utils.logger.error(f"{__name__}: additional edge {edge} has endpoint(s) not in the input graph")
+                raise ValueError(f"additional edge {edge} has endpoint(s) not in the input graph")
+            if G.has_edge(edge[0], edge[1]):
+                utils.logger.error(f"{__name__}: additional edge {edge} is already in the original graph")
+                raise ValueError(f"additional edge {edge} is already in the original graph")
 
         # Handling node-weighted graphs
         self.flow_attr_origin = flow_attr_origin
@@ -180,6 +215,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             edges_to_ignore_internal = self.G_internal.edges_to_ignore
             edges_to_ignore_internal += [self.G_internal.get_expanded_edge(node) for node in elements_to_ignore]
             edges_to_ignore_internal = list(set(edges_to_ignore_internal))
+            additional_edges_internal = set([self.G_internal.get_expanded_edge(edge, check_in_graph=False) for edge in self.additional_edges])
 
             error_scaling_internal = {self.G_internal.get_expanded_edge(node): error_scaling[node] for node in error_scaling}
 
@@ -187,7 +223,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             if G.number_of_edges() == 0:
                 utils.logger.error(f"{__name__}: The input graph G has no edges. Please provide a graph with at least one edge.")
                 raise ValueError(f"The input graph G has no edges. Please provide a graph with at least one edge.")
-            self.G_internal = G
+            self.G_internal = copy.deepcopy(G)
             subpath_constraints_internal = subpath_constraints
             if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in elements_to_ignore):
                 utils.logger.error(f"elements_to_ignore must be a list of edges (i.e. tuples of nodes), not {elements_to_ignore}")
@@ -195,14 +231,21 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             edges_to_ignore_internal = elements_to_ignore
             additional_starts_internal = additional_starts
             additional_ends_internal = additional_ends
+            additional_edges_internal = self.additional_edges
             error_scaling_internal = error_scaling
         else:
             utils.logger.error(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
 
+        self.flow_attr = flow_attr
+
+        # Add additional edges with default flow_attr 0
+        self.G_internal.add_edges_from(additional_edges_internal, **{self.flow_attr: 0})
+
         self.G = stdag.stDAG(self.G_internal, additional_starts=additional_starts_internal, additional_ends=additional_ends_internal)
         self.subpath_constraints = subpath_constraints_internal
         self.edges_to_ignore = self.G.source_sink_edges.union(edges_to_ignore_internal)
+        self.additional_edges = additional_edges_internal
         self.edge_error_scaling = error_scaling_internal
         # If the error scaling factor is 0, we ignore the edge
         self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
@@ -221,8 +264,6 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.subpath_constraints_coverage = subpath_constraints_coverage
         self.subpath_constraints_coverage_length = subpath_constraints_coverage_length
         self.length_attr = length_attr
-
-        self.flow_attr = flow_attr
 
         self.k = k
         # If k is not specified, we set k to the edge width of the graph
@@ -260,6 +301,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.pi_vars = {}
         self.path_weights_vars = {}
         self.path_slacks_vars = {}
+        self.additional_edges_used_vars = {}
 
         self.path_weights_sol = None
         self.path_slacks_sol = None
@@ -389,7 +431,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         for u, v, data in self.G.edges(data=True):
             if (u, v) in self.edges_to_ignore:
                 continue
-
+            if (u, v) in self.additional_edges:
+                continue
             f_u_v = data[self.flow_attr]
             edge_error_scaling_u_v = self.edge_error_scaling.get((u, v), 1)
 
@@ -534,6 +577,8 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         for u, v, data in self.G.edges(data=True):
             if (u, v) in self.edges_to_ignore:
                 continue
+            if (u, v) in self.additional_edges:
+                continue
 
             f_u_v = data[self.flow_attr]
             edge_error_scaling_u_v = self.edge_error_scaling.get((u, v), 1)
@@ -584,8 +629,31 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
     def _encode_objective(self):
 
+        self.additional_edges_used_vars = {}
+        if len(self.additional_edges) > 0:
+            self.additional_edges_used_vars = self.solver.add_variables(
+                self.additional_edges,
+                name_prefix="edge_used",
+                lb=0,
+                ub=1,
+                var_type="binary",
+            )
+
+            # Each additional edge is counted at most once in objective even if used by many paths.
+            for (u, v) in self.additional_edges:
+                for i in range(self.k):
+                    self.solver.add_constraint(
+                        self.additional_edges_used_vars[(u, v)] >= self.edge_vars[(u, v, i)],
+                        name=f"edge_used_constraint_u={u}_v={v}_i={i}",
+                    )
+
         self.solver.set_objective(
-            self.solver.quicksum(self.path_slacks_vars[(i)] for i in range(self.k)), sense="minimize"
+            self.solver.quicksum(self.path_slacks_vars[(i)] for i in range(self.k))
+            + self.additional_edges_lambda
+            * self.solver.quicksum(
+                self.additional_edges_used_vars[(u, v)] for (u, v) in self.additional_edges
+            ),
+            sense="minimize"
         )
 
     def _remove_empty_paths(self, solution):
@@ -754,7 +822,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
                     num_paths_on_edges[e] += 1
 
         for u, v, data in self.G.edges(data=True):
-            if self.flow_attr in data and (u,v) not in self.edges_to_ignore:
+            if self.flow_attr in data and (u,v) not in self.edges_to_ignore and (u, v) not in self.additional_edges:
                 if (
                     abs(data[self.flow_attr] - weight_from_paths[(u, v)])
                     > tolerance * num_paths_on_edges[(u, v)] + slack_from_paths[(u, v)]
@@ -771,7 +839,11 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
                     return False
 
-        if abs(self.get_objective_value() - self.solver.get_objective_value()) > tolerance * self.k:
+        obj_tolerance = tolerance * self.k
+        if self.additional_edges_lambda > 0 and len(self.additional_edges) > 0:
+            obj_tolerance += self.additional_edges_lambda * len(self.additional_edges) * tolerance
+
+        if abs(self.get_objective_value() - self.solver.get_objective_value()) > obj_tolerance:
             utils.logger.info(f"{__name__}: self.get_objective_value() = {self.get_objective_value()} self.solver.get_objective_value() = {self.solver.get_objective_value()}")
             return False
         
@@ -811,7 +883,16 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
             self.get_solution()
 
         # sum of slacks
-        return sum(self._solution["slacks"])
+        objective_value = sum(self._solution["slacks"])
+
+        if self.additional_edges_lambda > 0 and len(self.additional_edges) > 0:
+            additional_edges_used_sol = self.solver.get_values(self.additional_edges_used_vars)
+            objective_value += self.additional_edges_lambda * sum(
+                additional_edges_used_sol[(u, v)]
+                for (u, v) in self.additional_edges
+            )
+
+        return objective_value
     
     def get_lowerbound_k(self):
 
