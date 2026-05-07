@@ -168,6 +168,9 @@ class AbstractWalkModelDiGraph(ABC):
         )
 
         self._is_solved = False
+        self._has_incumbent_solution = False
+        self._incumbent_objective_value = None
+        self._incumbent_edge_vars_sol = None
 
         if not hasattr(self, "solve_time_start") or self.solve_time_start is None:
             self.solve_time_start = time.perf_counter()
@@ -268,7 +271,7 @@ class AbstractWalkModelDiGraph(ABC):
         # Constraints to make sure the entire walk is strongly connected
         # Every vertex gets a distance d[v,i]
         self.distance_vars = self.solver.add_variables(self.vertex_indexes, name_prefix="distance", lb=0, ub=self.G.number_of_nodes(), var_type="integer")
-        self.edge_selected_vars = self.solver.add_variables(self.edge_indexes, name_prefix="selected_edge", lb=0, ub=1, var_type="integer")
+        self.edge_selected_vars = self.solver.add_variables(self.edge_indexes, name_prefix="selected_edge", lb=0, ub=1, var_type="binary")
 
         # Edge selected constraints
 
@@ -337,13 +340,13 @@ class AbstractWalkModelDiGraph(ABC):
         self.subset_indexes = [ (i, j) for i in range(self.k) for j in range(len(self.subset_constraints)) ]
 
         self.subset_vars = self.solver.add_variables(
-            self.subset_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
+            self.subset_indexes, name_prefix="r", lb=0, ub=1, var_type="binary")
 
         # Model z[(u,v,i)] = min(1, x[(u,v,i)]) with a binary aux var and per-edge UB:
         #   z <= x
         #   x <= U_e * z, where U_e is the per-edge upper bound
         self.edge_used_vars = self.solver.add_variables(
-            self.edge_indexes, name_prefix="used_edge", lb=0, ub=1, var_type="integer"
+            self.edge_indexes, name_prefix="used_edge", lb=0, ub=1, var_type="binary"
         )
         for i in range(self.k):
             for (u, v) in self.G.edges:
@@ -635,13 +638,36 @@ class AbstractWalkModelDiGraph(ABC):
         self.solve_statistics[f"avg_size_of_non_trivial_SCC"] = self.G.get_avg_size_of_non_trivial_SCC()
         self.solve_statistics[f"size_of_largest_SCC"] = self.G.get_size_of_largest_SCC()
 
-        if self.solver.get_model_status() == "kOptimal" or self.solver.get_model_status() == 2:
+        self._has_incumbent_solution = False
+        self._incumbent_objective_value = None
+        self._incumbent_edge_vars_sol = None
+
+        solver_status = self.solver.get_model_status()
+        if solver_status == "kOptimal" or solver_status == 2:
             self._is_solved = True
             utils.logger.info(f"{__name__}: solved successfully. Objective value: {self.get_objective_value()}")
             return True
 
+        # Store best incumbent on timeout (without marking solved).
+        if solver_status == "kTimeLimit" and self.solver.has_feasible_solution():
+            self._store_incumbent_solution()
+            self._is_solved = False
+            utils.logger.warning(
+                f"{__name__}: solver reached time limit; stored best feasible incumbent. Objective value: {self._incumbent_objective_value}",
+            )
+            return False
+
         self._is_solved = False
         return False
+
+    def _store_incumbent_solution(self):
+        """Capture the current solver incumbent into dedicated instance variables."""
+        self._incumbent_edge_vars_sol = self.solver.get_values(self.edge_vars)
+        self._has_incumbent_solution = True
+        try:
+            self._incumbent_objective_value = self.solver.get_objective_value()
+        except Exception:
+            self._incumbent_objective_value = None
 
     def check_is_solved(self):
         if not self.is_solved():
@@ -652,6 +678,14 @@ class AbstractWalkModelDiGraph(ABC):
         
     def is_solved(self):
         return self._is_solved
+
+    def has_incumbent_solution(self) -> bool:
+        return self._has_incumbent_solution
+
+    def get_incumbent_objective_value(self):
+        if not self.has_incumbent_solution():
+            raise Exception("No incumbent solution stored.")
+        return self._incumbent_objective_value
     
     def set_solved(self):
         self._is_solved = True
@@ -692,26 +726,28 @@ class AbstractWalkModelDiGraph(ABC):
         
         if self.edge_vars_sol == {}:
             self.edge_vars_sol = self.solver.get_values(self.edge_vars)
-        # utils.logger.debug(f"{__name__}: Getting solution walks with self.edge_vars_sol = {self.edge_vars_sol}")
+        return self._decode_solution_walks_from_values(self.edge_vars_sol)
 
+    def get_incumbent_solution_walks(self) -> list:
+        if not self.has_incumbent_solution():
+            raise Exception("No incumbent solution stored.")
+        return self._decode_solution_walks_from_values(self._incumbent_edge_vars_sol)
+
+    def _decode_solution_walks_from_values(self, edge_values: dict) -> list:
+        """Decode one walk per layer from edge multiplicity values."""
         walks = []
         for i in range(self.k):
-            # Build residual graph for this layer with edge multiplicities
-            residual_graph = self._build_residual_graph_for_layer(i)
-            # utils.logger.debug(f"{__name__}: residual_graph = {residual_graph}")
-            
-            # Check if there's any flow in this layer
+            residual_graph = self._build_residual_graph_for_layer(i, edge_values)
             if not residual_graph:
                 walks.append([])
                 continue
-                
-            # Reconstruct complete Eulerian walk
+
             walk = self._reconstruct_eulerian_walk(residual_graph, i)
             walks.append(walk)
-        
+
         return walks
 
-    def _build_residual_graph_for_layer(self, layer_i: int) -> dict:
+    def _build_residual_graph_for_layer(self, layer_i: int, edge_values: dict) -> dict:
         """
         Builds a residual graph for a specific layer with edge multiplicities.
         
@@ -727,8 +763,8 @@ class AbstractWalkModelDiGraph(ABC):
         # Add edges based on solution values
         for (u, v) in self.G.edges():
             edge_key = (str(u), str(v), layer_i)
-            if edge_key in self.edge_vars_sol:
-                multiplicity = round(self.edge_vars_sol[edge_key])
+            if edge_key in edge_values:
+                multiplicity = round(edge_values[edge_key])
                 # Add this edge 'multiplicity' times to the residual graph
                 for _ in range(multiplicity):
                     residual_graph[u].append(v)

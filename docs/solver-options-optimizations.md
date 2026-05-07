@@ -11,6 +11,8 @@ Set this options by passing a dictionary `solver_options`, with the following po
 - `"presolve"` (str): Presolve option. Defaults to `"choose"`.
 - `"log_to_console"` (str): Log to console option. Defaults to `"false"`.
 - `"external_solver"` (str): External solver to use. Defaults to `"highs"`.
+- `"tolerance"` (float): Unified solver tolerance used for MIP gap, integrality tolerance, and feasibility tolerance. Defaults to `1e-9`.
+- `"gurobi_params"` (dict): Extra Gurobi parameters passed to `gurobipy.Env.setParam(...)` when `"external_solver"` is `"gurobi"`.
 
 !!! warning "Time limit"
     Large or complex graphs may take more than the default 300 seconds to run. In this case, `your_model.is_solved()` will be `False`. You can also check the model status with `your_model.get_model_status()`. If it equals `"kTimeLimit"`, then you should pass a larger `"time_limit"`.

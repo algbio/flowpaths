@@ -63,6 +63,8 @@ class SolverWrapper:
             applied uniformly (default ``1e-9``; must be >= 1e-9).
         - ``optimization_sense`` (str): ``"minimize"`` or ``"maximize``
             (default ``"minimize"``).
+        - ``gurobi_params`` (dict): optional extra Gurobi parameters passed
+            through via ``Env.setParam`` before model creation.
 
     Attributes
     ----------
@@ -154,6 +156,24 @@ class SolverWrapper:
             self.env.setParam("MIPGap", self.tolerance)
             self.env.setParam("IntFeasTol", self.tolerance)
             self.env.setParam("FeasibilityTol", self.tolerance)
+
+            gurobi_params = kwargs.get("gurobi_params", {})
+            if gurobi_params is None:
+                gurobi_params = {}
+            if not isinstance(gurobi_params, dict):
+                utils.logger.error(f"{__name__}: `gurobi_params` must be a dict when using external_solver='gurobi'.")
+                raise ValueError("`gurobi_params` must be a dict when using external_solver='gurobi'.")
+
+            for param_name, param_value in gurobi_params.items():
+                try:
+                    self.env.setParam(str(param_name), param_value)
+                except Exception as exc:
+                    utils.logger.error(
+                        f"{__name__}: Failed to set Gurobi parameter '{param_name}' to value '{param_value}': {exc}",
+                    )
+                    raise ValueError(
+                        f"Failed to set Gurobi parameter '{param_name}' to value '{param_value}': {exc}"
+                    ) from exc
 
             self.env.start()
             self.solver = gurobipy.Model(env=self.env)
@@ -248,7 +268,7 @@ class SolverWrapper:
             - scalars (applied to all indexes), or
             - dicts mapping each index -> bound, or
             - sequences aligned with ``indexes`` order (same length).
-        var_type : {"integer", "continuous"}, default "integer"
+        var_type : {"integer", "continuous", "binary"}, default "integer"
             Variable domain type.
 
         Returns
@@ -298,6 +318,8 @@ class SolverWrapper:
             var_type_map = {
                 "integer": highspy.HighsVarType.kInteger,
                 "continuous": highspy.HighsVarType.kContinuous,
+                # HiGHS uses integer + [0,1] bounds to represent binary variables.
+                "binary": highspy.HighsVarType.kInteger,
             }
             return self.solver.addVariables(
                 indexes, 
@@ -311,6 +333,7 @@ class SolverWrapper:
             var_type_map = {
                 "integer": gurobipy.GRB.INTEGER,
                 "continuous": gurobipy.GRB.CONTINUOUS,
+                "binary": gurobipy.GRB.BINARY,
             }
             # Single batched call using keys with per-index bounds
             keys = list(indexes)
@@ -342,6 +365,56 @@ class SolverWrapper:
             self.solver.addConstr(expr, name=name)
         elif self.external_solver == "gurobi":
             self.solver.addConstr(expr, name=name)
+
+    def add_indicator_constraint(self, binary_var, binary_value: int, expr, name=""):
+        """Add an indicator constraint (Gurobi only).
+
+        Parameters
+        ----------
+        binary_var : variable
+            Binary variable controlling activation.
+        binary_value : int
+            Indicator value in {0, 1} for activation.
+        expr : TempConstr
+            Constraint expression activated by the indicator.
+        name : str, optional
+            Optional identifier.
+        """
+        if binary_value not in (0, 1):
+            raise ValueError("binary_value must be 0 or 1.")
+        if self.external_solver != "gurobi":
+            raise ValueError("Indicator constraints are currently supported only with external_solver='gurobi'.")
+
+        self.solver.addGenConstrIndicator(binary_var, binary_value, expr, name=name)
+
+    def set_start_values(self, variable_values: dict):
+        """Assign MIP-start values to variables when supported by the backend.
+
+        Parameters
+        ----------
+        variable_values : dict
+            Mapping ``variable -> value``.
+
+        Notes
+        -----
+        - Gurobi: values are assigned to the ``Start`` attribute.
+        - HiGHS: current wrapper exposes no MIP-start support; the call is a
+          no-op and is kept for a uniform API.
+        """
+        if not variable_values:
+            return
+
+        if self.external_solver == "gurobi":
+            import gurobipy as gp
+
+            vars_to_seed = list(variable_values.keys())
+            start_values = [float(value) for value in variable_values.values()]
+            self.solver.setAttr(gp.GRB.Attr.Start, vars_to_seed, start_values)
+            self.solver.update()
+        elif self.external_solver == "highs":
+            utils.logger.debug(
+                f"{__name__}: Ignoring MIP-start request because HiGHS warm starts are not exposed by SolverWrapper.",
+            )
 
     def add_binary_continuous_product_constraint(self, binary_var, continuous_var, product_var, lb, ub, name: str):
         """
@@ -563,6 +636,35 @@ class SolverWrapper:
             return self.solver.getModelStatus().name
         elif self.external_solver == "gurobi":
             return SolverWrapper.gurobi_status_to_highs.get(self.solver.status, self.solver.status) if not raw else self.solver.status
+
+    def has_feasible_solution(self) -> bool:
+        """Return whether the backend currently exposes a feasible incumbent.
+
+        This is primarily used to recover a best-known solution on solver time
+        limit. It is conservative: returns ``False`` when feasibility cannot be
+        established with confidence.
+        """
+        status = self.get_model_status()
+
+        if status in ("kOptimal", 2):
+            return True
+
+        if status != "kTimeLimit":
+            return False
+
+        if self.external_solver == "gurobi":
+            try:
+                return int(getattr(self.solver, "SolCount", 0)) > 0
+            except Exception:
+                return False
+
+        # HiGHS: best-effort incumbent check under time limit.
+        try:
+            objective_value = float(self.solver.getObjectiveValue())
+            variable_values = self.solver.allVariableValues()
+            return math.isfinite(objective_value) and len(variable_values) > 0
+        except Exception:
+            return False
 
     def get_all_variable_values(self):
         """Return values for all variables in solver insertion order."""

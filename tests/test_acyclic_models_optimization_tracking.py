@@ -127,6 +127,7 @@ class TestOptimizationTracking:
     def test_symmetry_breaking_optimization(self, test_graph):
         """Test that symmetry breaking optimization is tracked."""
         optimization_options = {
+            "optimize_with_greedy": False,
             "optimize_with_flow_safe_paths": False,
             "optimize_with_safe_paths": False,
             "optimize_with_safe_sequences": False,
@@ -152,6 +153,30 @@ class TestOptimizationTracking:
             # If it's there, that's correct tracking
             assert True
         assert "optimize_with_safe_lists" not in optimizations
+
+    def test_lp_tightening_constraints_optimization(self, test_graph):
+        """Test that LP-tightening constraints optimization is tracked when enabled."""
+        optimization_options = {
+            "optimize_with_greedy": False,
+            "optimize_with_flow_safe_paths": False,
+            "optimize_with_safe_paths": False,
+            "optimize_with_safe_sequences": False,
+            "optimize_with_safe_zero_edges": False,
+            "optimize_with_symmetry_breaking_lexicographic_paths": False,
+            "optimize_with_lp_tightening_constraints": True,
+        }
+
+        mfd = fp.MinFlowDecomp(
+            test_graph,
+            flow_attr="flow",
+            optimization_options=optimization_options
+        )
+        mfd.solve()
+
+        assert mfd.is_solved()
+        stats = mfd.solve_statistics
+        optimizations = stats["optimizations_applied"]
+        assert "optimize_with_lp_tightening_constraints" in optimizations
     
     def test_combined_optimizations_safe_paths_and_symmetry(self, test_graph):
         """Test that multiple optimizations can be tracked together."""

@@ -198,7 +198,7 @@ def read_ngraph(graph_raw) -> nx.DiGraph:
     Constraint lines:
         - '#S n1 n2 n3 ...' lines define subpath constraints.
         - Duplicates are filtered by exact node sequence.
-        - Constraints are stored in G.graph['constraints'] as edge lists.
+        - Constraints are stored in G.graph['constraints'] as node lists.
     """
 
     idx = 0
@@ -216,9 +216,8 @@ def read_ngraph(graph_raw) -> nx.DiGraph:
                 seq_key = tuple(nodes_seq)
                 if seq_key not in subpaths_seen:
                     subpaths_seen.add(seq_key)
-                    edges_list = [(u, v) for u, v in zip(nodes_seq, nodes_seq[1:])]
-                    if edges_list:
-                        constraint_subpaths.append(edges_list)
+                    if len(nodes_seq) >= 2:
+                        constraint_subpaths.append(nodes_seq)
         else:
             header_lines.append(stripped.lstrip("#").strip())
         idx += 1
@@ -306,9 +305,8 @@ def read_ngraph(graph_raw) -> nx.DiGraph:
                     seq_key = tuple(nodes_seq)
                     if seq_key not in subpaths_seen:
                         subpaths_seen.add(seq_key)
-                        edges_list = [(u, v) for u, v in zip(nodes_seq, nodes_seq[1:])]
-                        if edges_list:
-                            constraint_subpaths.append(edges_list)
+                        if len(nodes_seq) >= 2:
+                            constraint_subpaths.append(nodes_seq)
             continue
 
         elements = stripped.split()
@@ -334,12 +332,12 @@ def read_ngraph(graph_raw) -> nx.DiGraph:
     # For ngraph, constraints can encode node-pair evidence (MultiTrans R),
     # which is not necessarily an existing edge. Validate only node existence.
     for subpath in constraint_subpaths:
-        for (u, v) in subpath:
-            if u not in G.nodes or v not in G.nodes:
+        for node_id in subpath:
+            if node_id not in G.nodes:
                 utils.logger.error(
-                    f"{__name__}: Constraint references unknown nodes ({u}, {v}) in ngraph {graph_id}."
+                    f"{__name__}: Constraint references unknown node {node_id} in ngraph {graph_id}."
                 )
-                raise ValueError(f"Constraint references unknown nodes ({u}, {v}).")
+                raise ValueError(f"Constraint references unknown node {node_id}.")
 
     G.graph["n"] = G.number_of_nodes()
     G.graph["m"] = G.number_of_edges()
@@ -608,7 +606,12 @@ def draw(
         
         - `subpath_constraints`: list
 
-            A list of subpaths to highlight in the graph as dashed edges, of various colors. Each subpath is a list of edges. Default is an empty list. There is no association between the subpath colors and the path colors.
+            A list of subpaths to highlight in the graph, of various colors. Each subpath can be:
+            
+            - A list of nodes: `['n1', 'n2', 'n3', ...]` — the nodes are highlighted with the constraint color, and edges between consecutive nodes are drawn as dashed lines.
+            - A list of edges: `[('n1', 'n2'), ('n2', 'n3'), ...]` — edges are drawn as dashed lines (existing behavior).
+            
+            Default is an empty list. There is no association between the subpath colors and the path colors.
         
         - `draw_options`: dict
 
@@ -1008,19 +1011,70 @@ def draw(
                 if len(path) == 1:
                     dot.node(str(path[0]), color=pathColor, penwidth=str(draw_options.get("pathwidth", 3.0)))        
                 
-            for index, path in enumerate(subpath_constraints):
-                pathColor = colors[index % len(colors)]
-                for i in range(len(path)):
-                    if len(path[i]) != 2:
-                        utils.logger.error(f"{__name__}: Subpaths must be lists of edges.")
-                        raise ValueError("Subpaths must be lists of edges.")
-                    dot.edge(
-                        str(path[i][0]),
-                        str(path[i][1]),
-                        color=pathColor,
-                        style="dashed",
-                        penwidth="2.0"
+            # Process subpath constraints: auto-detect node-based vs edge-based
+            # Build mapping of nodes to constraint colors for node-based constraints
+            node_constraint_colors = {}  # node -> list of (index, color) tuples
+            
+            for index, constraint in enumerate(subpath_constraints):
+                if not constraint:
+                    continue
+                    
+                constraint_color = colors[index % len(colors)]
+                
+                # Detect if this constraint is node-based or edge-based
+                is_edge_based = isinstance(constraint[0], (tuple, list)) and len(constraint[0]) == 2
+                
+                if is_edge_based:
+                    # Edge-based constraint: draw dashed edges
+                    for i in range(len(constraint)):
+                        if len(constraint[i]) != 2:
+                            utils.logger.error(f"{__name__}: Subpath edges must be 2-tuples.")
+                            raise ValueError("Subpath edges must be 2-tuples.")
+                        dot.edge(
+                            str(constraint[i][0]),
+                            str(constraint[i][1]),
+                            color=constraint_color,
+                            style="dashed",
+                            penwidth="2.0"
                         )
+                else:
+                    # Node-based constraint: nodes are a sequence
+                    # Highlight nodes with constraint color (no dashed edges)
+                    for node in constraint:
+                        if node not in node_constraint_colors:
+                            node_constraint_colors[node] = []
+                        node_constraint_colors[node].append((index, constraint_color))
+            
+            # Re-draw nodes with constraint colors if any node-based constraints exist
+            if node_constraint_colors:
+                for node in node_constraint_colors:
+                    constraint_list = node_constraint_colors[node]
+                    # Use the color of the first constraint this node is in
+                    # (or could use a blended approach if desired)
+                    first_color = constraint_list[0][1]
+                    
+                    # Re-draw the node with the constraint color as fillcolor
+                    # Preserve node label (including weights) and styling
+                    label = str(node) if style != "points" else ""
+                    if draw_options.get("show_node_weights", False) and flow_attr is not None and flow_attr in G.nodes[node]:
+                        label = f"{G.nodes[node][flow_attr]}\\n{node}" if style != "points" else ""
+                    
+                    # Determine the style based on the drawing style
+                    if style == "default":
+                        node_style = "rounded,filled"
+                    elif style == "points":
+                        node_style = "filled"
+                    else:
+                        node_style = "filled"
+                    
+                    dot.node(
+                        name=str(node),
+                        label=label,
+                        color="black",
+                        fillcolor=first_color,
+                        style=node_style,
+                        penwidth="1.5"
+                    )
                     
             dot.render(outfile=filename, view=False, cleanup=True)
         

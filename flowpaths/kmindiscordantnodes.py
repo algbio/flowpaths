@@ -3,6 +3,7 @@ import flowpaths.stdag as stdag
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.utils as utils
 import flowpaths.nodeexpandeddigraph as nedg
+import math
 import copy
 
 
@@ -14,7 +15,7 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
         k: int,
         weight_type: type = float,
         discordance_tolerance: float = 0.1,
-        subpath_constraints: list = [],
+        subsequence_constraints: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
         optimization_options: dict = None,
@@ -44,11 +45,11 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
             
             The type of the weights and slacks (`int` or `float`). Default is `float`.
 
-         - `subpath_constraints: list`, optional
+        - `subsequence_constraints: list`, optional
             
-            List of subpath constraints. Default is an empty list. 
-            Each subpath constraint is a list of edges that must be covered by some solution path, according 
-            to the `subpath_constraints_coverage` or `subpath_constraints_coverage_length` parameters (see below).
+            List of subsequence constraints. Default is an empty list.
+            Each constraint is a list of node names that must all be visited (in order) by some solution path.
+            Internally, each node is mapped to its expanded edge ``(node.0, node.1)`` via ``NodeExpandedDiGraph``.
         
         - `additional_starts: list`, optional
             
@@ -83,7 +84,7 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
             utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
             raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
         self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr)
-        subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
+        subpath_constraints_internal = self.G_internal._get_expanded_subpath_constraints_nodes(subsequence_constraints)
         additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
         additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
 
@@ -108,11 +109,12 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
         self.discordance_tolerance = discordance_tolerance
         
         self.flow_attr = flow_attr
-        self.w_max = self.k * self.weight_type(
-            self.G.get_max_flow_value_and_check_non_negative_flow(
-                flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
-            )
+        max_flow = self.G.get_max_flow_value_and_check_non_negative_flow(
+            flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
         )
+        w_max_base = (1 + self.discordance_tolerance) * max_flow
+        self.w_max = math.ceil(w_max_base) if self.weight_type == int else float(w_max_base)
+        self.path_cover_mip_start_paths = self.optimization_options.get("path_cover_mip_start_paths", [])
 
         self.pi_vars = {}
         self.path_weights_vars = {}
@@ -152,11 +154,13 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
         # This method is called from the current class to add the objective function
         self._encode_objective()
 
+        # If available, seed the MILP with a structural path-cover witness.
+        self._apply_path_cover_mip_start()
+
         utils.logger.info(f"{__name__}: END initialized with graph id = {utils.fpid(G)}, k = {self.k}")
 
     def _encode_discordance_decomposition(self):
 
-        # pi vars from https://arxiv.org/pdf/2201.10923 page 14
         self.pi_vars = self.solver.add_variables(
             self.edge_indexes,
             name_prefix="pi",
@@ -174,26 +178,19 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
 
         self.edge_indexes_basic = [(u,v) for (u,v) in self.G.edges() if (u,v) not in self.edges_to_ignore]
 
-        self.discordant_edge_vars = self.solver.add_variables(
-            self.edge_indexes_basic,
-            name_prefix="z",
-            lb=0,
-            ub=1,
-            var_type="integer",
-        )
         self.discordant_low_vars = self.solver.add_variables(
             self.edge_indexes_basic,
             name_prefix="zlow",
             lb=0,
             ub=1,
-            var_type="integer",
+            var_type="binary",
         )
         self.discordant_high_vars = self.solver.add_variables(
             self.edge_indexes_basic,
             name_prefix="zhigh",
             lb=0,
             ub=1,
-            var_type="integer",
+            var_type="binary",
         )
 
         for u, v, data in self.G.edges(data=True):
@@ -205,9 +202,7 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
             interval_ub = (1 + self.discordance_tolerance) * f_u_v
             total_pi_u_v = self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k))
 
-            # Bound for the sum over k pi variables, each in [0, w_max].
-            sum_pi_ub = self.k * self.w_max
-            big_m = sum_pi_ub + abs(interval_lb) + abs(interval_ub)
+            big_m = 2 * self.w_max
             strict_eps = 1 if self.weight_type == int else 1e-6
 
             # We encode that edge_vars[(u,v,i)] * self.path_weights_vars[(i)] = self.pi_vars[(u,v,i)],
@@ -233,31 +228,53 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
                         name=f"10_u={u}_v={v}_i={i}",
                     )
 
-            # z[(u, v)] = 0 iff total_pi_u_v is inside [interval_lb, interval_ub].
-            self.solver.add_constraint(
-                total_pi_u_v >= interval_lb - big_m * self.discordant_low_vars[(u, v)],
-                name=f"disc_lb_u={u}_v={v}",
-            )
-            self.solver.add_constraint(
-                total_pi_u_v <= interval_ub + big_m * self.discordant_high_vars[(u, v)],
-                name=f"disc_ub_u={u}_v={v}",
-            )
-            self.solver.add_constraint(
-                total_pi_u_v <= interval_lb - strict_eps + big_m * (1 - self.discordant_low_vars[(u, v)]),
-                name=f"disc_force_low_u={u}_v={v}",
-            )
-            self.solver.add_constraint(
-                total_pi_u_v >= interval_ub + strict_eps - big_m * (1 - self.discordant_high_vars[(u, v)]),
-                name=f"disc_force_high_u={u}_v={v}",
-            )
             self.solver.add_constraint(
                 self.discordant_low_vars[(u, v)] + self.discordant_high_vars[(u, v)] <= 1,
                 name=f"disc_side_exclusive_u={u}_v={v}",
             )
-            self.solver.add_constraint(
-                self.discordant_edge_vars[(u, v)] == self.discordant_low_vars[(u, v)] + self.discordant_high_vars[(u, v)],
-                name=f"disc_z_link_u={u}_v={v}",
-            )
+
+            if self.solver.external_solver == "gurobi":
+                self.solver.add_indicator_constraint(
+                    self.discordant_low_vars[(u, v)],
+                    0,
+                    total_pi_u_v >= interval_lb,
+                    name=f"disc_ind_lb0_u={u}_v={v}",
+                )
+                self.solver.add_indicator_constraint(
+                    self.discordant_low_vars[(u, v)],
+                    1,
+                    total_pi_u_v <= interval_lb - strict_eps,
+                    name=f"disc_ind_lb1_u={u}_v={v}",
+                )
+                self.solver.add_indicator_constraint(
+                    self.discordant_high_vars[(u, v)],
+                    0,
+                    total_pi_u_v <= interval_ub,
+                    name=f"disc_ind_ub0_u={u}_v={v}",
+                )
+                self.solver.add_indicator_constraint(
+                    self.discordant_high_vars[(u, v)],
+                    1,
+                    total_pi_u_v >= interval_ub + strict_eps,
+                    name=f"disc_ind_ub1_u={u}_v={v}",
+                )
+            else:
+                self.solver.add_constraint(
+                    total_pi_u_v >= interval_lb - big_m * self.discordant_low_vars[(u, v)],
+                    name=f"disc_lb_u={u}_v={v}",
+                )
+                self.solver.add_constraint(
+                    total_pi_u_v <= interval_ub + big_m * self.discordant_high_vars[(u, v)],
+                    name=f"disc_ub_u={u}_v={v}",
+                )
+                self.solver.add_constraint(
+                    total_pi_u_v <= interval_lb - strict_eps + big_m * (1 - self.discordant_low_vars[(u, v)]),
+                    name=f"disc_force_low_u={u}_v={v}",
+                )
+                self.solver.add_constraint(
+                    total_pi_u_v >= interval_ub + strict_eps - big_m * (1 - self.discordant_high_vars[(u, v)]),
+                    name=f"disc_force_high_u={u}_v={v}",
+                )
 
     def _encode_cover_every_node_edge_constraints(self):
         """
@@ -279,9 +296,113 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
 
         self.solver.set_objective(
             self.solver.quicksum(
-                self.discordant_edge_vars[(u, v)] for (u, v) in self.edge_indexes_basic
+                self.discordant_low_vars[(u, v)] + self.discordant_high_vars[(u, v)]
+                for (u, v) in self.edge_indexes_basic
             ),
             sense="minimize"
+        )
+
+    def _path_satisfies_subpath_constraint(self, path_edges: set, constraint: list) -> bool:
+        """Return whether a seeded path satisfies one expanded-graph subpath constraint."""
+        if self.subpath_constraints_coverage_length is None:
+            covered_edges = sum((edge in path_edges) for edge in constraint)
+            required_coverage = len(constraint) * self.subpath_constraints_coverage
+            return covered_edges + 1e-9 >= required_coverage
+
+        covered_length = sum(
+            self.G[u][v].get(self.length_attr, 1)
+            for (u, v) in constraint
+            if (u, v) in path_edges
+        )
+        required_length = (
+            sum(self.G[u][v].get(self.length_attr, 1) for (u, v) in constraint)
+            * self.subpath_constraints_coverage_length
+        )
+        return covered_length + 1e-9 >= required_length
+
+    def _get_seed_internal_path(self, condensed_path: list):
+        """Map one original-node path to a full source-to-sink path in the expanded st-DAG."""
+        if not condensed_path:
+            return None
+
+        expanded_path = [self.G.source]
+        for node in condensed_path:
+            expanded_edge = self.G_internal.get_expanded_edge(node)
+            expanded_path.extend([expanded_edge[0], expanded_edge[1]])
+        expanded_path.append(self.G.sink)
+
+        for edge in zip(expanded_path[:-1], expanded_path[1:]):
+            if not self.G.has_edge(*edge):
+                return None
+
+        return expanded_path
+
+    def _apply_path_cover_mip_start(self):
+        """Seed the MILP with a structural path-cover witness when available."""
+        if not self.path_cover_mip_start_paths:
+            return
+
+        if self.solver.external_solver != "gurobi":
+            utils.logger.info(
+                f"{__name__}: Structural path-cover witness with {len(self.path_cover_mip_start_paths)} paths is available, but MIP starts are only enabled for Gurobi.",
+            )
+            return
+
+        if self.k < len(self.path_cover_mip_start_paths):
+            utils.logger.info(
+                f"{__name__}: Skipping path-cover MIP start because k={self.k} is smaller than witness size {len(self.path_cover_mip_start_paths)}.",
+            )
+            return
+
+        seeded_paths = []
+        for condensed_path in self.path_cover_mip_start_paths:
+            expanded_path = self._get_seed_internal_path(condensed_path)
+            if expanded_path is None:
+                utils.logger.warning(
+                    f"{__name__}: Skipping path-cover MIP start because witness path {condensed_path} cannot be embedded in the expanded st-DAG.",
+                )
+                return
+            seeded_paths.append(expanded_path)
+
+        if not seeded_paths:
+            return
+
+        while len(seeded_paths) < self.k:
+            seeded_paths.append(list(seeded_paths[0]))
+
+        path_edge_sets = [
+            set(zip(path[:-1], path[1:]))
+            for path in seeded_paths
+        ]
+
+        start_values = {}
+
+        for i, path_edges in enumerate(path_edge_sets):
+            for (u, v, path_index) in self.edge_indexes:
+                if path_index != i:
+                    continue
+                start_values[self.edge_vars[(u, v, path_index)]] = 1.0 if (u, v) in path_edges else 0.0
+
+        for i in self.path_indexes:
+            start_values[self.path_weights_vars[i]] = 0.0
+
+        for edge_index in self.edge_indexes:
+            start_values[self.pi_vars[edge_index]] = 0.0
+
+        for edge in self.edge_indexes_basic:
+            start_values[self.discordant_low_vars[edge]] = 1.0
+            start_values[self.discordant_high_vars[edge]] = 0.0
+
+        if len(self.subpath_constraints) > 0:
+            for i, path_edges in enumerate(path_edge_sets):
+                for j, constraint in enumerate(self.subpath_constraints):
+                    start_values[self.subpaths_vars[(i, j)]] = 1.0 if self._path_satisfies_subpath_constraint(path_edges, constraint) else 0.0
+
+        self.solver.set_start_values(start_values)
+        self.solve_statistics["optimizations_applied"].add("optimize_with_path_cover_mip_start")
+        self.solve_statistics["path_cover_mip_start_path_count"] = len(self.path_cover_mip_start_paths)
+        utils.logger.info(
+            f"{__name__}: Seeded Gurobi with a feasible path-cover MIP start using {len(self.path_cover_mip_start_paths)} structural paths.",
         )
 
     def _remove_empty_paths(self, solution):
@@ -350,9 +471,11 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
             )
             for i in range(self.k)
         ]
-        self.discordant_edges_sol = self.solver.get_values(self.discordant_edge_vars)
+        discordant_lows = self.solver.get_values(self.discordant_low_vars)
+        discordant_highs = self.solver.get_values(self.discordant_high_vars)
+        self.discordant_edges_sol = {}
         for (u, v) in self.edge_indexes_basic:
-            self.discordant_edges_sol[(u, v)] = int(round(self.discordant_edges_sol[(u, v)]))
+            self.discordant_edges_sol[(u, v)] = int(round(discordant_lows[(u, v)])) + int(round(discordant_highs[(u, v)]))
         self.discordant_nodes_sol = {}
         for expanded_edge, z_value in self.discordant_edges_sol.items():
             condensed_node = self.G_internal.get_condensed_node(expanded_edge)
@@ -397,9 +520,11 @@ class kMinDiscordantNodes(pathmodel.AbstractPathModelDAG):
         solution_paths = self._solution.get("_paths_internal", self._solution["paths"])
         solution_weights = self._solution["weights"]
         if self.discordant_edges_sol is None:
-            self.discordant_edges_sol = self.solver.get_values(self.discordant_edge_vars)
+            discordant_lows = self.solver.get_values(self.discordant_low_vars)
+            discordant_highs = self.solver.get_values(self.discordant_high_vars)
+            self.discordant_edges_sol = {}
             for (u, v) in self.edge_indexes_basic:
-                self.discordant_edges_sol[(u, v)] = int(round(self.discordant_edges_sol[(u, v)]))
+                self.discordant_edges_sol[(u, v)] = int(round(discordant_lows[(u, v)])) + int(round(discordant_highs[(u, v)]))
 
         solution_discordance_expanded = self.discordant_edges_sol
         solution_paths_of_edges = [

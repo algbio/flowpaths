@@ -39,7 +39,7 @@ def test_k_min_discordant_nodes_cycles_solves_and_returns_discordant_nodes():
     assert model.get_objective_value() == sum(solution["discordant_nodes"].values())
 
 
-def test_k_min_discordant_nodes_cycles_respects_subset_constraints_nodes_parameter():
+def test_k_min_discordant_nodes_cycles_respects_subsequence_constraints_parameter():
     graph = nx.DiGraph()
     graph.add_node("s", flow=5)
     graph.add_node("a", flow=5)
@@ -57,7 +57,7 @@ def test_k_min_discordant_nodes_cycles_respects_subset_constraints_nodes_paramet
         k=1,
         discordance_tolerance=0.0,
         weight_type=int,
-        subset_constraints=[["a", "b"]],
+        subsequence_constraints=[["a", "b"]],
         solver_options=SOLVER_OPTIONS,
     )
 

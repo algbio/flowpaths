@@ -1,5 +1,6 @@
 import copy
 import time
+import math
 
 import networkx as nx
 
@@ -17,7 +18,7 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
         k: int,
         weight_type: type = float,
         discordance_tolerance: float = 0.1,
-        subset_constraints: list = [],
+        subsequence_constraints: list = [],
         additional_starts: list = [],
         additional_ends: list = [],
         optimization_options: dict = None,
@@ -50,16 +51,11 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
 
             The type of the weights (`int` or `float`). Default is `float`.
 
-        - `subset_constraints: list`, optional
+        - `subsequence_constraints: list`, optional
 
-            List of subset constraints. Default is an empty list.
-
-            In this node-weighted model, constraints are expected on original graph nodes,
-            i.e. each constraint is a list/set of node names that must be covered by some
-            solution walk (order-independent, set semantics).
-
-            These are converted to expanded-graph edges via `NodeExpandedDiGraph`
-            (node `v` becomes expanded edge `(v.0, v.1)`) before encoding.
+            List of subsequence constraints. Default is an empty list.
+            Each constraint is a list of node names that must all be covered by some solution walk.
+            Internally, each node is mapped to its expanded edge ``(node.0, node.1)`` via ``NodeExpandedDiGraph``.
 
         - `additional_starts: list`, optional
 
@@ -93,7 +89,7 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
             raise ValueError("The input graph G has no nodes. Please provide a graph with at least one node.")
 
         self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr)
-        subset_constraints_expanded = self.G_internal.get_expanded_subpath_constraints(subset_constraints)
+        subset_constraints_expanded = self.G_internal._get_expanded_subpath_constraints_nodes(subsequence_constraints)
         additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
         additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)
 
@@ -120,12 +116,12 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
         self.discordance_tolerance = discordance_tolerance
 
         self.flow_attr = flow_attr
-        self.w_max = self.k * self.weight_type(
-            self.G.get_max_flow_value_and_check_non_negative_flow(
-                flow_attr=self.flow_attr,
-                edges_to_ignore=self.edges_to_ignore,
-            )
+        max_flow = self.G.get_max_flow_value_and_check_non_negative_flow(
+            flow_attr=self.flow_attr,
+            edges_to_ignore=self.edges_to_ignore,
         )
+        w_max_base = (1 + self.discordance_tolerance) * max_flow
+        self.w_max = math.ceil(w_max_base) if self.weight_type == int else float(w_max_base)
 
         self.pi_vars = {}
         self.path_weights_vars = {}
@@ -186,26 +182,19 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
         # Excludes helper source-sink edges, and the edges of the original graph that are ignored for discordance evaluation (e.g. because this model does not use their flow values).
         self.edge_indexes_basic = [(u, v) for (u, v) in self.G.edges() if (u, v) not in self.edges_to_ignore]
 
-        self.discordant_edge_vars = self.solver.add_variables(
-            self.edge_indexes_basic,
-            name_prefix="z",
-            lb=0,
-            ub=1,
-            var_type="integer",
-        )
         self.discordant_low_vars = self.solver.add_variables(
             self.edge_indexes_basic,
             name_prefix="zlow",
             lb=0,
             ub=1,
-            var_type="integer",
+            var_type="binary",
         )
         self.discordant_high_vars = self.solver.add_variables(
             self.edge_indexes_basic,
             name_prefix="zhigh",
             lb=0,
             ub=1,
-            var_type="integer",
+            var_type="binary",
         )
 
         for u, v, data in self.G.edges(data=True):
@@ -217,9 +206,7 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
             interval_ub = (1 + self.discordance_tolerance) * f_u_v
             total_pi_u_v = self.solver.quicksum(self.pi_vars[(u, v, i)] for i in range(self.k))
 
-            # Safe bound for sum_i pi[(u,v,i)] across k walks.
-            sum_pi_ub = self.k * self.w_max
-            big_m = sum_pi_ub + abs(interval_lb) + abs(interval_ub)
+            big_m = 2 * self.w_max
             strict_eps = 1 if self.weight_type == int else 1e-6
 
             for i in range(self.k):
@@ -244,30 +231,52 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
                     )
 
             self.solver.add_constraint(
-                total_pi_u_v >= interval_lb - big_m * self.discordant_low_vars[(u, v)],
-                name=f"disc_lb_u={u}_v={v}",
-            )
-            self.solver.add_constraint(
-                total_pi_u_v <= interval_ub + big_m * self.discordant_high_vars[(u, v)],
-                name=f"disc_ub_u={u}_v={v}",
-            )
-            self.solver.add_constraint(
-                total_pi_u_v <= interval_lb - strict_eps + big_m * (1 - self.discordant_low_vars[(u, v)]),
-                name=f"disc_force_low_u={u}_v={v}",
-            )
-            self.solver.add_constraint(
-                total_pi_u_v >= interval_ub + strict_eps - big_m * (1 - self.discordant_high_vars[(u, v)]),
-                name=f"disc_force_high_u={u}_v={v}",
-            )
-            self.solver.add_constraint(
                 self.discordant_low_vars[(u, v)] + self.discordant_high_vars[(u, v)] <= 1,
                 name=f"disc_side_exclusive_u={u}_v={v}",
             )
-            self.solver.add_constraint(
-                self.discordant_edge_vars[(u, v)]
-                == self.discordant_low_vars[(u, v)] + self.discordant_high_vars[(u, v)],
-                name=f"disc_z_link_u={u}_v={v}",
-            )
+
+            if self.solver.external_solver == "gurobi":
+                self.solver.add_indicator_constraint(
+                    self.discordant_low_vars[(u, v)],
+                    0,
+                    total_pi_u_v >= interval_lb,
+                    name=f"disc_ind_lb0_u={u}_v={v}",
+                )
+                self.solver.add_indicator_constraint(
+                    self.discordant_low_vars[(u, v)],
+                    1,
+                    total_pi_u_v <= interval_lb - strict_eps,
+                    name=f"disc_ind_lb1_u={u}_v={v}",
+                )
+                self.solver.add_indicator_constraint(
+                    self.discordant_high_vars[(u, v)],
+                    0,
+                    total_pi_u_v <= interval_ub,
+                    name=f"disc_ind_ub0_u={u}_v={v}",
+                )
+                self.solver.add_indicator_constraint(
+                    self.discordant_high_vars[(u, v)],
+                    1,
+                    total_pi_u_v >= interval_ub + strict_eps,
+                    name=f"disc_ind_ub1_u={u}_v={v}",
+                )
+            else:
+                self.solver.add_constraint(
+                    total_pi_u_v >= interval_lb - big_m * self.discordant_low_vars[(u, v)],
+                    name=f"disc_lb_u={u}_v={v}",
+                )
+                self.solver.add_constraint(
+                    total_pi_u_v <= interval_ub + big_m * self.discordant_high_vars[(u, v)],
+                    name=f"disc_ub_u={u}_v={v}",
+                )
+                self.solver.add_constraint(
+                    total_pi_u_v <= interval_lb - strict_eps + big_m * (1 - self.discordant_low_vars[(u, v)]),
+                    name=f"disc_force_low_u={u}_v={v}",
+                )
+                self.solver.add_constraint(
+                    total_pi_u_v >= interval_ub + strict_eps - big_m * (1 - self.discordant_high_vars[(u, v)]),
+                    name=f"disc_force_high_u={u}_v={v}",
+                )
 
     def _encode_cover_every_node_edge_constraints(self):
         """
@@ -290,7 +299,8 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
 
         self.solver.set_objective(
             self.solver.quicksum(
-                self.discordant_edge_vars[(u, v)] for (u, v) in self.edge_indexes_basic
+                self.discordant_low_vars[(u, v)] + self.discordant_high_vars[(u, v)]
+                for (u, v) in self.edge_indexes_basic
             ),
             sense="minimize",
         )
@@ -328,9 +338,11 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
             for i in range(self.k)
         ]
 
-        self.discordant_edges_sol = self.solver.get_values(self.discordant_edge_vars)
+        discordant_lows = self.solver.get_values(self.discordant_low_vars)
+        discordant_highs = self.solver.get_values(self.discordant_high_vars)
+        self.discordant_edges_sol = {}
         for (u, v) in self.edge_indexes_basic:
-            self.discordant_edges_sol[(u, v)] = int(round(self.discordant_edges_sol[(u, v)]))
+            self.discordant_edges_sol[(u, v)] = int(round(discordant_lows[(u, v)])) + int(round(discordant_highs[(u, v)]))
 
         self.discordant_nodes_sol = {}
         for expanded_edge, z_value in self.discordant_edges_sol.items():
@@ -363,9 +375,11 @@ class kMinDiscordantNodesCycles(walkmodel.AbstractWalkModelDiGraph):
         solution_weights = self._solution["weights"]
 
         if self.discordant_edges_sol is None:
-            self.discordant_edges_sol = self.solver.get_values(self.discordant_edge_vars)
+            discordant_lows = self.solver.get_values(self.discordant_low_vars)
+            discordant_highs = self.solver.get_values(self.discordant_high_vars)
+            self.discordant_edges_sol = {}
             for (u, v) in self.edge_indexes_basic:
-                self.discordant_edges_sol[(u, v)] = int(round(self.discordant_edges_sol[(u, v)]))
+                self.discordant_edges_sol[(u, v)] = int(round(discordant_lows[(u, v)])) + int(round(discordant_highs[(u, v)]))
 
         solution_discordance_expanded = self.discordant_edges_sol
         solution_walks_of_edges = [

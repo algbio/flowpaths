@@ -28,7 +28,7 @@ def test_read_ngraph_parses_nodes_edges_and_constraints():
     assert graph.nodes["2"]["flow"] == 11.0
     assert graph["0"]["1"]["flow"] == 1.0
     assert graph["1"]["2"]["flow"] == 2.0
-    assert graph.graph["constraints"] == [[("0", "1"), ("1", "2")]]
+    assert graph.graph["constraints"] == [["0", "1", "2"]]
 
 
 def test_read_ngraphs_parses_multiple_blocks(tmp_path: Path):
@@ -63,7 +63,7 @@ def test_read_ngraphs_parses_multiple_blocks(tmp_path: Path):
 
     assert len(graphs) == 2
     assert graphs[0].graph["id"] == "graph number = 0"
-    assert graphs[0].graph["constraints"] == [[("0", "1")]]
+    assert graphs[0].graph["constraints"] == [["0", "1"]]
     assert graphs[1].graph["id"] == "graph number = 1"
     assert graphs[1].graph["n"] == 3
     assert graphs[1].graph["m"] == 2

@@ -6,7 +6,7 @@ import networkx as nx
 SOLVER_OPTIONS = {"external_solver": "gurobi"}
 
 
-def test_k_min_discordant_nodes_exact_fit_with_subpath_constraints():
+def test_k_min_discordant_nodes_exact_fit_with_subsequence_constraints():
     graph = nx.DiGraph()
     graph.add_node("s", flow=10)
     graph.add_node("a", flow=6)
@@ -26,7 +26,7 @@ def test_k_min_discordant_nodes_exact_fit_with_subpath_constraints():
         k=2,
         discordance_tolerance=0.0,
         weight_type=int,
-        subpath_constraints=[[("a", "c")]],
+        subsequence_constraints=[["a", "c"]],
         solver_options=SOLVER_OPTIONS,
     )
 
@@ -92,7 +92,7 @@ def test_k_min_discordant_nodes_supports_multi_vertex_constraints():
         k=2,
         discordance_tolerance=0.0,
         weight_type=int,
-        subpath_constraints=[[("a", "b"), ("b", "c")]],
+        subsequence_constraints=[["a", "b", "c"]],
         solver_options=SOLVER_OPTIONS,
     )
 

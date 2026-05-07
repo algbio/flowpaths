@@ -27,7 +27,8 @@ def test_min_paths_min_discordant_nodes_cycles_initialization_sets_expected_defa
     assert model.stop_on_delta_rel is None
     assert model.min_num_paths == 2
     assert model.max_num_paths == 5
-    assert model.kwargs["G"] is graph
+    assert set(model.kwargs["G"].nodes()) == set(graph.nodes())
+    assert set(model.kwargs["G"].edges()) == set(graph.edges())
     assert model.kwargs["flow_attr"] == "flow"
 
 
@@ -64,3 +65,56 @@ def test_min_paths_min_discordant_nodes_cycles_solve_stops_when_objective_platea
     assert "walks" in solution
     assert "weights" in solution
     assert "discordant_nodes" in solution
+
+
+def test_min_paths_min_discordant_nodes_cycles_scales_and_restores_weights_with_rounding():
+    graph = nx.DiGraph()
+    graph.add_node("s", flow=6)
+    graph.add_node("t", flow=6)
+    graph.add_edge("s", "t")
+
+    model = fp.MinPathsMinDiscordantNodesCycles(
+        G=graph,
+        flow_attr="flow",
+        weight_type=int,
+        discordance_tolerance=0.0,
+        flow_values_divisor=2,
+        round_flow_values_to_int=True,
+        max_num_paths=3,
+        solver_options=SOLVER_OPTIONS,
+    )
+
+    model.solve()
+
+    assert model.is_solved()
+    assert model.is_valid_solution()
+    solution = model.get_solution(remove_empty_paths=False)
+    assert solution["weights"] == [6.0]
+    assert solution["discordant_nodes"] == {"s": 0, "t": 0}
+    assert model.get_objective_value() == 0
+
+
+def test_min_paths_min_discordant_nodes_cycles_scales_without_rounding_and_keeps_validity():
+    graph = nx.DiGraph()
+    graph.add_node("s", flow=5.0)
+    graph.add_node("t", flow=5.0)
+    graph.add_edge("s", "t")
+
+    model = fp.MinPathsMinDiscordantNodesCycles(
+        G=graph,
+        flow_attr="flow",
+        weight_type=float,
+        discordance_tolerance=0.0,
+        flow_values_divisor=2,
+        round_flow_values_to_int=False,
+        max_num_paths=3,
+        solver_options=SOLVER_OPTIONS,
+    )
+
+    model.solve()
+
+    assert model.is_solved()
+    assert model.is_valid_solution()
+    solution = model.get_solution(remove_empty_paths=False)
+    assert solution["weights"] == [5.0]
+    assert solution["discordant_nodes"] == {"s": 0, "t": 0}

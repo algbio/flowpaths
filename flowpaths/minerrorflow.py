@@ -311,7 +311,7 @@ class MinErrorFlow():
             name_prefix="all_flow_values_used_indicator_vars",
             lb=0, 
             ub=1, 
-            var_type="integer",
+            var_type="binary",
         )
         # flow_value_map_vars[(u, v, i)] = 1 if the flow value of edge (u, v) is equal to all_flow_values_vars[i], 0 otherwise
         self.flow_value_map_vars = self.solver.add_variables(
@@ -319,7 +319,7 @@ class MinErrorFlow():
             name_prefix="flow_values_map_vars", 
             lb=0, 
             ub=1, 
-            var_type="integer",
+            var_type="binary",
         )
         
         for (u, v) in edge_subset:

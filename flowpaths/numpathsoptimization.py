@@ -3,6 +3,7 @@ import copy
 import flowpaths.abstractpathmodeldag as pathmodel
 import flowpaths.abstractwalkmodeldigraph as walkmodel
 import flowpaths.utils as utils
+import flowpaths.utils.solverwrapper as sw
 
 class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWalkModelDiGraph):
     # We inherit both abstract bases so this optimizer can wrap either DAG path
@@ -20,6 +21,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
         stop_on_first_feasible: bool = None,
         stop_on_delta_abs: float = None,
         stop_on_delta_rel: float = None,
+        stop_on_infeasible_on_delta: bool = True,
         min_num_paths: int = 1,
         max_num_paths: int = 2**64,
         time_limit: float = float("inf"),
@@ -59,6 +61,13 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
             !!! warning "Pass at least one stopping criterion"
                 At least one of the stopping criterion must be set: `stop_on_first_feasible`, `stop_on_delta_abs`, `stop_on_delta_rel`.
 
+        - `stop_on_infeasible_on_delta : bool`, optional
+
+            If True (default), and a delta-based stopping mode is enabled
+            (`stop_on_delta_abs` or `stop_on_delta_rel`), stop immediately and
+            report infeasible when an iteration becomes infeasible (including
+            the first tried iteration).
+
         - `min_num_paths : int`, optional
 
             Minimum number of paths/walks to be considered in the optimization.
@@ -96,6 +105,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
         self.stop_on_first_feasible = stop_on_first_feasible
         self.stop_on_delta_abs = stop_on_delta_abs
         self.stop_on_delta_rel = stop_on_delta_rel
+        self.stop_on_infeasible_on_delta = stop_on_infeasible_on_delta
         self.min_num_paths = min_num_paths
         self.max_num_paths = max_num_paths
         self.time_limit = time_limit
@@ -113,6 +123,8 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
         
         self.lowerbound_k = None
         self._solution = None
+        self._incumbent_solution = None
+        self._incumbent_objective_value = None
         self.solve_statistics = None
         self._is_solved = False
 
@@ -181,12 +193,40 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
         found_feasible = False
         previous_feasible_model = None
         selected_model = None
+        self._incumbent_solution = None
+        self._incumbent_objective_value = None
 
         for k in range(max(self.min_num_paths,self.get_lowerbound_k()), self.max_num_paths+1):
+            remaining_time = self.time_limit - self.solve_time_elapsed
+            if remaining_time <= 0:
+                solve_status = NumPathsOptimization.timeout_status_name
+                utils.logger.info(
+                    f"{__name__}: model id = {id(self)}, no remaining time before iteration k = {k}, stopping with timeout"
+                )
+                break
+
+            model_kwargs = copy.deepcopy(self.kwargs)
+            # Enforce a global wall-clock budget by capping each per-k model with
+            # the remaining time (without overriding a stricter caller-provided cap).
+            if self.time_limit != float("inf"):
+                if "solver_options" in model_kwargs and isinstance(model_kwargs["solver_options"], dict):
+                    solver_time_limit = model_kwargs["solver_options"].get("time_limit", float("inf"))
+                    model_kwargs["solver_options"]["time_limit"] = min(solver_time_limit, remaining_time)
+                if "time_limit" in model_kwargs:
+                    model_time_limit = model_kwargs.get("time_limit", float("inf"))
+                    model_kwargs["time_limit"] = min(model_time_limit, remaining_time)
+
             # Create the model
             utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}")
-            model = self.model_type(**self.kwargs, k=k)
+            model = self.model_type(**model_kwargs, k=k)
             model.solve()
+
+            model_status = None
+            if hasattr(model, "solver") and hasattr(model.solver, "get_model_status"):
+                model_status = model.solver.get_model_status()
+            elif hasattr(model, "solve_statistics") and isinstance(model.solve_statistics, dict):
+                model_status = model.solve_statistics.get("model_status")
+
             if model.is_solved():
                 found_feasible = True
                 current_solution_objective_value = model.get_objective_value()
@@ -215,9 +255,46 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
 
                 previous_feasible_model = model
                 previous_solution_objective_value = current_solution_objective_value
+
+                # Preserve paper-like timeout semantics: when current k hits the
+                # time limit but has an incumbent, return best-so-far.
+                if model_status == "kTimeLimit":
+                    solve_status = NumPathsOptimization.timeout_status_name
+                    selected_model = model
+                    utils.logger.info(
+                        f"{__name__}: model id = {id(self)}, iteration with k = {k}, solver reported time limit with feasible incumbent"
+                    )
+                    break
             else:
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, model is not solved")
-            if self.solve_time_elapsed > self.time_limit:
+                if model_status == "kTimeLimit":
+                    solve_status = NumPathsOptimization.timeout_status_name
+                    if hasattr(model, "has_incumbent_solution") and model.has_incumbent_solution():
+                        if hasattr(model, "get_incumbent_solution_paths"):
+                            self._incumbent_solution = {
+                                "paths": model.get_incumbent_solution_paths(),
+                            }
+                        elif hasattr(model, "get_incumbent_solution_walks"):
+                            self._incumbent_solution = {
+                                "walks": model.get_incumbent_solution_walks(),
+                            }
+                        if hasattr(model, "get_incumbent_objective_value"):
+                            self._incumbent_objective_value = model.get_incumbent_objective_value()
+                    utils.logger.info(
+                        f"{__name__}: model id = {id(self)}, iteration with k = {k}, solver reported time limit"
+                    )
+                    break
+                if (
+                    self.stop_on_infeasible_on_delta
+                    and (self.stop_on_delta_abs is not None or self.stop_on_delta_rel is not None)
+                    and model_status == sw.SolverWrapper.infeasible_status
+                ):
+                    solve_status = NumPathsOptimization.infeasible_status_name
+                    utils.logger.info(
+                        f"{__name__}: model id = {id(self)}, iteration with k = {k}, stopping on infeasible model while running delta-based stopping"
+                    )
+                    break
+            if self.solve_time_elapsed >= self.time_limit:
                 solve_status = NumPathsOptimization.timeout_status_name
                 utils.logger.info(f"{__name__}: model id = {id(self)}, iteration with k = {k}, time out")
                 break
@@ -235,7 +312,7 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
 
         if solve_status == NumPathsOptimization.solved_status_name:
             if selected_model is None:
-                selected_model = model
+                selected_model = previous_feasible_model if previous_feasible_model is not None else model
             # Store the unfiltered solution when the wrapped model supports it,
             # so callers can decide whether to remove empty paths/walks.
             self._solution = self._get_unfiltered_solution_from_model(selected_model)
@@ -316,6 +393,19 @@ class NumPathsOptimization(pathmodel.AbstractPathModelDAG, walkmodel.AbstractWal
         self._solution = self._get_unfiltered_solution_from_model(self.model)
 
         return self._remove_empty_sequences(self._solution) if remove_empty_paths else self._solution
+
+    def has_incumbent_solution(self) -> bool:
+        return self._incumbent_solution is not None
+
+    def get_incumbent_solution(self, remove_empty_paths=False):
+        if not self.has_incumbent_solution():
+            raise Exception("No incumbent solution stored.")
+        return self._remove_empty_sequences(self._incumbent_solution) if remove_empty_paths else self._incumbent_solution
+
+    def get_incumbent_objective_value(self):
+        if not self.has_incumbent_solution():
+            raise Exception("No incumbent solution stored.")
+        return self._incumbent_objective_value
     
     def get_objective_value(self):
         """

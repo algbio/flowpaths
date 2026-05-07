@@ -60,6 +60,8 @@ class AbstractPathModelDAG(ABC):
     optimize_with_safety_as_subpath_constraints = False
     optimize_with_safety_from_largest_antichain = False
     optimize_with_symmetry_breaking_lexicographic_paths = True
+    optimize_with_lp_tightening_constraints = True
+    optimize_with_deterministic_propagation_from_fixed_edges = True
 
     def __init__(
         self,
@@ -214,6 +216,8 @@ class AbstractPathModelDAG(ABC):
         self.optimize_with_safe_sequences = optimization_options.get("optimize_with_safe_sequences", AbstractPathModelDAG.optimize_with_safe_sequences)
         self.optimize_with_subpath_constraints_as_safe_sequences = optimization_options.get("optimize_with_subpath_constraints_as_safe_sequences", AbstractPathModelDAG.optimize_with_subpath_constraints_as_safe_sequences)
         self.optimize_with_symmetry_breaking_lexicographic_paths = optimization_options.get("optimize_with_symmetry_breaking_lexicographic_paths", AbstractPathModelDAG.optimize_with_symmetry_breaking_lexicographic_paths)
+        self.optimize_with_lp_tightening_constraints = optimization_options.get("optimize_with_lp_tightening_constraints", AbstractPathModelDAG.optimize_with_lp_tightening_constraints)
+        self.optimize_with_deterministic_propagation_from_fixed_edges = optimization_options.get("optimize_with_deterministic_propagation_from_fixed_edges", AbstractPathModelDAG.optimize_with_deterministic_propagation_from_fixed_edges)
         self.trusted_edges_for_safety = optimization_options.get("trusted_edges_for_safety", None)
         self.optimize_with_safe_zero_edges = optimization_options.get("optimize_with_safe_zero_edges", AbstractPathModelDAG.optimize_with_safe_zero_edges)
         self.external_solution_paths = optimization_options.get("external_solution_paths", None)
@@ -222,6 +226,9 @@ class AbstractPathModelDAG(ABC):
         self.optimize_with_safety_from_largest_antichain = optimization_options.get("optimize_with_safety_from_largest_antichain", AbstractPathModelDAG.optimize_with_safety_from_largest_antichain)
         
         self._is_solved = False
+        self._has_incumbent_solution = False
+        self._incumbent_objective_value = None
+        self._incumbent_edge_vars_sol = None
         if self.external_solution_paths is not None:
             self._is_solved = True
 
@@ -284,7 +291,7 @@ class AbstractPathModelDAG(ABC):
 
         # The identifiers of the constraints come from https://arxiv.org/pdf/2201.10923 page 14-15
 
-        self.edge_vars = self.solver.add_variables(self.edge_indexes, name_prefix="edge", lb=0, ub=1, var_type="integer")
+        self.edge_vars = self.solver.add_variables(self.edge_indexes, name_prefix="edge", lb=0, ub=1, var_type="binary")
 
         for i in range(self.k):
             
@@ -327,6 +334,53 @@ class AbstractPathModelDAG(ABC):
                     f"10c_v={v}_i={i}",
                 )
 
+        self._apply_lp_tightening_constraints()
+
+    def _apply_lp_tightening_constraints(self):
+        """
+        Add LP-tightening constraints that preserve integer-feasible solutions while
+        improving the linear relaxation.
+
+        The added constraints are:
+        1) For each internal node v and path i:
+           - sum_in(v, i) <= 1
+           - sum_out(v, i) <= 1
+        2) For each path i, explicit source/sink flow balance:
+           - sum_out(source, i) == sum_in(sink, i)
+        """
+
+        if not self.optimize_with_lp_tightening_constraints:
+            return
+
+        for i in range(self.k):
+            source_out_i = self.solver.quicksum(
+                self.edge_vars[(self.G.source, v, i)]
+                for v in self.G.successors(self.G.source)
+            )
+            sink_in_i = self.solver.quicksum(
+                self.edge_vars[(u, self.G.sink, i)]
+                for u in self.G.predecessors(self.G.sink)
+            )
+            self.solver.add_constraint(
+                source_out_i == sink_in_i,
+                name=f"lp_tight_source_sink_balance_i={i}",
+            )
+
+            for v in self.G.nodes:
+                if v == self.G.source or v == self.G.sink:
+                    continue
+
+                self.solver.add_constraint(
+                    self.solver.quicksum(self.edge_vars[(u, v, i)] for u in self.G.predecessors(v)) <= 1,
+                    name=f"lp_tight_in_deg_v={v}_i={i}",
+                )
+                self.solver.add_constraint(
+                    self.solver.quicksum(self.edge_vars[(v, w, i)] for w in self.G.successors(v)) <= 1,
+                    name=f"lp_tight_out_deg_v={v}_i={i}",
+                )
+
+        self.solve_statistics["optimizations_applied"].add("optimize_with_lp_tightening_constraints")
+
     def _encode_subpath_constraints(self):
 
         ################################
@@ -339,7 +393,7 @@ class AbstractPathModelDAG(ABC):
 
         if len(self.subpath_constraints) > 0:
             self.subpaths_vars = self.solver.add_variables(
-                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="integer")
+                self.subpath_indexes, name_prefix="r", lb=0, ub=1, var_type="binary")
         
             for i in range(self.k):
                 for j in range(len(self.subpath_constraints)):
@@ -504,8 +558,10 @@ class AbstractPathModelDAG(ABC):
                     self.solve_statistics["edge_variables=1"] += 1
             if len(self.paths_to_fix) > 0:
                 self.solve_statistics["optimizations_applied"].add("optimize_with_safe_lists")
+            utils.logger.debug(f"{__name__}: Fixed {self.solve_statistics['edge_variables=1']} edge variables to 1 via safety optimizations.")
 
             self._apply_safety_optimizations_fix_zero_edges()
+            self._apply_deterministic_propagation_from_fixed_edges()
 
     def _apply_safety_optimizations_fix_zero_edges(self):
         """
@@ -593,6 +649,183 @@ class AbstractPathModelDAG(ABC):
         self.solve_statistics["optimizations_applied"].add("optimize_with_safe_zero_edges")
         self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + fixed_zero_count
         utils.logger.debug(f"{__name__}: Fixed {fixed_zero_count} edge variables to 0 via reachability pruning.")
+
+    def _apply_deterministic_propagation_from_fixed_edges(self):
+        """
+        Apply deterministic fixed-point propagation on edge binaries using already fixed
+        values and hard path constraints.
+
+        It can derive additional fixes to 0 and 1 from:
+        - source-outgoing cardinality constraints,
+        - internal flow conservation constraints,
+        - and optional LP-tightening caps/source-sink balance when enabled.
+        """
+
+        if not self.optimize_with_deterministic_propagation_from_fixed_edges:
+            return
+
+        if self.is_solved():
+            return
+
+        propagated_zero_count = 0
+        propagated_one_count = 0
+
+        def _status(edge_key):
+            if edge_key in self.edges_set_to_one:
+                return 1
+            if edge_key in self.edges_set_to_zero:
+                return 0
+            return None
+
+        def _fix(edge_key, value):
+            nonlocal propagated_zero_count, propagated_one_count
+
+            current = _status(edge_key)
+            if current == value:
+                return False
+            if current is not None and current != value:
+                utils.logger.error(
+                    f"{__name__}: inconsistent deterministic propagation on edge {edge_key}, "
+                    f"existing={current}, new={value}."
+                )
+                raise ValueError(
+                    f"Inconsistent deterministic propagation on edge {edge_key}, existing={current}, new={value}."
+                )
+
+            u, v, i = edge_key
+            self.solver.add_constraint(
+                self.edge_vars[edge_key] == value,
+                name=f"det_prop_i={i}_u={u}_v={v}_val={value}",
+            )
+
+            if value == 1:
+                self.edges_set_to_one[edge_key] = True
+                propagated_one_count += 1
+            else:
+                self.edges_set_to_zero[edge_key] = True
+                propagated_zero_count += 1
+
+            return True
+
+        def _bounds(edge_keys, cap=None):
+            fixed_ones = 0
+            unfixed = 0
+            for edge_key in edge_keys:
+                s = _status(edge_key)
+                if s == 1:
+                    fixed_ones += 1
+                elif s is None:
+                    unfixed += 1
+
+            lb = fixed_ones
+            ub = fixed_ones + unfixed
+            if cap is not None:
+                ub = min(ub, cap)
+            return lb, ub
+
+        def _propagate_group(edge_keys, required_lb, required_ub):
+            changed_group = False
+
+            while True:
+                fixed_ones = 0
+                unfixed_keys = []
+                for edge_key in edge_keys:
+                    s = _status(edge_key)
+                    if s == 1:
+                        fixed_ones += 1
+                    elif s is None:
+                        unfixed_keys.append(edge_key)
+
+                if fixed_ones > required_ub or fixed_ones + len(unfixed_keys) < required_lb:
+                    utils.logger.error(
+                        f"{__name__}: deterministic propagation found infeasible cardinality "
+                        f"range [{required_lb},{required_ub}] with fixed_ones={fixed_ones}, "
+                        f"unfixed={len(unfixed_keys)}."
+                    )
+                    raise ValueError(
+                        f"Deterministic propagation found infeasible cardinality range [{required_lb},{required_ub}] "
+                        f"with fixed_ones={fixed_ones}, unfixed={len(unfixed_keys)}."
+                    )
+
+                local_changed = False
+                for edge_key in list(unfixed_keys):
+                    # If keeping edge_key at 0 makes lower bound unreachable, edge_key must be 1.
+                    if fixed_ones + (len(unfixed_keys) - 1) < required_lb:
+                        if _fix(edge_key, 1):
+                            fixed_ones += 1
+                            unfixed_keys.remove(edge_key)
+                            local_changed = True
+                            changed_group = True
+                        continue
+
+                    # If upper bound is already met by fixed 1s, all remaining are forced to 0.
+                    if fixed_ones >= required_ub:
+                        if _fix(edge_key, 0):
+                            unfixed_keys.remove(edge_key)
+                            local_changed = True
+                            changed_group = True
+
+                if not local_changed:
+                    break
+
+            return changed_group
+
+        changed = True
+        while changed:
+            changed = False
+
+            for i in range(self.k):
+                source_out_keys = [(self.G.source, v, i) for v in self.G.successors(self.G.source)]
+                source_lb = 0 if self.allow_empty_paths else 1
+                source_ub = 1
+                if _propagate_group(source_out_keys, source_lb, source_ub):
+                    changed = True
+
+                if self.optimize_with_lp_tightening_constraints:
+                    sink_in_keys = [(u, self.G.sink, i) for u in self.G.predecessors(self.G.sink)]
+                    if _propagate_group(sink_in_keys, source_lb, source_ub):
+                        changed = True
+
+                for v in self.G.nodes:
+                    if v == self.G.source or v == self.G.sink:
+                        continue
+
+                    in_keys = [(u, v, i) for u in self.G.predecessors(v)]
+                    out_keys = [(v, w, i) for w in self.G.successors(v)]
+
+                    cap = 1 if self.optimize_with_lp_tightening_constraints else None
+                    min_in, max_in = _bounds(in_keys, cap=cap)
+                    min_out, max_out = _bounds(out_keys, cap=cap)
+
+                    required_lb = max(min_in, min_out)
+                    required_ub = min(max_in, max_out)
+                    if required_lb > required_ub:
+                        utils.logger.error(
+                            f"{__name__}: deterministic propagation found no feasible balance at node={v}, layer={i}, "
+                            f"in=[{min_in},{max_in}] out=[{min_out},{max_out}]."
+                        )
+                        raise ValueError(
+                            f"Deterministic propagation found no feasible balance at node={v}, layer={i}, "
+                            f"in=[{min_in},{max_in}] out=[{min_out},{max_out}]."
+                        )
+
+                    if _propagate_group(in_keys, required_lb, required_ub):
+                        changed = True
+                    if _propagate_group(out_keys, required_lb, required_ub):
+                        changed = True
+
+        if propagated_zero_count > 0 or propagated_one_count > 0:
+            self.solve_statistics["optimizations_applied"].add("optimize_with_deterministic_propagation_from_fixed_edges")
+
+        self.solve_statistics["edge_variables=0"] = self.solve_statistics.get("edge_variables=0", 0) + propagated_zero_count
+        self.solve_statistics["edge_variables=1"] = self.solve_statistics.get("edge_variables=1", 0) + propagated_one_count
+        self.solve_statistics["edge_variables_propagated=0"] = self.solve_statistics.get("edge_variables_propagated=0", 0) + propagated_zero_count
+        self.solve_statistics["edge_variables_propagated=1"] = self.solve_statistics.get("edge_variables_propagated=1", 0) + propagated_one_count
+
+        utils.logger.debug(
+            f"{__name__}: Deterministic propagation fixed {propagated_zero_count} edge variables to 0 and "
+            f"{propagated_one_count} edge variables to 1."
+        )
 
 
     def _get_paths_to_fix_from_safe_lists(self) -> list:
@@ -690,13 +923,13 @@ class AbstractPathModelDAG(ABC):
         # p=0 is always 1 (constant), so variables run from p=1 to p=m.
         tied_indexes = [(p, i) for i in free_pair_indices for p in range(1, m + 1)]
         self.symmetry_tied_vars = self.solver.add_variables(
-            tied_indexes, name_prefix="sym_tied", lb=0, ub=1, var_type="integer"
+            tied_indexes, name_prefix="sym_tied", lb=0, ub=1, var_type="binary"
         )
 
         # sym_diff[(p, i)]: |x[edge_p, i] - x[edge_p, i-1]|, one per edge position.
         diff_indexes = [(p, i) for i in free_pair_indices for p in range(m)]
         self.symmetry_diff_vars = self.solver.add_variables(
-            diff_indexes, name_prefix="sym_diff", lb=0, ub=1, var_type="integer"
+            diff_indexes, name_prefix="sym_diff", lb=0, ub=1, var_type="binary"
         )
 
         for i in free_pair_indices:
@@ -812,16 +1045,36 @@ class AbstractPathModelDAG(ABC):
             self.solver.get_model_status()
         )
 
-        if (
-            self.solver.get_model_status() == "kOptimal"
-            or self.solver.get_model_status() == 2
-        ):
+        self._has_incumbent_solution = False
+        self._incumbent_objective_value = None
+        self._incumbent_edge_vars_sol = None
+
+        solver_status = self.solver.get_model_status()
+        if solver_status == "kOptimal" or solver_status == 2:
             self._is_solved = True
             utils.logger.info(f"{__name__}: solved successfully. Objective value: {self.get_objective_value()}")
             return True
 
+        # Store best incumbent on timeout (without marking solved).
+        if solver_status == "kTimeLimit" and self.solver.has_feasible_solution():
+            self._store_incumbent_solution()
+            self._is_solved = False
+            utils.logger.warning(
+                f"{__name__}: solver reached time limit; stored best feasible incumbent. Objective value: {self._incumbent_objective_value}",
+            )
+            return False
+
         self._is_solved = False
         return False
+
+    def _store_incumbent_solution(self):
+        """Capture the current solver incumbent into dedicated instance variables."""
+        self._incumbent_edge_vars_sol = self.solver.get_values(self.edge_vars, binary_values=True)
+        self._has_incumbent_solution = True
+        try:
+            self._incumbent_objective_value = self.solver.get_objective_value()
+        except Exception:
+            self._incumbent_objective_value = None
 
     def check_is_solved(self):
         if not self.is_solved():
@@ -832,6 +1085,14 @@ class AbstractPathModelDAG(ABC):
         
     def is_solved(self):
         return self._is_solved
+
+    def has_incumbent_solution(self) -> bool:
+        return self._has_incumbent_solution
+
+    def get_incumbent_objective_value(self):
+        if not self.has_incumbent_solution():
+            raise Exception("No incumbent solution stored.")
+        return self._incumbent_objective_value
     
     def set_solved(self):
         self._is_solved = True
@@ -870,13 +1131,23 @@ class AbstractPathModelDAG(ABC):
         if self.edge_vars_sol == {}:
             self.edge_vars_sol = self.solver.get_values(self.edge_vars, binary_values=True)
 
+        return self._decode_solution_paths_from_values(self.edge_vars_sol)
+
+    def get_incumbent_solution_paths(self) -> list:
+        if not self.has_incumbent_solution():
+            raise Exception("No incumbent solution stored.")
+        return self._decode_solution_paths_from_values(self._incumbent_edge_vars_sol)
+
+    def _decode_solution_paths_from_values(self, edge_values) -> list:
+        """Decode source-to-sink paths from edge binary values for all layers."""
+
         paths = []
         for i in range(self.k):
             vertex = self.G.source
             # checking if there is a path from source to sink
             found_path = False
             for out_neighbor in self.G.successors(vertex):
-                if self.edge_vars_sol[(str(vertex), str(out_neighbor), i)] == 1:
+                if edge_values[(str(vertex), str(out_neighbor), i)] == 1:
                     found_path = True
                     break
             if not found_path:
@@ -887,7 +1158,7 @@ class AbstractPathModelDAG(ABC):
                 path = [vertex]
                 while vertex != self.G.sink:
                     for out_neighbor in self.G.successors(vertex):
-                        if self.edge_vars_sol[(str(vertex), str(out_neighbor), i)] == 1:
+                        if edge_values[(str(vertex), str(out_neighbor), i)] == 1:
                             vertex = out_neighbor
                             break
                     path.append(vertex)
