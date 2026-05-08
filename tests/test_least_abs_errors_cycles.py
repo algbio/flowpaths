@@ -87,21 +87,30 @@ def test_additional_edges_lambda_validation_cycles():
 
 
 def test_additional_edges_objective_cycles():
+    # Configure logging
+    fp.utils.configure_logging(
+        level=fp.utils.logging.DEBUG,
+        log_to_console=True,
+    )
+    
     G = nx.DiGraph()
-    G.add_edge("s", "a", flow=3)
-    G.add_edge("a", "b", flow=3)
+    G.add_edge("s", "a", flow=40)
+    G.add_edge("a", "b", flow=4)
     G.add_edge("b", "a", flow=3)
-    G.add_edge("b", "t", flow=3)
+    G.add_edge("b", "t", flow=4)
 
     model = fp.kLeastAbsErrorsCycles(
         G=G,
         flow_attr="flow",
-        k=2,
+        k=1,
         additional_edges=[("a", "t")],
-        additional_edges_lambda=2.0,
-        solver_options={"external_solver": "highs"},
+        # additional_edges_lambda=2.0,
+        # solver_options={"external_solver": "highs"},
     )
     model.solve()
+    assert model.get_solution()["walks"] == [['s', 'a', 't']], "Expected walk not found"
+    assert model.get_solution()["weights"] == [40.0], "Expected weight not found"
+    assert model.get_objective_value() == 12, "Objective value should be 12 with the additional edge a->t used to resolve the cycle and the error on edge a->b."
 
     assert model.is_solved()
     assert model.is_valid_solution()

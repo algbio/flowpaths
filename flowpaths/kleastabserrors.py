@@ -184,7 +184,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             if G.number_of_nodes() == 0:
                 utils.logger.error(f"{__name__}: The input graph G has no nodes. Please provide a graph with at least one node.")
                 raise ValueError(f"The input graph G has no nodes. Please provide a graph with at least one node.")
-            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr)
+            self.G_internal = nedg.NodeExpandedDiGraph(G, node_flow_attr=flow_attr, node_length_attr=length_attr) 
             subpath_constraints_internal = self.G_internal.get_expanded_subpath_constraints(subpath_constraints)
             additional_starts_internal = self.G_internal.get_expanded_additional_starts(additional_starts)
             additional_ends_internal = self.G_internal.get_expanded_additional_ends(additional_ends)

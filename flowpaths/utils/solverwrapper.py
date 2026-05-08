@@ -95,7 +95,7 @@ class SolverWrapper:
     presolve = "choose"
     log_to_console = "false"
     external_solver = "highs"
-    tolerance = 1e-9
+    tolerance = 1e-6
     optimization_sense = "minimize"
     infeasible_status = "kInfeasible"
     use_also_custom_timeout = False
@@ -143,7 +143,7 @@ class SolverWrapper:
             self.solver.setOptionValue("mip_feasibility_tolerance", self.tolerance)
             self.solver.setOptionValue("mip_abs_gap", self.tolerance)
             self.solver.setOptionValue("mip_rel_gap", self.tolerance)
-            self.solver.setOptionValue("primal_feasibility_tolerance", self.tolerance)
+            self.solver.setOptionValue("primal_feasibility_tolerance", max(self.tolerance, 1e-7))
         elif self.external_solver == "gurobi":
             import gurobipy
 

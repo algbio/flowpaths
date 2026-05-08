@@ -180,8 +180,6 @@ class NodeExpandedDiGraph(nx.DiGraph):
         if try_filling_in_missing_flow_attr:
             self._try_filling_in_missing_flow_values()
 
-        nx.freeze(self)    
-
     def _try_filling_in_missing_flow_values(self):
         
         # Fills in missing flow values in the expanded graph, by setting them to the flow values of a maximum flow
