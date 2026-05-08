@@ -37,10 +37,21 @@ For each edge in `additional_edges`:
 
 And:
 
-- `additional_edges_lambda` must be numeric and non-negative.
+- `additional_edges_lambda` can be either:
+	- `None` (automatic graph-dependent default), or
+	- a numeric non-negative constant.
+
+When `additional_edges_lambda=None`, the models use:
+
+$$
+\lambda_{\mathrm{add}} = \max\left(1.0,\ 0.1 \cdot \frac{Q_{0.9}(\text{flow values})}{\text{graph width}}\right),
+$$
+
+where $Q_{0.9}$ is the 90th percentile of edge flows (or node flows in node-weighted mode).
 
 ## 4. Practical Guidance
 
-- Start with a moderate `additional_edges_lambda` (for example, `1.0`).
+- By default, pass `additional_edges_lambda=None` to use the automatic graph-dependent value above.
+- You can still pass an explicit constant if you want stronger/weaker penalization.
 - Increase it if the solver overuses additional edges.
 - Decrease it if additional edges are plausible and needed to reduce large errors.

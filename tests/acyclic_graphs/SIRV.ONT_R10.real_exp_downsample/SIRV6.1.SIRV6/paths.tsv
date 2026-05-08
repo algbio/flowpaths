@@ -1,0 +1,13 @@
+transcript_id	count	count_scaled	status	path	path_simple	missing_vertices	missing_edges
+SIRV601	3955	5	ok	15-0-3-13-5-4-7-8-6-21	15,0,3,13,5,4,7,8,6,21	0	0
+SIRV604	2363	3	partial	*-0-3-1-2-5-4-7-8-6-21	0,3,1,2,5,4,7,8,6,21	1	1
+SIRV612	6045	7	partial	*-0-3-1-2-5-4-7-8-6-21	0,3,1,2,5,4,7,8,6,21	1	1
+SIRV607	33254	41	partial	*-0-1-2-19	0,1,2,19	1	1
+SIRV609	17645	22	partial	*-0-3-1-18	0,3,1,18	1	1
+SIRV617	24330	30	monoexonic			0	0
+SIRV606	3063	4	ok	14-5-4-7-17	14,5,4,7,17	0	0
+SIRV618	3047	4	monoexonic			0	0
+SIRV610	7983	10	partial	*-5-4-7-6-22	5,4,7,6,22	1	1
+SIRV614	4836	6	partial	*-5-4-10-9-20	5,4,10,9,20	1	1
+SIRV613	4016	5	ok	16-12-11-9-8-6-21	16,12,11,9,8,6,21	0	0
+SIRV603	19706	24	monoexonic			0	0

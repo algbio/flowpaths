@@ -1,0 +1,9 @@
+transcript_id	count	count_scaled	status	path	path_simple	missing_vertices	missing_edges
+SIRV308	6708	21	ok	17-9-7-21	17,9,7,21	0	0
+SIRV301	5954	19	ok	19-6-3-10-5-23	19,6,3,10,5,23	0	0
+SIRV303	1594	5	disconnected	18|6-3-20	18,6,3,20	0	1
+SIRV304	3605	11	ok	18-8-2-3-13-11-14-5-23	18,8,2,3,13,11,14,5,23	0	0
+SIRV307	5507	17	ok	18-8-2-3-12-23	18,8,2,3,12,23	0	0
+SIRV305	10984	35	ok	15-2-4-22	15,2,4,22	0	0
+SIRV311	1622	5	monoexonic			0	0
+SIRV309	25562	80	ok	16-1-0-24	16,1,0,24	0	0

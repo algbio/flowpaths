@@ -41,6 +41,13 @@ This class implements a more general version, as follows:
 5. Another way to relax the constraint is to allow also some looseness in the slack value, based on the length of the solution path. Intuitively, suppose that longer paths have even higher variance in their weight across the edges of the path, while shorter paths less. Formally, suppose that we have a function $\alpha : \mathbb{N} \rightarrow \mathbb{R}^+$ that for every solution path length $\ell$, it returns a multiplicative factor $\alpha(\ell)$. Then, we can multiply each path slack $\rho_i$ by $\alpha(|P_i|)$ in the constraint of the problem (where $|P_i|$ denotes the length of solution path $P_i$). In the above example, we could set $\alpha(\ell) > 1$ for "large" lengths $\ell$. Note that in this model we keep the same objective function (i.e. sum of slacks), and thus this multiplier has no effect on the objective value. You can pass the function $\alpha$ to the class as a piecewise encoding, via parameters `path_length_ranges` and `path_length_factors`, see [kMinPathError()](k-min-path-error.md#flowpaths.kminpatherror.kMinPathError).
 6. You can optionally add extra candidate edges not present in the original graph via `additional_edges` $E_{\mathrm{add}}$. Their usage can be penalized in the objective via `additional_edges_lambda` $\lambda_{\mathrm{add}}$, where each additional edge is counted at most once, even if multiple paths use it. See also [additional edges and usage penalty documentation](additional-edges-penalty.md).
 
+!!! note "Choosing `additional_edges_lambda`"
+        - If you pass `additional_edges_lambda=None`, the model sets it automatically to:
+            $$
+            \max\left(1.0,\ 0.1 \cdot \frac{Q_{0.9}(\text{flow values})}{\text{graph width}}\right).
+            $$
+        - You can still pass any explicit non-negative constant to override this behavior.
+
 !!! info "Generalized constraint"
     Formally, the constraint generalized as in 3., 4. and 5. above is:
     $$

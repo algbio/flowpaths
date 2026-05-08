@@ -33,6 +33,13 @@ This class implements a more general version, as follows:
 4. The error (i.e. the above absolute of the difference) of every edge can contribute differently to the objective function, according to a scale factor $\in [0,1]$. Set these via a dictionary that you pass to `error_scaling`, which stores the scale factor $\lambda_{(u,v)} \in [0,1]$ of each edge $(u,v)$ in the dictionary. Setting $\lambda_{(u,v)} = 0$ is equivalent to adding the edge $(u,v)$ to `elements_to_ignore`; the latter option is more efficient, as it results in a smaller model.
 5. You can optionally add extra candidate edges not present in the original graph via `additional_edges` $E_{\mathrm{add}}$. Their usage can be penalized in the objective via `additional_edges_lambda` $\lambda_{\mathrm{add}}$, where each additional edge is counted at most once, even if multiple paths use it. See also [additional edges and usage penalty documentation](additional-edges-penalty.md).
 
+!!! note "Choosing `additional_edges_lambda`"
+        - If you pass `additional_edges_lambda=None`, the model sets it automatically to:
+            $$
+            \max\left(1.0,\ 0.1 \cdot \frac{Q_{0.9}(\text{flow values})}{\text{graph width}}\right).
+            $$
+        - You can still pass any explicit non-negative constant to override this behavior.
+
 !!! info "Generalized objective function"
     Formally, with 3.-5. above, the minimized objective function is:
     $$

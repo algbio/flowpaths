@@ -1,0 +1,6 @@
+transcript_id	count	count_scaled	status	path	path_simple	missing_vertices	missing_edges
+SIRV409	14806	45	ok	8-2-1-12	8,2,1,12	0	0
+SIRV406	7282	22	ok	10-6-14	10,6,14	0	0
+SIRV403	1446	4	ok	9-4-0-3-13	9,4,0,3,13	0	0
+SIRV408	11382	34	ok	9-4-5-0-3-13	9,4,5,0,3,13	0	0
+SIRV405	22521	68	ok	7-0-11	7,0,11	0	0

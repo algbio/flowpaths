@@ -1,3 +1,5 @@
+from pathlib import Path
+import csv
 from itertools import count
 import networkx as nx
 import flowpaths.utils as utils
@@ -6,6 +8,242 @@ import flowpaths.utils as utils
 # stdigraph inside functions that need it (e.g. read_graph) after this module is fully loaded.
 
 bigNumber = 1 << 32
+
+
+def _read_tsv_rows(file_path: Path) -> list:
+    with file_path.open("r", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        return list(reader)
+
+
+def _parse_path_simple_nodes(path_simple: str) -> list:
+    if path_simple is None:
+        return []
+
+    stripped = path_simple.strip()
+    if stripped == "":
+        return []
+
+    return [node.strip() for node in stripped.split(",") if node.strip()]
+
+
+def _nodes_to_edges(nodes: list) -> list:
+    return [(u, v) for u, v in zip(nodes, nodes[1:])]
+
+
+def read_intron_graph(graph_dir) -> nx.DiGraph:
+    """
+    Read one node-weighted graph from a folder produced in the intron-graph TSV format.
+
+    Expected files inside `graph_dir`:
+    - `vertices.tsv`: node list. Each row becomes one graph node, with:
+      - node id from `vertex_id`
+      - node weight stored in `G.nodes[node]["flow"]` from the `weight` column
+      - extra metadata copied from the row (`type`, `chr`, `start`, `end`)
+    - `edges.tsv`: directed graph edges. The `u` and `v` columns define edges.
+      If a third `weight` column is present, it is stored on the edge as `flow`.
+        - `read_subpaths.tsv` (optional): subpath constraints. Each non-empty `path_simple`
+      value is parsed as a comma-separated node list and appended to
+      `G.graph["constraints"]`.
+        - `paths.tsv` (optional): ground-truth transcript paths. For each row,
+            `path_simple` is parsed as a node list and stored in:
+            - `G.graph["groundtruth_paths_nodes"]` (list of node lists)
+            - `G.graph["groundtruth_paths_edges"]` (list of edge lists between consecutive nodes)
+            and `count_scaled` is stored in `G.graph["groundtruth_weights"]`.
+        - `ref_edges.tsv` (optional): reference edge metadata. Rows with concrete
+            `u_id`, `v_id` values are collected in two groups:
+            - `status == "in_graph"` -> `G.graph["reference_edges"]`
+            - `status == "missing_edge"` -> `G.graph["additional_edges"]`
+
+    The returned graph uses node weights (`flow`) in the same spirit as `read_ngraph`.
+    It also stores:
+    - `G.graph["id"]`: folder name
+    - `G.graph["source_folder"]`: absolute folder path
+    - `G.graph["constraints"]`: list of node lists from `read_subpaths.tsv:path_simple`
+    - `G.graph["groundtruth_paths_nodes"]`: list of node lists from `paths.tsv:path_simple`
+    - `G.graph["groundtruth_paths_edges"]`: list of edge lists induced by `groundtruth_paths_nodes`
+    - `G.graph["groundtruth_weights"]`: list of `count_scaled` values from `paths.tsv`
+    - `G.graph["reference_edges"]`: list of in-graph `(u_id, v_id)` pairs from `ref_edges.tsv`
+    - `G.graph["additional_edges"]`: list of missing-edge `(u_id, v_id)` pairs from `ref_edges.tsv`
+    - `G.graph["n"]`, `G.graph["m"]`, `G.graph["w"]`: node count, edge count, width
+    """
+
+    graph_path = Path(graph_dir)
+    if not graph_path.is_dir():
+        utils.logger.error(f"{__name__}: Graph directory not found: {graph_path}")
+        raise ValueError(f"Graph directory not found: {graph_path}")
+
+    vertices_path = graph_path / "vertices.tsv"
+    edges_path = graph_path / "edges.tsv"
+    read_subpaths_path = graph_path / "read_subpaths.tsv"
+    paths_path = graph_path / "paths.tsv"
+    ref_edges_path = graph_path / "ref_edges.tsv"
+
+    if not vertices_path.is_file():
+        utils.logger.error(f"{__name__}: Missing vertices.tsv in {graph_path}")
+        raise ValueError(f"Missing vertices.tsv in {graph_path}")
+    if not edges_path.is_file():
+        utils.logger.error(f"{__name__}: Missing edges.tsv in {graph_path}")
+        raise ValueError(f"Missing edges.tsv in {graph_path}")
+
+    G = nx.DiGraph()
+    G.graph["id"] = graph_path.name
+    G.graph["source_folder"] = str(graph_path.resolve())
+    G.graph["constraints"] = []
+    G.graph["groundtruth_paths_nodes"] = []
+    G.graph["groundtruth_paths_edges"] = []
+    G.graph["groundtruth_weights"] = []
+    G.graph["reference_edges"] = []
+    G.graph["additional_edges"] = []
+
+    for row in _read_tsv_rows(vertices_path):
+        node_id = row["vertex_id"].strip()
+        try:
+            weight = float(row["weight"])
+        except (TypeError, ValueError):
+            utils.logger.error(f"{__name__}: Invalid node weight in {vertices_path}: {row}")
+            raise
+
+        G.add_node(
+            node_id,
+            flow=weight,
+            type=row.get("type"),
+            chr=row.get("chr"),
+            start=row.get("start"),
+            end=row.get("end"),
+        )
+
+    for row in _read_tsv_rows(edges_path):
+        u = row["u"].strip()
+        v = row["v"].strip()
+        if u not in G.nodes or v not in G.nodes:
+            utils.logger.error(
+                f"{__name__}: Edge ({u}, {v}) references unknown node in {graph_path}"
+            )
+            raise ValueError(f"Edge ({u}, {v}) references unknown node in {graph_path}")
+
+        edge_attrs = {}
+        if row.get("weight") not in [None, ""]:
+            try:
+                edge_attrs["flow"] = float(row["weight"])
+            except ValueError:
+                utils.logger.error(f"{__name__}: Invalid edge weight in {edges_path}: {row}")
+                raise
+        G.add_edge(u, v, **edge_attrs)
+
+    constraints = []
+    constraints_seen = set()
+    if read_subpaths_path.is_file():
+        for row in _read_tsv_rows(read_subpaths_path):
+            nodes = _parse_path_simple_nodes(row.get("path_simple", ""))
+            if len(nodes) == 0:
+                continue
+            if not all(node in G.nodes for node in nodes):
+                missing_nodes = [node for node in nodes if node not in G.nodes]
+                utils.logger.error(
+                    f"{__name__}: Constraint references unknown nodes {missing_nodes} in {graph_path}"
+                )
+                raise ValueError(f"Constraint references unknown nodes {missing_nodes} in {graph_path}")
+
+            key = tuple(nodes)
+            if key in constraints_seen:
+                continue
+            constraints_seen.add(key)
+            constraints.append(nodes)
+    G.graph["constraints"] = constraints
+
+    groundtruth_paths_nodes = []
+    groundtruth_paths_edges = []
+    groundtruth_weights = []
+    if paths_path.is_file():
+        for row in _read_tsv_rows(paths_path):
+            nodes = _parse_path_simple_nodes(row.get("path_simple", ""))
+            if len(nodes) > 0 and not all(node in G.nodes for node in nodes):
+                missing_nodes = [node for node in nodes if node not in G.nodes]
+                utils.logger.error(
+                    f"{__name__}: Groundtruth path references unknown nodes {missing_nodes} in {graph_path}"
+                )
+                raise ValueError(
+                    f"Groundtruth path references unknown nodes {missing_nodes} in {graph_path}"
+                )
+
+            try:
+                weight = int(row.get("count_scaled", 0))
+            except (TypeError, ValueError):
+                utils.logger.error(f"{__name__}: Invalid count_scaled value in {paths_path}: {row}")
+                raise
+
+            groundtruth_paths_nodes.append(nodes)
+            groundtruth_paths_edges.append(_nodes_to_edges(nodes))
+            groundtruth_weights.append(weight)
+
+    G.graph["groundtruth_paths_nodes"] = groundtruth_paths_nodes
+    G.graph["groundtruth_paths_edges"] = groundtruth_paths_edges
+    G.graph["groundtruth_weights"] = groundtruth_weights
+
+    reference_edges = []
+    reference_edges_seen = set()
+    additional_edges = []
+    additional_edges_seen = set()
+    if ref_edges_path.is_file():
+        for row in _read_tsv_rows(ref_edges_path):
+            u = (row.get("u_id") or "").strip()
+            v = (row.get("v_id") or "").strip()
+            if u in ["", "*"] or v in ["", "*"]:
+                continue
+            if u not in G.nodes or v not in G.nodes:
+                utils.logger.error(
+                    f"{__name__}: Reference edge ({u}, {v}) references unknown node in {graph_path}"
+                )
+                raise ValueError(f"Reference edge ({u}, {v}) references unknown node in {graph_path}")
+
+            edge = (u, v)
+            status = row.get("status")
+
+            if status == "in_graph":
+                if edge in reference_edges_seen:
+                    continue
+                reference_edges_seen.add(edge)
+                reference_edges.append(edge)
+            elif status == "missing_edge":
+                if edge in additional_edges_seen:
+                    continue
+                additional_edges_seen.add(edge)
+                additional_edges.append(edge)
+
+    G.graph["reference_edges"] = reference_edges
+    G.graph["additional_edges"] = additional_edges
+    G.graph["n"] = G.number_of_nodes()
+    G.graph["m"] = G.number_of_edges()
+    from flowpaths import stdigraph as _stdigraph  # type: ignore
+    G.graph["w"] = _stdigraph.stDiGraph(G).get_width()
+
+    return G
+
+
+def read_intron_graphs(foldername) -> list:
+    """
+    Read all intron-format graph folders inside `foldername`.
+
+    Behavior:
+    - If `foldername` itself contains `vertices.tsv`, it is parsed as one graph folder.
+    - Otherwise, every immediate child directory containing `vertices.tsv` is parsed.
+
+    Returns a list of graphs in lexicographic folder-name order.
+    """
+
+    folder_path = Path(foldername)
+    if not folder_path.is_dir():
+        utils.logger.error(f"{__name__}: Folder not found: {folder_path}")
+        raise ValueError(f"Folder not found: {folder_path}")
+
+    if (folder_path / "vertices.tsv").is_file():
+        return [read_intron_graph(folder_path)]
+
+    graph_dirs = sorted(
+        child for child in folder_path.iterdir() if child.is_dir() and (child / "vertices.tsv").is_file()
+    )
+    return [read_intron_graph(graph_dir) for graph_dir in graph_dirs]
 
 def fpid(G) -> str:
     """
@@ -554,6 +792,7 @@ def draw(
         weights: list = [], 
         additional_starts: list = [],
         additional_ends: list = [],
+        additional_edges: list = [],
         subpath_constraints: list = [],
         draw_options: dict = {
             "show_graph_edges": True,
@@ -603,6 +842,11 @@ def draw(
         - `additional_ends`: list
 
                 A list of additional nodes to highlight in red as ending nodes. Default is an empty list.
+        
+        - `additional_edges`: list
+
+                A list of additional edges to draw as dashed black lines if `show_graph_edges` is True. 
+                Each edge should be a tuple `(u, v)`. Default is an empty list.
         
         - `subpath_constraints`: list
 
@@ -986,6 +1230,16 @@ def draw(
                         dot.edge(
                             tail_name=str(u), 
                             head_name=str(v))
+                
+                # drawing additional edges as dashed black lines
+                for u, v in additional_edges:
+                    dot.edge(
+                        tail_name=str(u),
+                        head_name=str(v),
+                        color="black",
+                        style="dashed",
+                        penwidth="2.0"
+                    )
 
             for index, path in enumerate(paths):
                 pathColor = colors[index % len(colors)]

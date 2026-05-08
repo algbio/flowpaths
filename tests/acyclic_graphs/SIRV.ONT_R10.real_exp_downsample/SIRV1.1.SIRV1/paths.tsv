@@ -1,0 +1,5 @@
+transcript_id	count	count_scaled	status	path	path_simple	missing_vertices	missing_edges
+SIRV102	1153	5	partial	9-7-1-0-*	9,7,1,0	1	1
+SIRV105	13921	64	ok	10-5-1-0-2-12	10,5,1,0,2,12	0	0
+SIRV107	11762	54	disconnected	11-3-4|14	11,3,4,14	0	1
+SIRV109	1390	6	partial	*-3-6-14	3,6,14	1	1

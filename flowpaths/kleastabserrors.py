@@ -23,7 +23,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         additional_starts: list = [],
         additional_ends: list = [],
         additional_edges: list = [],
-        additional_edges_lambda: float = 1.0,
+        additional_edges_lambda: float | None = None,
         solution_weights_superset: list = None,
         optimization_options: dict = None,
         solver_options: dict = {},
@@ -113,9 +113,12 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             List of additional edges that can be used in the solution, but are not in the original graph. Default is an empty list.
             See [additional edges and usage penalty documentation](additional-edges-penalty.md).
 
-        - `additional_edges_lambda: float`, optional
+        - `additional_edges_lambda: float | None`, optional
 
-            Multiplicative penalty weight for selecting additional edges in the objective. Default is `1.0`.
+            Multiplicative penalty weight for selecting additional edges in the objective.
+            If `None` (default), it is set automatically to:
+            `max(1.0, 0.1 * (Q90(flow values) / graph_width))`,
+            where `Q90` is the 90th percentile of edge flows (or node flows when `flow_attr_origin="node"`).
             See [additional edges and usage penalty documentation](additional-edges-penalty.md).
 
         - `solution_weights_superset: list`, optional
@@ -155,14 +158,17 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
     
         utils.logger.info(f"{__name__}: START initialized with graph id = {utils.fpid(G)}, k = {k}")
 
-        # Validate additional_edges_lambda early before any graph processing
-        if not isinstance(additional_edges_lambda, (int, float)):
-            utils.logger.error(f"{__name__}: additional_edges_lambda must be numeric, not {type(additional_edges_lambda)}")
-            raise ValueError(f"additional_edges_lambda must be numeric, not {type(additional_edges_lambda)}")
-        if additional_edges_lambda < 0:
-            utils.logger.error(f"{__name__}: additional_edges_lambda must be non-negative, not {additional_edges_lambda}")
-            raise ValueError(f"additional_edges_lambda must be non-negative, not {additional_edges_lambda}")
-        self.additional_edges_lambda = float(additional_edges_lambda)
+        # Validate additional_edges_lambda early; if None, compute graph-dependent default later.
+        if additional_edges_lambda is not None:
+            if not isinstance(additional_edges_lambda, (int, float)):
+                utils.logger.error(f"{__name__}: additional_edges_lambda must be numeric, not {type(additional_edges_lambda)}")
+                raise ValueError(f"additional_edges_lambda must be numeric, not {type(additional_edges_lambda)}")
+            if additional_edges_lambda < 0:
+                utils.logger.error(f"{__name__}: additional_edges_lambda must be non-negative, not {additional_edges_lambda}")
+                raise ValueError(f"additional_edges_lambda must be non-negative, not {additional_edges_lambda}")
+            self.additional_edges_lambda = float(additional_edges_lambda)
+        else:
+            self.additional_edges_lambda = None
 
         # handle additional edges
         self.additional_edges = set(additional_edges or [])        
@@ -220,6 +226,14 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
             raise ValueError(f"flow_attr_origin must be either 'node' or 'edge', not {self.flow_attr_origin}")
 
         self.flow_attr = flow_attr
+
+        if self.additional_edges_lambda is None:
+            self.additional_edges_lambda = utils.auto_additional_edges_lambda(
+                G,
+                flow_attr=self.flow_attr,
+                flow_attr_origin=self.flow_attr_origin,
+            )
+            utils.logger.info(f"{__name__}: additional_edges_lambda set automatically to {self.additional_edges_lambda}")
 
         # Add additional edges to the internal graph
         self.G_internal.add_edges_from(additional_edges_internal, **{self.flow_attr: 0})

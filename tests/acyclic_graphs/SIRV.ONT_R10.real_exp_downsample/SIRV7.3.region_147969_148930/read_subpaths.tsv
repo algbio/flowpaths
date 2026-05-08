@@ -1,0 +1,5 @@
+read_count	is_fl	status	path	path_simple	missing_vertices	missing_edges
+3	1	ok	11-3-2-1-0-12	11,3,2,1,0,12	0	0
+1	1	ok	10-6-5-4-0-8-14	10,6,5,4,0,8,14	0	0
+1	1	ok	10-6-5-4-0-7-13	10,6,5,4,0,7,13	0	0
+1	1	ok	10-6-5-4-0-9-15	10,6,5,4,0,9,15	0	0
