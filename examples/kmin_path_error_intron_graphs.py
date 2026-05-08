@@ -19,7 +19,7 @@ def run_kmin_path_error_on_intron_graphs(
     )
 
     graphs = fp.utils.read_intron_graphs(dataset_folder) # all graphs
-    # graphs = [fp.utils.read_intron_graph(dataset_folder/ "SIRV6.1.SIRV6")]
+    # graphs = [fp.utils.read_intron_graph(dataset_folder/ "SIRV6.1.SIRV6")] # for testing with a single graph
     print(f"Loaded {len(graphs)} graph(s) from: {dataset_folder}")
     fp.utils.logger.debug(f"Running with hard-coded settings: time_limit={time_limit}, fixed_k={k}")
 
@@ -101,11 +101,8 @@ def run_kmin_path_error_on_intron_graphs(
         else:
             print("  skipping groundtruth drawing: no groundtruth paths found")
 
-        k_value = graph.graph.get("w") if k is None else k
-
         model = fp.kMinPathError(
             graph,
-            k=k_value,
             flow_attr="flow",
             flow_attr_origin="node",
             subpath_constraints=constraints,
@@ -115,7 +112,7 @@ def run_kmin_path_error_on_intron_graphs(
             solver_options={"time_limit": time_limit} if time_limit is not None else {},
         )
         fp.utils.logger.debug(
-            f"Initialized kMinPathError for {graph_id} with k={k_value}, "
+            f"Initialized kMinPathError for {graph_id} with k={model.k}, "
             f"additional_edges={additional_edges}"
         )
 
@@ -126,7 +123,7 @@ def run_kmin_path_error_on_intron_graphs(
             objective = model.get_objective_value()
             print(
                 f"  solved: objective={objective}, "
-                f"k={k_value}, "
+                f"k={model.k}, "
                 f"num_paths={len(solution.get('paths', []))}, "
                 f"total_weight={sum(solution.get('weights', []))}"
             )
@@ -151,7 +148,7 @@ def run_kmin_path_error_on_intron_graphs(
             print(f"  drawing saved to: {output_file}")
         else:
             not_solved += 1
-            print(f"  not solved (k={k_value})")
+            print(f"  not solved (k={model.k})")
         print(model.solve_statistics)
         fp.utils.logger.debug(f"Solve statistics for {graph_id}: {model.solve_statistics}")
 

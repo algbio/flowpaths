@@ -22,6 +22,7 @@ $$
 !!! success "Note"
     - This class support also graphs with **flow values on nodes**. Set the parameter `flow_attr_origin = "node"`. For details on how these are handled internally, see [Handling graphs with flows / weights on nodes](node-expanded-digraph.md).
     - The graph may have more than one source or sink nodes, in which case the solution paths are just required to start in any source node, and end in any sink node.
+    - You can pass `k=None` to automatically set `k` to the graph width. If `subset_constraints` are provided, width is computed under those constraints.
 
 ## 2. Generalizations
 

@@ -220,7 +220,13 @@ class stDiGraph(AbstractSourceSinkGraph):
 
         return (self._condensation.graph['mapping'][u], self._condensation.graph['mapping'][v])
 
-    def get_width(self, edges_to_ignore: list = None) -> int:
+    def get_width(
+        self,
+        edges_to_ignore: list = None,
+        subset_constraints: list = None,
+        subset_constraints_coverage: float = 1.0,
+        solver_options: dict = None,
+    ) -> int:
         """
         Returns the width of the graph, which we define as the minimum number of $s$-$t$ walks needed to cover all edges.
 
@@ -244,6 +250,32 @@ class stDiGraph(AbstractSourceSinkGraph):
                 If an SCC `v` has no more member edges left, we can also add the condensation edge `(v, v_expanded)` to
                 the list of edges to ignore when computing the width of the condensation.
         """
+
+        if subset_constraints is not None:
+            # When constraints are provided, width is the constrained minimum walk cover size.
+            from flowpaths.minpathcovercycles import MinPathCoverCycles
+
+            edges_to_ignore_list = [
+                edge
+                for edge in set(edges_to_ignore or [])
+                if isinstance(edge, tuple) and len(edge) == 2 and self.base_graph.has_edge(edge[0], edge[1])
+            ]
+
+            mpc_cycles_model = MinPathCoverCycles(
+                G=self.base_graph,
+                cover_type="edge",
+                subset_constraints=subset_constraints,
+                subset_constraints_coverage=subset_constraints_coverage,
+                elements_to_ignore=edges_to_ignore_list,
+                additional_starts=list(self.additional_starts),
+                additional_ends=list(self.additional_ends),
+                solver_options=solver_options or {},
+            )
+            mpc_cycles_model.solve()
+            if not mpc_cycles_model.is_solved():
+                utils.logger.error(f"{__name__}: Could not compute constrained width with MinPathCoverCycles.")
+                raise ValueError("Could not compute constrained width with MinPathCoverCycles.")
+            return mpc_cycles_model.get_objective_value()
 
         if self.condensation_width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
             return self.condensation_width

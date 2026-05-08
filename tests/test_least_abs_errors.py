@@ -238,6 +238,32 @@ def test_additional_edges_lambda_objective_value():
            (obj_lambda_0 == obj_lambda_1 == obj_lambda_10)  # All equal if no additional edges used
 
 
+def test_k_none_uses_constrained_width_with_subpath_constraints_lae():
+    import networkx as nx
+
+    g = nx.DiGraph()
+    g.add_edge("s", "a", flow=1)
+    g.add_edge("a", "t", flow=1)
+    g.add_edge("s", "b", flow=1)
+    g.add_edge("b", "t", flow=1)
+
+    edges_to_ignore = [("s", "b"), ("b", "t")]
+    subpath_constraints = [[("s", "b"), ("b", "t")]]
+
+    model = fp.kLeastAbsErrors(
+        G=g,
+        flow_attr="flow",
+        k=None,
+        elements_to_ignore=edges_to_ignore,
+        subpath_constraints=subpath_constraints,
+        solver_options={"external_solver": "highs"},
+    )
+
+    assert model.k == 2
+    model.solve()
+    assert model.is_solved()
+
+
 def test_additional_edges_counted_once():
     """Test that each additional edge is counted at most once in the objective, regardless of how many paths use it."""
     import networkx as nx

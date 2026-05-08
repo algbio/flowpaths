@@ -11,7 +11,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         self,
         G: nx.DiGraph,
         flow_attr: str,
-        k: int,
+        k: int | None,
         flow_attr_origin: str = "edge",
         weight_type: type = float,
         subpath_constraints: list = [],
@@ -49,6 +49,10 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
         - `k: int`
             
             The number of paths to decompose in.
+
+            !!! note "Unknown $k$"
+                If you do not have a good guess for $k$, you can pass `k=None` and the model will set $k$ to the graph width.
+                If `subpath_constraints` are provided, this width is computed under those constraints.
 
         - `flow_attr_origin: str`, optional
 
@@ -260,7 +264,19 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
 
 
         self.k = k
-        self.original_k = k
+        if self.k is None:
+            utils.logger.debug(f"{__name__}: k is None; computing k as graph width with current constraints and ignored/additional edges")
+            self.k = self.G.get_width(
+                edges_to_ignore=list(set(self.edges_to_ignore).union(self.additional_edges)),
+                subpath_constraints=self.subpath_constraints if len(self.subpath_constraints) > 0 else None,
+                subpath_constraints_coverage=subpath_constraints_coverage,
+                subpath_constraints_coverage_length=subpath_constraints_coverage_length,
+                length_attr=length_attr,
+                solver_options=solver_options,
+            )
+            utils.logger.info(f"{__name__}: k received as None, we set it to {self.k} (graph width)")
+
+        self.original_k = self.k
         self.solution_weights_superset = solution_weights_superset
         self.optimization_options = optimization_options or {}
         self.cover_every_edge = cover_every_edge        
@@ -305,6 +321,7 @@ class kLeastAbsErrors(pathmodel.AbstractPathModelDAG):
                 or self.subpath_constraints_coverage_length == 1:
                 for constraint in self.subpath_constraints:
                     self.optimization_options["trusted_edges_for_safety"].update(constraint)
+        self.optimization_options["trusted_edges_for_safety"].difference_update(self.additional_edges)
 
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(

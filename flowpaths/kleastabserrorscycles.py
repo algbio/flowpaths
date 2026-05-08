@@ -234,8 +234,9 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         # If the error scaling factor is 0, we ignore the edge
         self.edges_to_ignore |= {edge for edge, factor in self.edge_error_scaling.items() if factor == 0}
 
-        # Remove from trusted_edges_for_safety the edges in edges_to_ignore
+        # Remove ignored and additional edges from trusted_edges_for_safety
         self.trusted_edges_for_safety -= self.edges_to_ignore
+        self.trusted_edges_for_safety -= self.additional_edges
 
         # Checking that every entry in self.error_scaling is between 0 and 1
         for key, value in error_scaling.items():
@@ -251,7 +252,13 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
         self.k = k
         # If k is not specified, we set k to the edge width of the graph
         if self.k is None:
-            self.k = self.G.get_width(list(self.edges_to_ignore))
+            utils.logger.debug(f"{__name__}: k is None; computing k as graph width with current constraints and ignored/additional edges")
+            self.k = self.G.get_width(
+                edges_to_ignore=list(set(self.edges_to_ignore).union(self.additional_edges)),
+                subset_constraints=self.subset_constraints if len(self.subset_constraints) > 0 else None,
+                subset_constraints_coverage=subset_constraints_coverage,
+                solver_options=solver_options,
+            )
         self.optimization_options = optimization_options or {}        
 
         self.subset_constraints_coverage = subset_constraints_coverage
@@ -282,6 +289,7 @@ class kLeastAbsErrorsCycles(walkmodel.AbstractWalkModelDiGraph):
             if self.subset_constraints_coverage == 1.0:
                 for constraint in self.subset_constraints:
                     self.optimization_options["trusted_edges_for_safety"].update(constraint)
+        self.optimization_options["trusted_edges_for_safety"].difference_update(self.additional_edges)
 
         # Call the constructor of the parent class AbstractWalkModelDiGraph
         super().__init__(

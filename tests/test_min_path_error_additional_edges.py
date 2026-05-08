@@ -97,3 +97,38 @@ def test_additional_edge_used_binary_counted_once_kminpatherror():
     slack_sum = sum(model.get_solution(remove_empty_paths=False)["slacks"])
     expected_obj = slack_sum + 5.0 * edge_used_sol[("s", "t")]
     assert abs(obj - expected_obj) < 1e-4
+
+
+def test_k_none_uses_constrained_width_with_subpath_constraints():
+    g = nx.DiGraph()
+    g.add_edge("s", "a", flow=1)
+    g.add_edge("a", "t", flow=1)
+    g.add_edge("s", "b", flow=1)
+    g.add_edge("b", "t", flow=1)
+
+    edges_to_ignore = [("s", "b"), ("b", "t")]
+    subpath_constraints = [[("s", "b"), ("b", "t")]]
+
+    stg = fp.stDAG(g)
+    unconstrained_width = stg.get_width(edges_to_ignore=edges_to_ignore)
+    constrained_width = stg.get_width(
+        edges_to_ignore=edges_to_ignore,
+        subpath_constraints=subpath_constraints,
+        solver_options={"external_solver": "highs"},
+    )
+
+    assert unconstrained_width == 1
+    assert constrained_width == 2
+
+    model = fp.kMinPathError(
+        g,
+        flow_attr="flow",
+        k=None,
+        elements_to_ignore=edges_to_ignore,
+        subpath_constraints=subpath_constraints,
+        solver_options={"external_solver": "highs"},
+    )
+
+    assert model.k == 2
+    model.solve()
+    assert model.is_solved()

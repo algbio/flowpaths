@@ -104,7 +104,7 @@ def test_additional_edges_objective_cycles():
         flow_attr="flow",
         k=1,
         additional_edges=[("a", "t")],
-        # additional_edges_lambda=2.0,
+        additional_edges_lambda=1.0,
         # solver_options={"external_solver": "highs"},
     )
     model.solve()
@@ -115,3 +115,27 @@ def test_additional_edges_objective_cycles():
     assert model.is_solved()
     assert model.is_valid_solution()
     assert abs(model.get_objective_value() - model.solver.get_objective_value()) < 1e-6
+
+
+def test_k_none_uses_constrained_width_with_subset_constraints_lae_cycles():
+    g = nx.DiGraph()
+    g.add_edge("s", "a", flow=1)
+    g.add_edge("a", "t", flow=1)
+    g.add_edge("s", "b", flow=1)
+    g.add_edge("b", "t", flow=1)
+
+    edges_to_ignore = [("s", "b"), ("b", "t")]
+    subset_constraints = [[("s", "b"), ("b", "t")]]
+
+    model = fp.kLeastAbsErrorsCycles(
+        G=g,
+        flow_attr="flow",
+        k=None,
+        elements_to_ignore=edges_to_ignore,
+        subset_constraints=subset_constraints,
+        solver_options={"external_solver": "highs"},
+    )
+
+    assert model.k == 2
+    model.solve()
+    assert model.is_solved()

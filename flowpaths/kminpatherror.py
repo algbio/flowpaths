@@ -11,7 +11,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self,
         G: nx.DiGraph,
         flow_attr: str,
-        k: int,
+        k: int = None,
         flow_attr_origin: str = "edge",
         weight_type: type = float,
         subpath_constraints: list = [],
@@ -282,7 +282,15 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         self.k = k
         # If k is not specified, we set k to the edge width of the graph
         if self.k is None:
-            self.k = self.G.get_width(list(self.edges_to_ignore))
+            utils.logger.debug(f"{__name__}: k is None; computing k as graph width with current constraints and ignored/additional edges")
+            self.k = self.G.get_width(
+                edges_to_ignore=list(set(self.edges_to_ignore).union(self.additional_edges)),
+                subpath_constraints=self.subpath_constraints if len(self.subpath_constraints) > 0 else None,
+                subpath_constraints_coverage=self.subpath_constraints_coverage,
+                subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+                length_attr=self.length_attr,
+                solver_options=solver_options,
+            )
         self.original_k = self.k
         self.solution_weights_superset = solution_weights_superset
         self.optimization_options = optimization_options or {}        
@@ -327,7 +335,7 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
 
         self.optimization_options["trusted_edges_for_safety"] = self.G.get_non_zero_flow_edges(
             flow_attr=self.flow_attr, edges_to_ignore=self.edges_to_ignore
-        ).difference(self.edges_to_ignore)
+        ).difference(self.edges_to_ignore).difference(self.additional_edges)
         
         # Call the constructor of the parent class AbstractPathModelDAG
         super().__init__(
@@ -913,6 +921,13 @@ class kMinPathError(pathmodel.AbstractPathModelDAG):
         if self._lowerbound_k != None:
             return self._lowerbound_k
 
-        self._lowerbound_k = self.G.get_width(edges_to_ignore=self.edges_to_ignore)
+        self._lowerbound_k = self.G.get_width(
+            edges_to_ignore=self.edges_to_ignore,
+            subpath_constraints=self.subpath_constraints if len(self.subpath_constraints) > 0 else None,
+            subpath_constraints_coverage=self.subpath_constraints_coverage,
+            subpath_constraints_coverage_length=self.subpath_constraints_coverage_length,
+            length_attr=self.length_attr,
+            solver_options=getattr(self, "solver_options", None),
+        )
 
         return self._lowerbound_k

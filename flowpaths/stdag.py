@@ -99,7 +99,15 @@ class stDAG(AbstractSourceSinkGraph):
 
         return self._reachable_edges_rev_from
 
-    def get_width(self, edges_to_ignore: list = None) -> int:
+    def get_width(
+        self,
+        edges_to_ignore: list = None,
+        subpath_constraints: list = None,
+        subpath_constraints_coverage: float = 1.0,
+        subpath_constraints_coverage_length: float = None,
+        length_attr: str = None,
+        solver_options: dict = None,
+    ) -> int:
         """
         Calculate and return the width of the graph.
         The width is computed as the minimum number of paths needed to cover all the edges of the graph, 
@@ -112,6 +120,34 @@ class stDAG(AbstractSourceSinkGraph):
         ----------
         - int: The width of the graph.
         """
+
+        if subpath_constraints is not None:
+            # When constraints are provided, width is the constrained minimum path cover size.
+            from flowpaths.minpathcover import MinPathCover
+
+            edges_to_ignore_list = [
+                edge
+                for edge in set(edges_to_ignore or [])
+                if isinstance(edge, tuple) and len(edge) == 2 and self.base_graph.has_edge(edge[0], edge[1])
+            ]
+
+            mpc_model = MinPathCover(
+                G=self.base_graph,
+                cover_type="edge",
+                subpath_constraints=subpath_constraints,
+                subpath_constraints_coverage=subpath_constraints_coverage,
+                subpath_constraints_coverage_length=subpath_constraints_coverage_length,
+                length_attr=length_attr,
+                elements_to_ignore=edges_to_ignore_list,
+                additional_starts=list(self.additional_starts),
+                additional_ends=list(self.additional_ends),
+                solver_options=solver_options or {},
+            )
+            mpc_model.solve()
+            if not mpc_model.is_solved():
+                utils.logger.error(f"{__name__}: Could not compute constrained width with MinPathCover.")
+                raise ValueError("Could not compute constrained width with MinPathCover.")
+            return mpc_model.get_objective_value()
 
         if self.width is not None and (edges_to_ignore is None or len(edges_to_ignore) == 0):
             return self.width
