@@ -13,7 +13,8 @@ class OnePathAvoidingSubpaths(fp.AbstractPathModelDAG):
 
     The model builds a single source-to-sink path in the augmented `stDAG`
     and adds one linear constraint per forbidden subpath so that not all edges
-    of that subpath can be selected simultaneously.
+    of that subpath can be selected simultaneously. Each forbidden subpath must
+    itself be a valid contiguous edge path.
     """
 
     def __init__(
@@ -31,7 +32,8 @@ class OnePathAvoidingSubpaths(fp.AbstractPathModelDAG):
         G : nx.DiGraph
             Input DAG.
         subpaths_to_avoid : list
-            List of forbidden subpaths, each given as a list of edges.
+            List of forbidden subpaths, each given as a list of contiguous
+            edges that form a path.
         additional_starts : list | None, optional
             Nodes that may serve as alternative path starts.
         additional_ends : list | None, optional
@@ -70,6 +72,12 @@ class OnePathAvoidingSubpaths(fp.AbstractPathModelDAG):
                 raise ValueError("Each forbidden subpath must contain at least one edge.")
             if not all(isinstance(edge, tuple) and len(edge) == 2 for edge in subpath):
                 raise ValueError("Each forbidden subpath must be a list of edges.")
+            for i in range(len(subpath) - 1):
+                if subpath[i][1] != subpath[i + 1][0]:
+                    raise ValueError(
+                        "Each forbidden subpath must have contiguous edges forming a path. "
+                        f"Found non-contiguous consecutive edges: {subpath[i]} and {subpath[i + 1]}."
+                    )
             for edge in subpath:
                 if not self.G.has_edge(edge[0], edge[1]):
                     raise ValueError(f"Forbidden subpath contains edge {edge}, which is not in the graph.")
