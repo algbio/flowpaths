@@ -17,6 +17,7 @@ class AbstractWalkModelDiGraph(ABC):
     # TODO: optimize_with_subset_constraints_as_safe_sequences = True
     optimize_with_safety_as_subset_constraints = False
     optimize_with_max_safe_antichain_as_subset_constraints = False
+    optimize_with_safety_from_largest_antichain = False
     allow_empty_walks = False
 
     def __init__(
@@ -160,6 +161,10 @@ class AbstractWalkModelDiGraph(ABC):
         self.allow_empty_walks = optimization_options.get("allow_empty_walks", AbstractWalkModelDiGraph.allow_empty_walks)
         self.optimize_with_safety_as_subset_constraints = optimization_options.get("optimize_with_safety_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_safety_as_subset_constraints)
         self.optimize_with_max_safe_antichain_as_subset_constraints = optimization_options.get("optimize_with_max_safe_antichain_as_subset_constraints", AbstractWalkModelDiGraph.optimize_with_max_safe_antichain_as_subset_constraints)
+        self.optimize_with_safety_from_largest_antichain = optimization_options.get(
+            "optimize_with_safety_from_largest_antichain",
+            AbstractWalkModelDiGraph.optimize_with_safety_from_largest_antichain,
+        )
         self.optimize_with_safe_sequences_allow_geq_constraints = optimization_options.get("optimize_with_safe_sequences_allow_geq_constraints", AbstractWalkModelDiGraph.optimize_with_safe_sequences_allow_geq_constraints)
         self.optimize_with_safe_sequences_fix_via_bounds = optimization_options.get("optimize_with_safe_sequences_fix_via_bounds", AbstractWalkModelDiGraph.optimize_with_safe_sequences_fix_via_bounds)
         self.optimize_with_safe_sequences_fix_zero_edges = optimization_options.get(
@@ -390,6 +395,8 @@ class AbstractWalkModelDiGraph(ABC):
             self.solve_statistics["optimizations_applied"].add("optimize_with_safety_as_subset_constraints")
         if self.optimize_with_max_safe_antichain_as_subset_constraints:
             self.solve_statistics["optimizations_applied"].add("optimize_with_max_safe_antichain_as_subset_constraints")
+        if self.optimize_with_safety_from_largest_antichain:
+            self.solve_statistics["optimizations_applied"].add("optimize_with_safety_from_largest_antichain")
 
         if self.optimize_with_safe_sequences or self.optimize_with_safety_as_subset_constraints or self.optimize_with_max_safe_antichain_as_subset_constraints:
             self.safe_lists += safetypathcoverscycles.maximal_safe_sequences_via_dominators(
@@ -561,13 +568,20 @@ class AbstractWalkModelDiGraph(ABC):
             utils.logger.debug(f"{__name__}: No safe lists available; caching empty walks_to_fix.")
             return self.walks_to_fix
 
-        walks_to_fix = self.G.get_longest_incompatible_sequences(self.safe_lists)
+        large_constant = 0
+        if self.optimize_with_safety_from_largest_antichain:
+            large_constant = self.G.number_of_edges() * self.G.number_of_edges()
+
+        walks_to_fix = self.G.get_longest_incompatible_sequences_with_parallel_edges(
+            self.safe_lists,
+            large_constant=large_constant,
+        )
         # Cache the result
         self.walks_to_fix = walks_to_fix
 
         utils.logger.debug(f"{__name__}: Found {len(walks_to_fix)} walks to fix based on safe lists.")
-        for i, walk in enumerate(walks_to_fix):
-            utils.logger.debug(f"{__name__}: Safe walk {i}: {walk}")
+        # for i, walk in enumerate(walks_to_fix):
+        #     utils.logger.debug(f"{__name__}: Safe walk {i}: {walk}")
 
         return self.walks_to_fix
 

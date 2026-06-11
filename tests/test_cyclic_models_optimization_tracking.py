@@ -84,6 +84,7 @@ class TestCyclicOptimizationTracking:
             "optimize_with_safe_sequences": True,
             "optimize_with_safety_as_subset_constraints": False,
             "optimize_with_max_safe_antichain_as_subset_constraints": False,
+            "optimize_with_safety_from_largest_antichain": False,
             "optimize_with_safe_sequences_fix_zero_edges": True,
         }
 
@@ -99,6 +100,30 @@ class TestCyclicOptimizationTracking:
 
         assert "optimize_with_safe_sequences" in optimizations
         assert "optimize_with_safe_sequences_fix_zero_edges" in optimizations
+
+    def test_safety_from_largest_antichain_tracking(self, test_graph):
+        """Largest-antichain weighting for safe sequence selection should be tracked."""
+        optimization_options = {
+            "optimize_with_safe_sequences": True,
+            "optimize_with_safety_as_subset_constraints": False,
+            "optimize_with_max_safe_antichain_as_subset_constraints": False,
+            "optimize_with_safety_from_largest_antichain": True,
+            "optimize_with_safe_sequences_fix_zero_edges": False,
+        }
+
+        mfd = fp.MinFlowDecompCycles(
+            test_graph,
+            flow_attr="flow",
+            optimization_options=optimization_options,
+        )
+        mfd.solve()
+
+        assert mfd.is_solved()
+        optimizations = mfd.solve_statistics["optimizations_applied"]
+
+        assert "optimize_with_safe_sequences" in optimizations
+        assert "optimize_with_safe_lists" in optimizations
+        assert "optimize_with_safety_from_largest_antichain" in optimizations
 
     def test_safety_as_subset_constraints_optimization(self, test_graph):
         """Safety-as-subset-constraints should be tracked distinctly."""

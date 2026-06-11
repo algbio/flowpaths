@@ -4,7 +4,7 @@ from flowpaths.utils import graphutils
 from flowpaths.stdag import stDAG
 import flowpaths.utils as utils
 from flowpaths.abstractsourcesinkgraph import AbstractSourceSinkGraph
-from typing import Dict, Tuple, Optional, Set
+from typing import Dict, Tuple, Optional, Set, List
 
 
 class stDiGraph(AbstractSourceSinkGraph):
@@ -44,6 +44,9 @@ class stDiGraph(AbstractSourceSinkGraph):
 
         """
         self._condensation_expanded = None
+        self._condensation_with_parallel_edges = None
+        self._edge_to_parallel_first_edge: Dict[Tuple[str, str], Tuple[str, str]] = {}
+        self._parallel_first_to_second_edge: Dict[Tuple[str, str], Tuple[str, str]] = {}
         super().__init__(
             base_graph=base_graph,
             additional_starts=additional_starts,
@@ -59,6 +62,7 @@ class stDiGraph(AbstractSourceSinkGraph):
             raise ValueError("The graph passed to stDiGraph must have at least one sink, or at least one node in `additional_ends`.")
         self.condensation_width = None
         self._build_condensation_expanded()
+        self._build_condensation_with_parallel_edges()
         # Build indices and caches used by reachability queries
         C: nx.DiGraph = self._condensation
         mapping = C.graph["mapping"]  # original node -> condensation node (int)
@@ -139,6 +143,67 @@ class stDiGraph(AbstractSourceSinkGraph):
         self._condensation_expanded = stDAG(condensation_expanded)
 
         utils.logger.debug(f"{__name__}: Condensation expanded graph: {self._condensation_expanded.edges()}")
+
+    def _build_condensation_with_parallel_edges(self):
+        """Build a DAG where inter-SCC multiplicities are represented explicitly.
+
+        For every condensation-expanded edge with multiplicity > 1 (coming from
+        parallel inter-SCC edges in the original graph), replace it with as many
+        length-2 paths as the multiplicity by introducing one subdivision node per
+        parallel copy. SCC-internal expanded edges are kept as-is.
+
+        Also build:
+        - self._edge_to_parallel_first_edge: maps each original edge to the first
+          edge used in this graph representation.
+        - self._parallel_first_to_second_edge: for subdivided paths, maps the first
+          edge to its second edge.
+        """
+        condensation_with_parallel_edges = nx.DiGraph()
+        condensation_with_parallel_edges.add_nodes_from(self._condensation_expanded.nodes())
+
+        # Group original edges by their edge in condensation_expanded.
+        edges_per_expanded_edge: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
+        for u, v in self.edges():
+            expanded_edge = self._edge_to_condensation_expanded_edge(u, v)
+            edges_per_expanded_edge.setdefault(expanded_edge, []).append((u, v))
+
+        self._edge_to_parallel_first_edge = {}
+        self._parallel_first_to_second_edge = {}
+
+        for expanded_edge in self._condensation_expanded.edges():
+            u_exp, v_exp = expanded_edge
+            original_edges = sorted(edges_per_expanded_edge.get(expanded_edge, []))
+            multiplicity = len(original_edges)
+
+            # SCC-internal edges have the form (str(v), str(v)+"_expanded").
+            # All original edges inside that SCC map to this single condensation
+            # edge, but the SCC can only contribute one sequence to any antichain
+            # (it can only be traversed once per walk). Always keep it as a single
+            # direct edge and map every original SCC-internal edge to it.
+            is_scc_internal_edge = (v_exp == u_exp + "_expanded")
+
+            if is_scc_internal_edge or multiplicity <= 1:
+                condensation_with_parallel_edges.add_edge(u_exp, v_exp)
+                for original_edge in original_edges:
+                    self._edge_to_parallel_first_edge[original_edge] = (u_exp, v_exp)
+                continue
+
+            # Replace this inter-SCC edge by multiplicity many length-2 paths,
+            # one per parallel original edge between the two SCCs.
+            for parallel_idx, original_edge in enumerate(original_edges):
+                subdivision_node = f"__parallel__{u_exp}__{v_exp}__{parallel_idx}"
+                first_edge = (u_exp, subdivision_node)
+                second_edge = (subdivision_node, v_exp)
+                condensation_with_parallel_edges.add_node(subdivision_node)
+                condensation_with_parallel_edges.add_edge(*first_edge)
+                condensation_with_parallel_edges.add_edge(*second_edge)
+                self._edge_to_parallel_first_edge[original_edge] = first_edge
+                self._parallel_first_to_second_edge[first_edge] = second_edge
+
+        self._condensation_with_parallel_edges = stDAG(condensation_with_parallel_edges)
+        utils.logger.debug(
+            f"{__name__}: Condensation with parallel edges graph: {self._condensation_with_parallel_edges.edges()}"
+        )
 
     def _edge_to_condensation_expanded_edge(self, u, v) -> tuple:
         """
@@ -319,6 +384,7 @@ class stDiGraph(AbstractSourceSinkGraph):
 
         width = self._condensation_expanded.compute_max_edge_antichain(get_antichain=False, weight_function=weight_function_condensation_expanded)
 
+        utils.logger.debug(f"{__name__}: weight_function_condensation_expanded: {weight_function_condensation_expanded}")
         utils.logger.debug(f"{__name__}: Width of the condensation expanded graph: {width}")
 
         if (edges_to_ignore is None or len(edges_to_ignore) == 0):
@@ -371,11 +437,8 @@ class stDiGraph(AbstractSourceSinkGraph):
         sizes = [len(self._condensation.graph['member_edges'][str(v)]) for v in self._condensation.nodes() if len(self._condensation.graph['member_edges'][str(v)]) > 0]
         return sum(sizes) // len(sizes) if sizes else 0
 
-    def get_longest_incompatible_sequences(self, sequences: list) -> list:
-
+    def get_longest_incompatible_sequences(self, sequences: list, large_constant: int = 0) -> list:
         # We map the edges in sequences to edges in self._condensation_expanded
-
-        large_constant = 0 #self.number_of_edges() + 1
 
         sequence_function = {e: [] for e in self._condensation_expanded.edges} # edge in self._condensation_expanded -> list of ids of all sequences using that edge
 
@@ -387,6 +450,8 @@ class stDiGraph(AbstractSourceSinkGraph):
         # for each edge, sort sequence function by the length of the sequences
         for edge in sequence_function:
             sequence_function[edge] = sorted(sequence_function[edge], key=lambda x: len(sequences[x]), reverse=True)
+            # if edge == ('2_expanded', '1'):
+            #     utils.logger.debug(f"{__name__}: Edge {edge} is used by sequences {[sequences[idx] for idx in sequence_function[edge]]}")
 
         # get the edge_multiplicity of each edge
         for e in self._condensation.edges():
@@ -414,10 +479,12 @@ class stDiGraph(AbstractSourceSinkGraph):
             weight_function=weight_function,
         )
 
+        utils.logger.debug(f"{__name__}: Antichain in the expanded graph: {antichain}")
+
         incompatible_sequences = []
 
         seq_idx_set = set()
-        for u, v in antichain:
+        for (u, v) in antichain:
             # extend incompatible_sequences with
             for seq_idx in sequence_function[(u, v)]:
                 incompatible_sequences.append(sequences[seq_idx])
@@ -426,6 +493,62 @@ class stDiGraph(AbstractSourceSinkGraph):
                     utils.logger.error(f"{__name__}: Sequence {seq_idx} is already in the incompatible sequences, skipping it.")
                     raise ValueError(f"{__name__}: CRITICAL BUG: Sequence {seq_idx} is already in the incompatible sequences")
                 seq_idx_set.add(seq_idx)
+
+        return incompatible_sequences
+
+    def get_longest_incompatible_sequences_with_parallel_edges(self, sequences: list, large_constant: int = 0) -> list:
+        # Store only the single longest sequence per edge in the new condensation.
+        best_sequence_idx_per_edge = {
+            edge: None for edge in self._condensation_with_parallel_edges.edges()
+        }
+
+        for seq_index, sequence in enumerate(sequences):
+            seq_len = len(sequence)
+            for u, v in sequence:
+                if (u, v) not in self._edge_to_parallel_first_edge:
+                    continue
+
+                first_edge = self._edge_to_parallel_first_edge[(u, v)]
+                current_idx = best_sequence_idx_per_edge[first_edge]
+                if current_idx is None or seq_len > len(sequences[current_idx]):
+                    best_sequence_idx_per_edge[first_edge] = seq_index
+
+                # For subdivided parallel paths, the sequence also traverses the
+                # second edge of the corresponding length-2 path.
+                if first_edge in self._parallel_first_to_second_edge:
+                    second_edge = self._parallel_first_to_second_edge[first_edge]
+                    current_second_idx = best_sequence_idx_per_edge[second_edge]
+                    if current_second_idx is None or seq_len > len(sequences[current_second_idx]):
+                        best_sequence_idx_per_edge[second_edge] = seq_index
+
+        weight_function = {
+            edge: large_constant + (
+                0
+                if best_sequence_idx_per_edge[edge] is None
+                else len(sequences[best_sequence_idx_per_edge[edge]])
+            )
+            for edge in self._condensation_with_parallel_edges.edges()
+        }
+
+        utils.logger.debug(f"{__name__}: Weight function for incompatible sequences (parallel edges): {weight_function}")
+
+        _, antichain = self._condensation_with_parallel_edges.compute_max_edge_antichain(
+            get_antichain=True,
+            weight_function=weight_function,
+        )
+
+        utils.logger.debug(f"{__name__}: Antichain in the parallel-expanded graph: {antichain}")
+
+        incompatible_sequences = []
+        seq_idx_set = set()
+        for edge in antichain:
+            seq_idx = best_sequence_idx_per_edge[edge]
+            if seq_idx is None:
+                continue
+            if seq_idx in seq_idx_set:
+                continue
+            incompatible_sequences.append(sequences[seq_idx])
+            seq_idx_set.add(seq_idx)
 
         return incompatible_sequences
 
