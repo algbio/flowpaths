@@ -1,5 +1,6 @@
 from pathlib import Path
 import csv
+import platform
 from itertools import count
 import networkx as nx
 import flowpaths.utils as utils
@@ -1333,8 +1334,57 @@ def draw(
             dot.render(outfile=filename, view=False, cleanup=True)
         
         except ImportError:
-            utils.logger.error(f"{__name__}: graphviz module not found. Please install it via pip (pip install graphviz).")
-            raise ImportError("graphviz module not found. Please install it via pip (pip install graphviz).")
+            utils.logger.error(f"{__name__}: graphviz Python package not found. Install it with: pip install graphviz")
+            raise ImportError("graphviz Python package not found. Install it with: pip install graphviz")
+        except Exception as e:
+            if "ExecutableNotFound" in type(e).__name__ or "dot" in str(e).lower():
+                _os = platform.system()
+                if _os == "Darwin":
+                    _install_instructions = (
+                        "  Option 1 – Homebrew (recommended):\n"
+                        "    brew install graphviz\n"
+                        "    (If Homebrew is not installed: https://brew.sh — one-line install, no sudo needed)\n"
+                        "  Option 2 – MacPorts:\n"
+                        "    sudo port install graphviz\n"
+                        "  Option 3 – Conda (no sudo needed):\n"
+                        "    conda install -c conda-forge graphviz"
+                    )
+                elif _os == "Linux":
+                    _install_instructions = (
+                        "  Option 1 – apt (Debian/Ubuntu, requires sudo):\n"
+                        "    sudo apt install graphviz\n"
+                        "  Option 2 – dnf/yum (Fedora/RHEL/CentOS, requires sudo):\n"
+                        "    sudo dnf install graphviz\n"
+                        "  Option 3 – Conda (no sudo needed, works on any Linux):\n"
+                        "    conda install -c conda-forge graphviz"
+                    )
+                elif _os == "Windows":
+                    _install_instructions = (
+                        "  Option 1 – winget:\n"
+                        "    winget install graphviz\n"
+                        "  Option 2 – Chocolatey:\n"
+                        "    choco install graphviz\n"
+                        "  Option 3 – Conda (no admin rights needed):\n"
+                        "    conda install -c conda-forge graphviz\n"
+                        "  Option 4 – Download installer from https://graphviz.org/download/"
+                    )
+                else:
+                    _install_instructions = (
+                        "  Conda (no sudo/admin rights needed):\n"
+                        "    conda install -c conda-forge graphviz\n"
+                        "  Or see https://graphviz.org/download/ for your platform."
+                    )
+                msg = (
+                    "The Graphviz 'dot' executable was not found on PATH.\n"
+                    "The 'graphviz' Python package is only a thin wrapper — it requires the "
+                    "Graphviz system binaries to be installed separately.\n"
+                    f"{_install_instructions}\n"
+                    "After installing, make sure 'dot' is on your PATH "
+                    "(open a new terminal and run: dot -V)"
+                )
+                utils.logger.error(f"{__name__}: {msg}")
+                raise RuntimeError(msg) from e
+            raise
 
 def get_subgraph_between_topological_nodes(graph: nx.DiGraph, topo_order: list, left: int, right: int) -> nx.DiGraph:
     """
