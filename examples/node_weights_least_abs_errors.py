@@ -36,7 +36,7 @@ def example1():
     
     # We get the solution 
     assert model.is_solved(), "kLeastAbsErrors did not solve the instance"
-    assert model.is_valid_solution(), "Solution should be a valid flow decomposition"
+    assert model.is_valid_solution(), "An internal check that the ILP solution matches the problem definition"
     solution = model.get_solution()
     print("Paths:", solution["paths"])
     print("Weights:", solution["weights"])
