@@ -7,11 +7,11 @@ def example1():
     # Example 1  #
     ##############
 
-    # We create a graph where weights (or flow values are on the nodes)
+    # We create a graph where weights are on the nodes, in the attribute called "flow" (the don't need to satisfy any flow conservation constraints, they are just weights). We want to find a flow decomposition of this graph into paths, such that the sum of the weights of the paths going through each node is as close as possible to the "flow" value on that node. We also want to enforce that there is a path in the solution that goes through the nodes s, b, c, d (not necessarily consecutively).
     graph = nx.DiGraph()
     graph.add_node("s", flow=13)
     graph.add_node("a", flow=6)
-    graph.add_node("b", ) # flow=9 # Note that we are not adding flow values to this node
+    graph.add_node("b", ) # flow=9 # It's supported to skip the flow value on some nodes, in which case they will be ignored in the objective function (i.e. they will not contribute to the error, but they might still be covered by the paths in the solution)
     graph.add_node("c", flow=13)
     graph.add_node("d", flow=6)
     graph.add_node("t", flow=13)
@@ -24,7 +24,6 @@ def example1():
     subpath_constraints_nodes=[['s', 'b', 'c', 'd']]
 
     # We create the model and solve it.
-    # To play with, we also set the subpath constraint coverage to 0.75, meaning that only 75% of the nodes in the constraint need to be covered by some solution path
     model = fp.kLeastAbsErrors(
         G=graph, 
         k=None, # this sets k (the number of paths) as the smallest for which there exists such paths); change to a given integer to enforce a specific number of paths
@@ -35,6 +34,7 @@ def example1():
         )
     model.solve()
     
+    # We get the solution 
     assert model.is_solved(), "kLeastAbsErrors did not solve the instance"
     assert model.is_valid_solution(), "Solution should be a valid flow decomposition"
     solution = model.get_solution()
