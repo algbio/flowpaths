@@ -8,6 +8,7 @@ import flowpaths as fp
 # GRAPH_FILE = "tests/cyclic_graphs/gt3.kmer63.(0.10000).V157.E230.mincyc100.perf.graph"
 # GRAPH_FILE = "tests/cyclic_graphs/gt4.kmer63.(0.10000).V281.E415.mincyc100.perf.graph"
 GRAPH_FILE = "tests/cyclic_graphs/gt5.kmer63.(0.10000).V375.E560.mincyc100.perf.graph"
+# GRAPH_FILE = "tests/cyclic_graphs/gt5.kmer27.(1300000.1400000).V809.E1091.mincyc1000.graph"
 
 
 # Configure logging
@@ -25,11 +26,12 @@ graph = graphs[0]
 model = fp.MinFlowDecompCycles(
     G=graph,
     flow_attr="flow",
-    weight_type=int,
+    weight_type=float,
     solver_options={
         "external_solver": "highs",
         "time_limit": 3000,
         "log_to_console": False,
+        "threads": 4,
     },
     optimization_options={
         "optimize_with_safe_sequences": True,
@@ -49,3 +51,5 @@ assert len(solution["walks"]) > 0
 
 objective_value = model.get_objective_value()
 assert objective_value >= 0
+
+print(model.solve_statistics)
